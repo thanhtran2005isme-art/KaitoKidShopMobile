@@ -1,10 +1,37 @@
-import SecureStore from 'expo-secure-store';
+import * as SecureStore from 'expo-secure-store';
 import { createContext, useContext, useEffect, useState } from 'react';
+import { Platform } from 'react-native';
 
 import { login as loginApi } from '@/services/auth.service';
 
 const TOKEN_KEY = 'kaitokid_access_token';
 const REFRESH_KEY = 'kaitokid_refresh_token';
+
+async function getStorageItem(key: string) {
+  if (Platform.OS === 'web') {
+    return localStorage.getItem(key);
+  }
+
+  return SecureStore.getItemAsync(key);
+}
+
+async function setStorageItem(key: string, value: string) {
+  if (Platform.OS === 'web') {
+    localStorage.setItem(key, value);
+    return;
+  }
+
+  await SecureStore.setItemAsync(key, value);
+}
+
+async function removeStorageItem(key: string) {
+  if (Platform.OS === 'web') {
+    localStorage.removeItem(key);
+    return;
+  }
+
+  await SecureStore.deleteItemAsync(key);
+}
 
 type AuthContextType = {
   token: string | null;
@@ -26,8 +53,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   async function restoreSession() {
-    const savedToken = await SecureStore.getItemAsync(TOKEN_KEY);
-    const savedUser = await SecureStore.getItemAsync('kaitokid_user');
+    const savedToken = await getStorageItem(TOKEN_KEY);
+    const savedUser = await getStorageItem('kaitokid_user');
+
     setToken(savedToken);
     setUser(savedUser ? JSON.parse(savedUser) : null);
     setLoading(false);
@@ -35,22 +63,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   async function login(email: string, password: string) {
     const result: any = await loginApi({ email, password });
-    await SecureStore.setItemAsync(TOKEN_KEY, result.accessToken || result.token);
+    const accessToken = result.accessToken || result.token;
+
+    await setStorageItem(TOKEN_KEY, accessToken);
+
     if (result.refreshToken) {
-      await SecureStore.setItemAsync(REFRESH_KEY, result.refreshToken);
+      await setStorageItem(REFRESH_KEY, result.refreshToken);
     }
+
     if (result.user) {
-      await SecureStore.setItemAsync('kaitokid_user', JSON.stringify(result.user));
+      await setStorageItem('kaitokid_user', JSON.stringify(result.user));
       setUser(result.user);
     }
-    setToken(result.accessToken || result.token);
+
+    setToken(accessToken);
     return result;
   }
 
   async function logout() {
-    await SecureStore.deleteItemAsync(TOKEN_KEY);
-    await SecureStore.deleteItemAsync(REFRESH_KEY);
-    await SecureStore.deleteItemAsync('kaitokid_user');
+    await removeStorageItem(TOKEN_KEY);
+    await removeStorageItem(REFRESH_KEY);
+    await removeStorageItem('kaitokid_user');
+
     setToken(null);
     setUser(null);
   }
