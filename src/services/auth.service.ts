@@ -25,13 +25,30 @@ async function request<T>(url: string, options: RequestInit): Promise<T> {
     },
   });
 
-  const data = await response.json();
+  const raw = await response.text();
+  let data: any = null;
 
-  if (!response.ok) {
-    throw new Error(data?.message || 'Có lỗi xảy ra');
+  try {
+    data = raw ? JSON.parse(raw) : null;
+  } catch {
+    data = raw;
   }
 
-  return data;
+  if (!response.ok) {
+    console.error('[KaitoKid Auth Error]', {
+      status: response.status,
+      url: `${API_URL}${url}`,
+      response: data,
+    });
+
+    throw new Error(
+      data?.message ||
+      data?.title ||
+      (typeof data === 'string' ? data : 'Có lỗi xảy ra')
+    );
+  }
+
+  return data as T;
 }
 
 export function login(data: LoginRequest) {
