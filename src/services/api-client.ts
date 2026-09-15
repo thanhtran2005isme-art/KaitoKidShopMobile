@@ -1,3 +1,5 @@
+import Constants from 'expo-constants';
+import * as Device from 'expo-device';
 import { Platform } from 'react-native';
 
 const fallbackApiUrl = Platform.select({
@@ -6,7 +8,31 @@ const fallbackApiUrl = Platform.select({
   default: 'http://localhost:5265',
 });
 
-export const API_BASE_URL = (process.env.EXPO_PUBLIC_API_URL || fallbackApiUrl || '').replace(/\/+$/, '');
+const explicitApiUrl = process.env.EXPO_PUBLIC_API_URL?.trim() || '';
+const runtimeApiUrl =
+  typeof Constants.expoConfig?.extra?.apiUrl === 'string'
+    ? Constants.expoConfig.extra.apiUrl.trim()
+    : '';
+
+const shouldPreferAndroidEmulatorFallback = Platform.OS === 'android' && !Device.isDevice && !explicitApiUrl;
+
+export const API_BASE_URL = (
+  explicitApiUrl ||
+  (shouldPreferAndroidEmulatorFallback ? fallbackApiUrl : runtimeApiUrl || fallbackApiUrl) ||
+  ''
+).replace(/\/+$/, '');
+
+if (__DEV__) {
+  const source = explicitApiUrl
+    ? 'EXPO_PUBLIC_API_URL'
+    : shouldPreferAndroidEmulatorFallback
+      ? 'Android emulator fallback'
+      : runtimeApiUrl
+        ? 'Expo LAN auto-detect'
+        : 'platform fallback';
+
+  console.log(`[KaitoKid API] ${API_BASE_URL} (${source})`);
+}
 
 async function getErrorMessage(response: Response) {
   const text = await response.text().catch(() => '');
@@ -47,12 +73,24 @@ export async function apiRequest<T>(path: string, init?: RequestInit): Promise<T
     if (response.status === 204) return undefined as T;
     return (await response.json()) as T;
   } catch (error) {
-    if (error instanceof Error && error.name === 'AbortError') {
-      throw new Error(`Kết nối API quá thời gian (${API_BASE_URL}). Hãy kiểm tra backend và địa chỉ EXPO_PUBLIC_API_URL.`);
+    const message = error instanceof Error ? error.message.toLowerCase() : '';
+    const wasCanceled =
+      (error instanceof Error && error.name === 'AbortError') ||
+      message.includes('canceled') ||
+      message.includes('cancelled');
+
+    if (wasCanceled) {
+      throw new Error(
+        `Kết nối tới ${API_BASE_URL} bị hủy hoặc quá thời gian. ` +
+          'Hãy kiểm tra API.Customer đang chạy cổng 5265, Windows Firewall và điện thoại có thể truy cập IP LAN của máy tính.',
+      );
     }
 
     if (error instanceof TypeError) {
-      throw new Error(`Không thể kết nối tới ${API_BASE_URL}. Nếu dùng điện thoại thật, hãy đặt EXPO_PUBLIC_API_URL bằng IP LAN của máy chạy backend.`);
+      throw new Error(
+        `Không thể kết nối tới ${API_BASE_URL}. ` +
+          'Nếu dùng điện thoại thật, hãy đảm bảo máy tính và điện thoại cùng mạng LAN/Wi-Fi và cho phép TCP 5265 qua firewall.',
+      );
     }
 
     throw error;
