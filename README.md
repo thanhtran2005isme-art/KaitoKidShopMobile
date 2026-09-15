@@ -1,56 +1,99 @@
-# Welcome to your Expo app 👋
+# KaitoKidShop Mobile
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Ứng dụng mua sắm thời trang trẻ em KaitoKid, xây dựng bằng Expo + React Native và dùng chung backend ASP.NET Core trong thư mục `BACKEND`.
 
-## Get started
+## Yêu cầu
 
-1. Install dependencies
+- Node.js và npm
+- Expo SDK 57
+- .NET SDK phù hợp với backend
+- SQL Server theo cấu hình của backend
 
-   ```bash
-   npm install
-   ```
+## Chạy mobile
 
-2. Start the app
-
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+Cài dependencies:
 
 ```bash
-npm run reset-project
+npm install
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+Khởi động Expo:
 
-### Other setup steps
+```bash
+npm start
+```
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+Hoặc chạy trực tiếp theo nền tảng:
 
-## Learn more
+```bash
+npm run android
+npm run ios
+npm run web
+```
 
-To learn more about developing your project with Expo, look at the following resources:
+## Kết nối backend
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+Customer API chạy development HTTP tại cổng `5265`.
 
-## Join the community
+### Android Emulator
 
-Join our community of developers creating universal apps.
+Không cần tạo `.env` nếu backend chạy trên cùng máy. Ứng dụng tự dùng:
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+```text
+http://10.0.2.2:5265
+```
+
+### iOS Simulator / Web
+
+Mặc định ứng dụng dùng:
+
+```text
+http://localhost:5265
+```
+
+### Điện thoại thật
+
+1. Đảm bảo điện thoại và máy chạy backend cùng mạng LAN/Wi-Fi.
+2. Sao chép `.env.example` thành `.env`.
+3. Đổi IP mẫu thành IPv4 LAN của máy chạy backend, ví dụ:
+
+```env
+EXPO_PUBLIC_API_URL=http://192.168.1.10:5265
+```
+
+4. Khởi động lại Expo sau khi đổi biến môi trường.
+5. Nếu điện thoại không kết nối được, kiểm tra firewall có cho phép TCP `5265` hay không.
+
+Backend Customer đã bind development HTTP vào `0.0.0.0:5265`, vì vậy có thể nhận kết nối từ thiết bị khác trong LAN khi firewall cho phép.
+
+## Cấu trúc mobile chính
+
+```text
+src/
+  app/
+    _layout.tsx
+    (tabs)/
+      index.tsx
+      categories.tsx
+      cart.tsx
+      account.tsx
+    product/[slug].tsx
+    search.tsx
+  components/
+    home/
+    product/
+  hooks/
+  services/
+  types/
+```
+
+Trang chủ hiện lấy dữ liệu trực tiếp từ backend qua các API banner, danh mục, hàng mới, bán chạy, giảm giá và homepage blocks.
+
+## Kiểm tra code
+
+```bash
+npm run lint
+npx tsc --noEmit
+```
+
+> Lưu ý: trước khi thay đổi API của Expo, đọc đúng tài liệu Expo SDK 57 theo `AGENTS.md` của repository.

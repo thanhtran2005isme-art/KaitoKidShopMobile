@@ -18,10 +18,16 @@ export function ProductCard({ product, width = 168 }: { product: Product; width?
 
   return (
     <Pressable
+      accessibilityHint="Mở chi tiết sản phẩm"
+      accessibilityRole="button"
       onPress={() => router.push({ pathname: '/product/[slug]', params: { slug: product.slug || String(product.id) } })}
-      style={[styles.card, { width }]}>
+      style={({ pressed }) => [styles.card, { width }, pressed && styles.pressed]}>
       <View style={styles.imageWrap}>
-        {image ? <Image contentFit="cover" source={{ uri: image }} style={styles.image} transition={180} /> : <Text style={styles.imageFallback}>👚</Text>}
+        {image ? (
+          <Image contentFit="cover" source={{ uri: image }} style={styles.image} transition={180} />
+        ) : (
+          <Text style={styles.imageFallback}>👚</Text>
+        )}
         {discount > 0 ? <View style={styles.saleBadge}><Text style={styles.saleText}>-{discount}%</Text></View> : null}
         {product.isNew ? <View style={styles.newBadge}><Text style={styles.newText}>MỚI</Text></View> : null}
       </View>
@@ -40,7 +46,8 @@ export function ProductCard({ product, width = 168 }: { product: Product; width?
 
 const styles = StyleSheet.create({
   card: { gap: 9 },
-  imageWrap: { height: 210, borderRadius: 18, overflow: 'hidden', backgroundColor: '#F3F4F6', alignItems: 'center', justifyContent: 'center' },
+  pressed: { opacity: 0.82 },
+  imageWrap: { aspectRatio: 0.8, borderRadius: 18, overflow: 'hidden', backgroundColor: '#F3F4F6', alignItems: 'center', justifyContent: 'center' },
   image: { width: '100%', height: '100%' },
   imageFallback: { fontSize: 44 },
   saleBadge: { position: 'absolute', left: 8, top: 8, borderRadius: 999, backgroundColor: '#DC2626', paddingHorizontal: 8, paddingVertical: 4 },

@@ -8,6 +8,24 @@ const fallbackApiUrl = Platform.select({
 
 export const API_BASE_URL = (process.env.EXPO_PUBLIC_API_URL || fallbackApiUrl || '').replace(/\/+$/, '');
 
+async function getErrorMessage(response: Response) {
+  const text = await response.text().catch(() => '');
+  if (!text) return `API trả về HTTP ${response.status}`;
+
+  try {
+    const payload = JSON.parse(text) as {
+      detail?: string;
+      error?: string;
+      message?: string;
+      title?: string;
+    };
+
+    return payload.message || payload.detail || payload.error || payload.title || text;
+  } catch {
+    return text;
+  }
+}
+
 export async function apiRequest<T>(path: string, init?: RequestInit): Promise<T> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 15000);
@@ -23,16 +41,20 @@ export async function apiRequest<T>(path: string, init?: RequestInit): Promise<T
     });
 
     if (!response.ok) {
-      const message = await response.text().catch(() => '');
-      throw new Error(message || `API trả về HTTP ${response.status}`);
+      throw new Error(await getErrorMessage(response));
     }
 
     if (response.status === 204) return undefined as T;
     return (await response.json()) as T;
   } catch (error) {
     if (error instanceof Error && error.name === 'AbortError') {
-      throw new Error('Kết nối API quá thời gian. Hãy kiểm tra địa chỉ backend.');
+      throw new Error(`Kết nối API quá thời gian (${API_BASE_URL}). Hãy kiểm tra backend và địa chỉ EXPO_PUBLIC_API_URL.`);
     }
+
+    if (error instanceof TypeError) {
+      throw new Error(`Không thể kết nối tới ${API_BASE_URL}. Nếu dùng điện thoại thật, hãy đặt EXPO_PUBLIC_API_URL bằng IP LAN của máy chạy backend.`);
+    }
+
     throw error;
   } finally {
     clearTimeout(timeout);

@@ -5,27 +5,41 @@ import { ActivityIndicator, FlatList, Pressable, ScrollView, StyleSheet, Text, V
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ProductCard } from '@/components/product/product-card';
+import { useProductGrid } from '@/hooks/use-product-grid';
 import { resolveMediaUrl } from '@/services/api-client';
 import { shopApi } from '@/services/home.api';
 import type { Category, Product } from '@/types/shop';
 
 export default function CategoriesScreen() {
   const params = useLocalSearchParams<{ category?: string }>();
+  const { cardWidth, columns, gap } = useProductGrid();
   const [categories, setCategories] = useState<Category[]>([]);
   const [selected, setSelected] = useState(params.category || '');
   const [products, setProducts] = useState<Product[]>([]);
   const [loadingCategories, setLoadingCategories] = useState(true);
   const [loadingProducts, setLoadingProducts] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [categoryError, setCategoryError] = useState<string | null>(null);
+  const [productError, setProductError] = useState<string | null>(null);
 
   useEffect(() => {
+    let active = true;
+
     shopApi.getCategories()
       .then((result) => {
+        if (!active) return;
         setCategories(result);
         setSelected((current) => current || result[0]?.name || '');
       })
-      .catch((err: unknown) => setError(err instanceof Error ? err.message : 'Không thể tải danh mục.'))
-      .finally(() => setLoadingCategories(false));
+      .catch((err: unknown) => {
+        if (active) setCategoryError(err instanceof Error ? err.message : 'Không thể tải danh mục.');
+      })
+      .finally(() => {
+        if (active) setLoadingCategories(false);
+      });
+
+    return () => {
+      active = false;
+    };
   }, []);
 
   useEffect(() => {
@@ -36,12 +50,28 @@ export default function CategoriesScreen() {
 
   useEffect(() => {
     if (!selected) return;
+    let active = true;
+
     setLoadingProducts(true);
-    setError(null);
+    setProductError(null);
+
     shopApi.getProductsByCategory(selected)
-      .then((result) => setProducts(result.items || []))
-      .catch((err: unknown) => setError(err instanceof Error ? err.message : 'Không thể tải sản phẩm.'))
-      .finally(() => setLoadingProducts(false));
+      .then((result) => {
+        if (active) setProducts(result.items || []);
+      })
+      .catch((err: unknown) => {
+        if (active) {
+          setProducts([]);
+          setProductError(err instanceof Error ? err.message : 'Không thể tải sản phẩm.');
+        }
+      })
+      .finally(() => {
+        if (active) setLoadingProducts(false);
+      });
+
+    return () => {
+      active = false;
+    };
   }, [selected]);
 
   return (
@@ -51,7 +81,11 @@ export default function CategoriesScreen() {
         <Text style={styles.subtitle}>Chọn nhóm sản phẩm phù hợp với bé</Text>
       </View>
 
-      {loadingCategories ? <ActivityIndicator color="#7C3AED" style={styles.loader} /> : (
+      {loadingCategories ? (
+        <ActivityIndicator color="#7C3AED" style={styles.loader} />
+      ) : categoryError ? (
+        <Text style={styles.error}>{categoryError}</Text>
+      ) : (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoryList}>
           {categories.map((item) => {
             const active = item.name === selected;
@@ -59,7 +93,11 @@ export default function CategoriesScreen() {
             return (
               <Pressable key={item.id} onPress={() => setSelected(item.name)} style={styles.categoryItem}>
                 <View style={[styles.categoryImageWrap, active && styles.categoryImageActive]}>
-                  {image ? <Image source={{ uri: image }} contentFit="cover" transition={160} style={styles.categoryImage} /> : <Text style={styles.fallback}>👕</Text>}
+                  {image ? (
+                    <Image source={{ uri: image }} contentFit="cover" transition={160} style={styles.categoryImage} />
+                  ) : (
+                    <Text style={styles.fallback}>👕</Text>
+                  )}
                 </View>
                 <Text numberOfLines={1} style={[styles.categoryName, active && styles.categoryNameActive]}>{item.name}</Text>
               </Pressable>
@@ -68,16 +106,19 @@ export default function CategoriesScreen() {
         </ScrollView>
       )}
 
-      {error ? <Text style={styles.error}>{error}</Text> : null}
-      {loadingProducts ? <ActivityIndicator color="#7C3AED" style={styles.loader} /> : (
+      {productError ? <Text style={styles.error}>{productError}</Text> : null}
+      {loadingProducts ? (
+        <ActivityIndicator color="#7C3AED" style={styles.loader} />
+      ) : (
         <FlatList
+          key={`categories-grid-${columns}`}
           contentContainerStyle={styles.productList}
           data={products}
           keyExtractor={(item) => String(item.id)}
-          numColumns={2}
-          columnWrapperStyle={styles.productRow}
-          ListEmptyComponent={<Text style={styles.empty}>Danh mục này chưa có sản phẩm.</Text>}
-          renderItem={({ item }) => <ProductCard product={item} width={160} />}
+          numColumns={columns}
+          columnWrapperStyle={[styles.productRow, { gap }]}
+          ListEmptyComponent={selected && !productError ? <Text style={styles.empty}>Danh mục này chưa có sản phẩm.</Text> : null}
+          renderItem={({ item }) => <ProductCard product={item} width={cardWidth} />}
           showsVerticalScrollIndicator={false}
         />
       )}
@@ -99,8 +140,8 @@ const styles = StyleSheet.create({
   fallback: { fontSize: 26 },
   categoryName: { color: '#6B7280', fontSize: 11, fontWeight: '700' },
   categoryNameActive: { color: '#7C3AED' },
-  error: { color: '#B91C1C', paddingHorizontal: 16, marginBottom: 10 },
-  productList: { paddingHorizontal: 12, paddingBottom: 28 },
-  productRow: { justifyContent: 'space-around', marginBottom: 20 },
+  error: { color: '#B91C1C', paddingHorizontal: 16, marginBottom: 10, lineHeight: 18 },
+  productList: { paddingHorizontal: 12, paddingBottom: 28, flexGrow: 1 },
+  productRow: { justifyContent: 'center', marginBottom: 20 },
   empty: { color: '#6B7280', textAlign: 'center', marginTop: 30 },
 });
