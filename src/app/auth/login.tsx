@@ -1,9 +1,27 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { Link, router } from 'expo-router';
-import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { useState } from 'react';
+import { Alert, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { login } from '../../services/auth.service';
 
 export default function LoginScreen() {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleLogin = async () => {
+    try {
+      setLoading(true);
+      await login({ email, password });
+      router.replace('/(tabs)');
+    } catch (error) {
+      Alert.alert('Đăng nhập thất bại', error instanceof Error ? error.message : 'Vui lòng thử lại');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <SafeAreaView style={styles.safe}>
       <LinearGradient colors={['#FFF7ED', '#FFFFFF', '#FDF2F8']} style={styles.container}>
@@ -15,11 +33,11 @@ export default function LoginScreen() {
 
         <View style={styles.card}>
           <Text style={styles.heading}>Đăng nhập</Text>
-          <TextInput placeholder="Email hoặc số điện thoại" style={styles.input} />
-          <TextInput placeholder="Mật khẩu" secureTextEntry style={styles.input} />
+          <TextInput placeholder="Email" value={email} onChangeText={setEmail} style={styles.input} />
+          <TextInput placeholder="Mật khẩu" value={password} onChangeText={setPassword} secureTextEntry style={styles.input} />
 
-          <TouchableOpacity style={styles.button} onPress={() => router.replace('/(tabs)')}>
-            <Text style={styles.buttonText}>Đăng nhập</Text>
+          <TouchableOpacity style={styles.button} onPress={handleLogin} disabled={loading}>
+            <Text style={styles.buttonText}>{loading ? 'Đang xử lý...' : 'Đăng nhập'}</Text>
           </TouchableOpacity>
 
           <Link href="/auth/register" style={styles.link}>Chưa có tài khoản? Đăng ký ngay</Link>
