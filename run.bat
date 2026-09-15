@@ -56,18 +56,10 @@ echo.
 echo [1/5] Kiem tra Android device...
 
 adb start-server >nul 2>&1
-
 adb devices | findstr /R "device$" >nul
 
 if errorlevel 1 (
-    echo.
     echo [LOI] Khong tim thay Android device!
-    echo.
-    echo Hay kiem tra:
-    echo - Cam cap USB dien thoai
-    echo - Bat USB Debugging
-    echo - Chap nhan Allow USB debugging tren dien thoai
-    echo.
     pause
     exit /b 1
 )
@@ -83,7 +75,6 @@ adb reverse tcp:5265 tcp:5265
 adb reverse --list
 
 if errorlevel 1 (
-    echo.
     echo [LOI] Khong the cau hinh ADB reverse
     pause
     exit /b 1
@@ -103,10 +94,12 @@ timeout /t 3 /nobreak >nul
 
 echo.
 echo [5/5] Chay Expo Mobile...
-set EXPO_PUBLIC_API_URL=http://127.0.0.1:5265
+set EXPO_PUBLIC_AUTH_API_URL=http://127.0.0.1:5053
+set EXPO_PUBLIC_CUSTOMER_API_URL=http://127.0.0.1:5265
 set EXPO_PACKAGER_PROXY_URL=http://127.0.0.1:8081
 
-echo API Mobile: %EXPO_PUBLIC_API_URL%
+echo Auth API: %EXPO_PUBLIC_AUTH_API_URL%
+echo Customer API: %EXPO_PUBLIC_CUSTOMER_API_URL%
 
 echo Khoi dong Expo...
 npx expo start --lan --port 8081 -c
