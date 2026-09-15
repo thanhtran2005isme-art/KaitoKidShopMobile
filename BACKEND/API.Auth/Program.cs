@@ -16,7 +16,8 @@ builder.Services.AddCors(options =>
                 "http://localhost:5173",
                 "http://localhost:5174",
                 "http://localhost:3000",
-                "http://127.0.0.1:5173"
+                "http://127.0.0.1:5173",
+                "http://127.0.0.1:8081"
             )
             .AllowAnyHeader()
             .AllowAnyMethod()
@@ -51,7 +52,6 @@ builder.Services.AddScoped<ILoginActivityService, LoginActivityService>();
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
     {
-        // Allow camelCase from frontend, map to PascalCase in C#
         options.JsonSerializerOptions.PropertyNameCaseInsensitive = true;
     });
 builder.Services.AddOpenApi();
