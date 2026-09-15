@@ -1,4 +1,8 @@
-const API_URL = process.env.EXPO_PUBLIC_AUTH_API_URL || process.env.EXPO_PUBLIC_API_URL || 'http://10.0.2.2:5053';
+const API_URL =
+  process.env.EXPO_PUBLIC_AUTH_API_URL ||
+  'http://127.0.0.1:5053';
+
+console.log('[KaitoKid Auth API]', API_URL);
 
 export type LoginRequest = {
   email: string;
