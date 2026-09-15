@@ -40,7 +40,25 @@ if not exist "%ROOT%BACKEND\API.Customer\API.Customer.csproj" (
 
 echo.
 echo [1/5] Kiem tra Android device...
-adb devices
+
+adb start-server >nul 2>&1
+
+adb devices | findstr /R "device$" >nul
+
+if errorlevel 1 (
+    echo.
+    echo [LOI] Khong tim thay Android device!
+    echo.
+    echo Hay kiem tra:
+    echo - Cam cap USB dien thoai
+    echo - Bat USB Debugging
+    echo - Chap nhan Allow USB debugging tren dien thoai
+    echo.
+    pause
+    exit /b 1
+)
+
+echo Android device OK
 
 echo.
 echo [2/5] Cau hinh ADB reverse USB...
@@ -49,6 +67,13 @@ adb reverse tcp:8081 tcp:8081
 adb reverse tcp:5053 tcp:5053
 adb reverse tcp:5265 tcp:5265
 adb reverse --list
+
+if errorlevel 1 (
+    echo.
+    echo [LOI] Khong the cau hinh ADB reverse
+    pause
+    exit /b 1
+)
 
 echo.
 echo [3/5] Mo API.Auth...
