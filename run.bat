@@ -2,72 +2,60 @@
 setlocal EnableExtensions
 chcp 65001 >nul
 
-title KaitoKidShop - Khoi dong du an
+title KaitoKidShop - Khoi dong moi truong dev USB
 
-rem Luon lay thu muc chua run.bat lam thu muc goc.
-rem Nho vay script khong phu thuoc vao terminal dang dung o Mobile, web hay thu muc khac.
 set "ROOT=%~dp0"
-
 pushd "%ROOT%" >nul 2>&1
+
 if errorlevel 1 (
-    echo [LOI] Khong the truy cap thu muc goc: %ROOT%
+    echo [LOI] Khong the truy cap thu muc goc
     pause
     exit /b 1
 )
+
+set "PATH=%PATH%;%LOCALAPPDATA%\Android\Sdk\platform-tools"
+
+echo ================================================
+echo KaitoKidShop - Dev Launcher USB
+ echo Thu muc: %ROOT%
+echo ================================================
 
 if not exist "%ROOT%package.json" (
-    echo [LOI] Khong tim thay package.json tai: %ROOT%
-    echo Hay dat run.bat o thu muc goc KaitoKidShopMobile.
-    popd
-    pause
-    exit /b 1
-)
-
-if not exist "%ROOT%BACKEND\API.Auth\API.Auth.csproj" (
-    echo [LOI] Khong tim thay BACKEND\API.Auth\API.Auth.csproj
-    popd
+    echo [LOI] Khong tim thay package.json
     pause
     exit /b 1
 )
 
 if not exist "%ROOT%BACKEND\API.Customer\API.Customer.csproj" (
-    echo [LOI] Khong tim thay BACKEND\API.Customer\API.Customer.csproj
-    popd
+    echo [LOI] Khong tim thay API.Customer
     pause
     exit /b 1
 )
 
-echo ================================================
-echo       KaitoKidShop - Khoi dong moi truong dev
-echo ================================================
-echo Thu muc goc: %ROOT%
 echo.
+echo [1/4] Kiem tra Android device...
+adb devices
 
-echo [1/3] Dang mo API.Auth tai http://0.0.0.0:5053 ...
-start "KaitoKidShop - API.Auth" cmd /k "cd /d ""%ROOT%BACKEND\API.Auth"" && dotnet run --urls http://0.0.0.0:5053"
+ echo.
+echo [2/4] Cau hinh ADB reverse USB...
+adb reverse --remove-all
+adb reverse tcp:8081 tcp:8081
+adb reverse tcp:5265 tcp:5265
+adb reverse --list
 
-timeout /t 2 /nobreak >nul
+ echo.
+echo [3/4] Mo Backend...
 
-echo [2/3] Dang mo API.Customer tai http://0.0.0.0:5265 ...
 start "KaitoKidShop - API.Customer" cmd /k "cd /d ""%ROOT%BACKEND\API.Customer"" && dotnet run --urls http://0.0.0.0:5265"
 
-timeout /t 2 /nobreak >nul
+timeout /t 3 /nobreak >nul
 
-echo [3/3] Dang mo Expo Mobile bang tunnel ...
-start "KaitoKidShop - Expo Mobile" cmd /k "cd /d ""%ROOT%"" && npx expo start --tunnel -c"
+ echo.
+echo [4/4] Chay Expo Mobile...
+set EXPO_PUBLIC_API_URL=http://127.0.0.1:5265
+set EXPO_PACKAGER_PROXY_URL=http://127.0.0.1:8081
 
-echo.
-echo Da mo 3 cua so:
-echo   - API.Auth     : http://localhost:5053
-echo   - API.Customer : http://localhost:5265
-echo   - Expo Mobile  : tunnel + xoa Metro cache
+npx expo start --lan --port 8081 -c
 
-echo.
-echo Luu y: dien thoai that can dung IP LAN cua may tinh de goi backend.
-echo Vi du API.Customer: http://192.168.1.10:5265
-
-echo.
-echo Co the dong cua so launcher nay sau khi 3 tien trinh da mo.
 popd
-pause
 endlocal
