@@ -1,4 +1,4 @@
-const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://10.0.2.2:5265';
+const API_URL = process.env.EXPO_PUBLIC_AUTH_API_URL || process.env.EXPO_PUBLIC_API_URL || 'http://10.0.2.2:5053';
 
 export type LoginRequest = {
   email: string;
