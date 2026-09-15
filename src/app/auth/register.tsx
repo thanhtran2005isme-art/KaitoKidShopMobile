@@ -1,9 +1,30 @@
 import { LinearGradient } from 'expo-linear-gradient';
-import { Link } from 'expo-router';
-import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Link, router } from 'expo-router';
+import { useState } from 'react';
+import { Alert, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { register } from '../../services/auth.service';
 
 export default function RegisterScreen() {
+  const [fullName, setFullName] = useState('');
+  const [email, setEmail] = useState('');
+  const [phoneNumber, setPhoneNumber] = useState('');
+  const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleRegister = async () => {
+    try {
+      setLoading(true);
+      await register({ fullName, email, phoneNumber, password });
+      Alert.alert('Thành công', 'Đăng ký thành công');
+      router.replace('/auth/login');
+    } catch (error) {
+      Alert.alert('Đăng ký thất bại', error instanceof Error ? error.message : 'Vui lòng thử lại');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <SafeAreaView style={styles.safe}>
       <LinearGradient colors={['#FFF7ED', '#FFFFFF', '#FDF2F8']} style={styles.container}>
@@ -13,13 +34,13 @@ export default function RegisterScreen() {
         </View>
 
         <View style={styles.card}>
-          <TextInput placeholder="Họ và tên" style={styles.input} />
-          <TextInput placeholder="Email" style={styles.input} />
-          <TextInput placeholder="Số điện thoại" style={styles.input} />
-          <TextInput placeholder="Mật khẩu" secureTextEntry style={styles.input} />
+          <TextInput placeholder="Họ và tên" value={fullName} onChangeText={setFullName} style={styles.input} />
+          <TextInput placeholder="Email" value={email} onChangeText={setEmail} style={styles.input} />
+          <TextInput placeholder="Số điện thoại" value={phoneNumber} onChangeText={setPhoneNumber} style={styles.input} />
+          <TextInput placeholder="Mật khẩu" value={password} onChangeText={setPassword} secureTextEntry style={styles.input} />
 
-          <TouchableOpacity style={styles.button}>
-            <Text style={styles.buttonText}>Đăng ký</Text>
+          <TouchableOpacity style={styles.button} onPress={handleRegister} disabled={loading}>
+            <Text style={styles.buttonText}>{loading ? 'Đang xử lý...' : 'Đăng ký'}</Text>
           </TouchableOpacity>
 
           <Link href="/auth/login" style={styles.link}>Đã có tài khoản? Đăng nhập</Link>
