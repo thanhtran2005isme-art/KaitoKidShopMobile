@@ -54,13 +54,21 @@ async function request<T>(url: string, options: RequestInit): Promise<T> {
 export function login(data: LoginRequest) {
   return request('/api/Auth/login', {
     method: 'POST',
-    body: JSON.stringify(data),
+    body: JSON.stringify({
+      identifier: data.email,
+      password: data.password,
+    }),
   });
 }
 
 export function register(data: RegisterRequest) {
   return request('/api/Auth/register', {
     method: 'POST',
-    body: JSON.stringify(data),
+    body: JSON.stringify({
+      name: data.fullName,
+      email: data.email,
+      phone: data.phoneNumber,
+      password: data.password,
+    }),
   });
 }
