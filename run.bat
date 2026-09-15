@@ -39,6 +39,20 @@ if not exist "%ROOT%BACKEND\API.Customer\API.Customer.csproj" (
 )
 
 echo.
+echo [CHECK] Kiem tra node_modules...
+if not exist "%ROOT%node_modules" (
+    echo Chua co node_modules. Dang cai dat npm...
+    npm install
+)
+
+if not exist "%ROOT%node_modules\expo-secure-store" (
+    echo Thieu expo-secure-store. Dang cai dat...
+    npx expo install expo-secure-store
+)
+
+echo Dependency mobile OK
+
+echo.
 echo [1/5] Kiem tra Android device...
 
 adb start-server >nul 2>&1
@@ -92,6 +106,9 @@ echo [5/5] Chay Expo Mobile...
 set EXPO_PUBLIC_API_URL=http://127.0.0.1:5265
 set EXPO_PACKAGER_PROXY_URL=http://127.0.0.1:8081
 
+echo API Mobile: %EXPO_PUBLIC_API_URL%
+
+echo Khoi dong Expo...
 npx expo start --lan --port 8081 -c
 
 popd
