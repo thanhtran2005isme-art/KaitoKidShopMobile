@@ -12,12 +12,12 @@ export function HomeSkeleton() {
         Animated.timing(opacity, {
           toValue: 0.9,
           duration: 700,
-          useNativeDriver: true,
+          useNativeDriver: false,
         }),
         Animated.timing(opacity, {
           toValue: 0.45,
           duration: 700,
-          useNativeDriver: true,
+          useNativeDriver: false,
         }),
       ]),
     );
