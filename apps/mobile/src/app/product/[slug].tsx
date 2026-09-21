@@ -315,6 +315,7 @@ export default function ProductDetailScreen() {
     (!sizes.length || Boolean(selectedSize));
   const currentSku = selectedVariant?.sku || product.sku;
   const wished = isWishlisted(product.id);
+  const selectedOutOfStock = selectionComplete && availableStock <= 0;
 
   const productPath = `/product/${product.slug || product.id}`;
 
@@ -420,6 +421,10 @@ export default function ProductDetailScreen() {
         ) {
           return {
             ...current,
+            availableStock: Math.max(
+              0,
+              (current.availableStock ?? current.stock) - quantity,
+            ),
             variantInventory: current.variantInventory.map((variant) =>
               variant.size === selectedSize &&
               variant.color === selectedColor
@@ -748,30 +753,38 @@ export default function ProductDetailScreen() {
 
           <Pressable
             accessibilityLabel="Thêm sản phẩm vào giỏ hàng"
-            disabled={actionBusy != null || isOutOfStock}
+            disabled={actionBusy != null || isOutOfStock || selectedOutOfStock}
             onPress={() => void handleAddToCart()}
             style={({ pressed }) => [
               styles.cartAction,
-              (actionBusy != null || isOutOfStock) && styles.cartActionDisabled,
-              pressed && !isOutOfStock && styles.actionPressed,
+              (actionBusy != null || isOutOfStock || selectedOutOfStock) &&
+                styles.cartActionDisabled,
+              pressed &&
+                !isOutOfStock &&
+                !selectedOutOfStock &&
+                styles.actionPressed,
             ]}>
             <View style={styles.cartActionCopy}>
               <Text style={styles.cartActionTitle}>
                 {isOutOfStock
                   ? 'Hết hàng'
-                  : actionBusy === 'cart'
+                  : selectedOutOfStock
+                    ? 'Biến thể hết hàng'
+                    : actionBusy === 'cart'
                     ? 'Đang thêm...'
                     : selectionComplete
                       ? 'Thêm vào giỏ'
                       : 'Chọn màu & size'}
               </Text>
-              {!isOutOfStock ? (
+              {!isOutOfStock && !selectedOutOfStock ? (
                 <Text style={styles.cartActionPrice}>
                   {formatPrice(product.price * quantity)}
                 </Text>
               ) : null}
             </View>
-            {!isOutOfStock && actionBusy !== 'cart' ? (
+            {!isOutOfStock &&
+            !selectedOutOfStock &&
+            actionBusy !== 'cart' ? (
               <Text style={styles.cartActionArrow}>→</Text>
             ) : null}
           </Pressable>
