@@ -18,14 +18,17 @@ KaitoKidShop/
 │  ├─ DbHelper/
 │  ├─ Shared/
 │  ├─ Database/
+│  ├─ db.local.example.bat
 │  └─ KaitoKidShop.slnx
 ├─ scripts/
+│  ├─ load-db-local.bat
 │  ├─ run-mobile.bat
 │  ├─ run-web.bat
 │  ├─ run-backend.bat
 │  ├─ run-all.bat
 │  ├─ stop-all.bat
 │  └─ stop-all.ps1
+├─ run.bat                # API.Auth + API.Customer + Expo Mobile
 ├─ package.json
 ├─ .gitignore
 └─ README.md
@@ -41,9 +44,33 @@ cd ..\web
 npm install
 ```
 
+## MariaDB local
+
+Backend dùng MariaDB/MySQL qua Pomelo. Cấu hình bí mật local nằm trong:
+
+```text
+backend\db.local.bat
+```
+
+File này được `.gitignore` và không được push lên GitHub.
+
+Lần đầu chạy `run.bat`, launcher sẽ tự tạo `backend\db.local.bat` từ file mẫu và mở Notepad. Thay `CHANGE_ME` bằng password local của user MariaDB `kaitokid`, lưu file rồi chạy lại `run.bat`.
+
+Mẫu connection string:
+
+```bat
+set "ConnectionStrings__DefaultConnection=Server=localhost;Port=3306;Database=kaitokid;User=kaitokid;Password=CHANGE_ME;CharSet=utf8mb4;"
+```
+
 ## Chạy development trên Windows
 
-Từ root repository:
+Mobile + API.Auth + API.Customer:
+
+```bat
+run.bat
+```
+
+Hoặc chạy từng phần từ root repository:
 
 ```bat
 scripts\run-backend.bat

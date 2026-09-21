@@ -12,6 +12,20 @@ if not exist "%BACKEND%\KaitoKidShop.slnx" (
   exit /b 1
 )
 
+call "%ROOT%\scripts\load-db-local.bat"
+if errorlevel 2 (
+  echo [DB] Hay luu password trong file vua mo, sau do chay lai script.
+  timeout /t 2 /nobreak >nul
+  exit /b 1
+)
+if errorlevel 1 (
+  echo [LOI] Khong nap duoc cau hinh MariaDB local.
+  pause
+  exit /b 1
+)
+
+echo [DB] Local MariaDB configuration loaded.
+
 start "KaitoKid - API.Auth" cmd /k "cd /d ""%BACKEND%\API.Auth"" && dotnet run --urls http://0.0.0.0:5053"
 start "KaitoKid - API.Customer" cmd /k "cd /d ""%BACKEND%\API.Customer"" && dotnet run --urls http://0.0.0.0:5265"
 start "KaitoKid - API.Admin" cmd /k "cd /d ""%BACKEND%\API.Admin"" && dotnet run --urls http://0.0.0.0:5089"
