@@ -10,6 +10,7 @@ public class ProductDTO
     public decimal Price { get; set; }
     public decimal? OldPrice { get; set; }
     public int Stock { get; set; }
+    public int AvailableStock { get; set; }
     public string Status { get; set; } = string.Empty;
     public string Image { get; set; } = string.Empty;
     public string? ShortDescription { get; set; }
