@@ -6,7 +6,7 @@ The local XAMPP installation reports MariaDB 10.4.32. The backend uses Pomelo's 
 
 For a clean database where old SQL Server data does not need to be preserved, use:
 
-`Database/KaitoKid_MariaDB.sql`
+`backend/Database/KaitoKid_MariaDB.sql`
 
 This is the MariaDB 10.4 conversion of the legacy SQL Server master schema. It includes:
 
@@ -21,37 +21,45 @@ The script is a **clean rebuild** and starts with `DROP DATABASE IF EXISTS Kaito
 From the repository root:
 
 ```bat
-"C:\xampp\mysql\bin\mysql.exe" -u root < BACKEND\Database\KaitoKid_MariaDB.sql
+"C:\xampp\mysql\bin\mysql.exe" -u root < backend\Database\KaitoKid_MariaDB.sql
 ```
 
 If the XAMPP root account has a password:
 
 ```bat
-"C:\xampp\mysql\bin\mysql.exe" -u root -p < BACKEND\Database\KaitoKid_MariaDB.sql
+"C:\xampp\mysql\bin\mysql.exe" -u root -p < backend\Database\KaitoKid_MariaDB.sql
 ```
 
 Verify the import:
 
 ```bat
-"C:\xampp\mysql\bin\mysql.exe" -u root -e "SELECT COUNT(*) AS table_count FROM information_schema.tables WHERE table_schema='KaitoKid' AND table_type='BASE TABLE';"
+"C:\xampp\mysql\bin\mysql.exe" -u root -e "SELECT COUNT(*) AS table_count FROM information_schema.tables WHERE table_schema='kaitokid' AND table_type='BASE TABLE';"
 ```
 
 The expected table count is **51**.
 
 ## Application database user
 
-`mysql-bootstrap.sql` creates the `kaitokid` account and grants access to `KaitoKid.*`. Keep the real password out of Git.
+`mysql-bootstrap.sql` creates the `kaitokid` account and grants access to the KaitoKid database.
 
-For CMD, set the runtime connection string in the terminal before launching a backend API:
+The real password must not be committed. Local launchers use:
 
-```bat
-set "ConnectionStrings__DefaultConnection=Server=localhost;Port=3306;Database=KaitoKid;User=kaitokid;Password=YOUR_PASSWORD;CharSet=utf8mb4;"
+```text
+backend\db.local.bat
 ```
 
-For PowerShell:
+The file is gitignored. The committed template is:
 
-```powershell
-$env:ConnectionStrings__DefaultConnection="Server=localhost;Port=3306;Database=KaitoKid;User=kaitokid;Password=YOUR_PASSWORD;CharSet=utf8mb4;"
+```text
+backend\db.local.example.bat
+```
+
+On the first `run.bat` or `scripts\run-backend.bat` execution, the launcher creates the local file from the template and opens it in Notepad. Replace `CHANGE_ME` with the local MariaDB password, save it, and run the launcher again.
+
+You can still override the connection for a single CMD session:
+
+```bat
+set "ConnectionStrings__DefaultConnection=Server=localhost;Port=3306;Database=kaitokid;User=kaitokid;Password=YOUR_PASSWORD;CharSet=utf8mb4;"
 ```
 
 ## Legacy SQL Server files
