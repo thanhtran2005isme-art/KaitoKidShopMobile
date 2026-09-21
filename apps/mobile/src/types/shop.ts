@@ -7,6 +7,7 @@ export type Product = {
   price: number;
   oldPrice?: number | null;
   stock: number;
+  availableStock?: number;
   status: string;
   image: string;
   shortDescription?: string | null;
