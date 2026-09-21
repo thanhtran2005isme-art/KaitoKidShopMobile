@@ -41,7 +41,7 @@ export default function HomeScreen() {
             {error ? <Text style={styles.inlineError}>Không làm mới được dữ liệu: {error}</Text> : null}
             <HeroCarousel banners={data.banners} />
             <CategoryStrip categories={data.categories} />
-            <ProductSection title="Hàng mới về" subtitle="Mẫu mới dành cho bé" products={data.newArrivals} />
+            <ProductSection title="Hàng mới về" subtitle="Mẫu mới cho bé 0–12 tuổi" products={data.newArrivals} />
             <ProductSection title="Bán chạy" subtitle="Những sản phẩm được yêu thích" products={data.bestSellers} />
             <ProductSection title="Đang giảm giá" subtitle="Ưu đãi nổi bật hôm nay" products={data.saleProducts} />
 
