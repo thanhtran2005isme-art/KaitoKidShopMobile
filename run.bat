@@ -2,7 +2,7 @@
 setlocal EnableExtensions
 chcp 65001 >nul
 
-title KaitoKidShop - Mobile + Backend
+title KaitoKidShop - Launcher
 
 set "ROOT=%~dp0"
 set "BACKEND=%ROOT%backend"
@@ -42,7 +42,12 @@ start "KaitoKid - API.Customer" cmd /k "cd /d ""%BACKEND%\API.Customer"" && dotn
 
 timeout /t 2 /nobreak >nul
 
-echo [3/3] Starting Expo Mobile...
-call "%ROOT%scripts\run-mobile.bat"
+echo [3/3] Starting Expo Mobile in a persistent window...
+start "KaitoKid - Expo Mobile" cmd /k "call ""%ROOT%scripts\run-mobile.bat"""
+
+echo.
+echo Da mo 3 cua so: API.Auth, API.Customer, Expo Mobile.
+echo Neu Expo loi, cua so Expo se GIU NGUYEN de xem log.
+timeout /t 2 /nobreak >nul
 
 endlocal

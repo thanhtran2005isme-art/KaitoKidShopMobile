@@ -1,7 +1,7 @@
 @echo off
 setlocal EnableExtensions
 chcp 65001 >nul
-title KaitoKidShop - Mobile
+title KaitoKid - Expo Mobile
 
 for %%I in ("%~dp0..") do set "ROOT=%%~fI"
 set "MOBILE=%ROOT%\apps\mobile"
@@ -17,7 +17,7 @@ pushd "%MOBILE%"
 
 if not exist "node_modules" (
   echo [SETUP] Installing mobile dependencies...
-  npm install
+  call npm install
   if errorlevel 1 goto :error
 )
 
@@ -29,15 +29,39 @@ if not errorlevel 1 (
   adb reverse tcp:5265 tcp:5265 >nul 2>&1
 )
 
-set EXPO_PUBLIC_AUTH_API_URL=http://127.0.0.1:5053
-set EXPO_PUBLIC_CUSTOMER_API_URL=http://127.0.0.1:5265
-set EXPO_PACKAGER_PROXY_URL=http://127.0.0.1:8081
+set "EXPO_PUBLIC_AUTH_API_URL=http://127.0.0.1:5053"
+set "EXPO_PUBLIC_CUSTOMER_API_URL=http://127.0.0.1:5265"
+set "EXPO_PACKAGER_PROXY_URL=http://127.0.0.1:8081"
 
-npx expo start --lan --port 8081 -c
-goto :eof
+echo.
+echo [EXPO] Project: %MOBILE%
+echo [EXPO] Starting Metro on port 8081...
+echo.
 
-:error
-echo [LOI] Khong the khoi dong Mobile.
+call npx expo start --lan --port 8081 -c
+if errorlevel 1 goto :expo_error
+
+popd
+endlocal
+exit /b 0
+
+:expo_error
+set "EXPO_EXIT=%ERRORLEVEL%"
+echo.
+echo ==================================================
+echo [LOI] Expo da dung voi ma loi %EXPO_EXIT%.
+echo Cua so nay duoc giu lai de ban doc/copy log loi.
+echo ==================================================
+echo.
 popd
 pause
+endlocal
+exit /b %EXPO_EXIT%
+
+:error
+echo.
+echo [LOI] Khong the cai dependencies cho Mobile.
+popd
+pause
+endlocal
 exit /b 1
