@@ -41,6 +41,14 @@ export function HomeHeader({ cartCount, userName }: HomeHeaderProps) {
           </Pressable>
 
           <Pressable
+            accessibilityLabel="Danh sách yêu thích"
+            accessibilityRole="button"
+            onPress={() => router.push('/wishlist')}
+            style={({ pressed }) => [styles.iconButton, pressed && styles.pressed]}>
+            <Text style={styles.wishlistIcon}>♡</Text>
+          </Pressable>
+
+          <Pressable
             accessibilityLabel="Giỏ hàng"
             accessibilityRole="button"
             onPress={() => router.push('/cart')}
@@ -136,6 +144,7 @@ const styles = StyleSheet.create({
     lineHeight: 26,
     fontWeight: '700',
   },
+  wishlistIcon: { color: BRAND_COLORS.primary, fontSize: 25, lineHeight: 27, fontWeight: '900' },
   cartIcon: { fontSize: 19 },
   cartBadge: {
     position: 'absolute',
