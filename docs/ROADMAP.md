@@ -7,7 +7,7 @@ Roadmap này là thứ tự triển khai chính. Không nhảy phase khi phần 
 - [x] PHASE 1 — Chốt branding + dữ liệu
 - [x] PHASE 2 — Nâng cấp Home
 - [x] PHASE 3 — Product Detail hoàn chỉnh
-- [ ] PHASE 4 — Wishlist + Add to Cart
+- [x] PHASE 4 — Wishlist + Add to Cart
 - [ ] PHASE 5 — Cart thật
 - [ ] PHASE 6 — Checkout + Address + Shipping + Payment
 - [ ] PHASE 7 — Orders + Tracking
@@ -105,15 +105,52 @@ PHASE 3 không cần migration database mới.
 
 ## PHASE 4 — Wishlist + Add to Cart
 
+Đã triển khai:
+
+- `ShoppingContext` là nguồn state chung cho wishlist và cart badge trên toàn mobile;
+- ProductCard có nút tim độc lập, đồng bộ thật với `/api/wishlist`;
+- Product Detail có wishlist CTA và trạng thái đã lưu;
+- thêm màn `/wishlist` để xem/xóa sản phẩm yêu thích;
+- Login hỗ trợ `redirect` để quay lại Product/Wishlist/Cart sau xác thực;
+- Add to Cart dùng đúng `productId + size + color + quantity` đã chọn ở PHASE 3;
+- CTA Product Detail phân biệt thiếu lựa chọn, sản phẩm hết hàng và biến thể hết hàng;
+- feedback thành công/thất bại hiển thị ngay trên màn chi tiết;
+- cart badge cập nhật ngay sau khi thêm và hiển thị cả ở Home header + tab Giỏ hàng;
+- tab Cart hiện phản ánh số lượng thật, nhưng màn quản lý item chi tiết vẫn để PHASE 5;
+- backend validate quantity, product status, size/màu và variant trước khi reserve;
+- reserve tồn kho được đồng bộ hai cấp:
+  `SanPham.SoLuongDaGiu` + `TonKhoBienThe.SoLuongDaGiu`;
+- remove/update/expire/checkout đều giải phóng reserve tương ứng;
+- Product API trả `AvailableStock` để mobile hiển thị tồn khả dụng thay vì chỉ tồn vật lý.
+
+### Migration PHASE 4
+
+Database local nên chạy:
+
+```bat
+"C:\xampp\mysql\bin\mysql.exe" -u root kaitokid < backend\Database\migrations\20260922_phase4_cart_reservation.sql
+```
+
+Migration này idempotent và chỉ bảo đảm các cột reservation cần thiết tồn tại; không xóa dữ liệu.
+
+### Validation
+
+Đã static-review TypeScript/C# và kiểm tra lại contract API, reservation flow và route login redirect. Runtime cuối vẫn cần xác nhận trên máy development sau khi pull.
+
+## PHASE 5 — Cart thật
+
 Mục tiêu tiếp theo:
 
-- wishlist thật trên ProductCard/Product Detail;
-- Add to Cart dùng đúng màu, size và số lượng đã chọn;
-- yêu cầu đăng nhập khi API cần token;
-- xử lý hết hàng/biến thể hết hàng;
-- cập nhật cart badge sau khi thêm;
-- feedback thành công/thất bại rõ ràng;
-- không làm Cart screen đầy đủ trước PHASE 5.
+- load danh sách item thật từ `/api/cart`;
+- tăng/giảm số lượng;
+- xóa item;
+- chọn nhiều/select all;
+- move to wishlist;
+- subtotal;
+- low-stock/reservation countdown;
+- cross-sell;
+- combo discount;
+- chuẩn bị CTA checkout cho PHASE 6.
 
 ## Nguyên tắc triển khai
 
