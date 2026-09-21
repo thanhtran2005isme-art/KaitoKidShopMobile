@@ -39,6 +39,34 @@ For meaningful changes:
 6. Open a PR and merge only when clean.
 7. Update documentation when the project state, architecture, operational procedure, or a durable decision changes.
 
+### Số lượng commit cho mỗi task/fix/phase
+
+Mặc định **một yêu cầu sửa, một task hoặc một PHASE = một commit duy nhất**.
+
+Quy tắc:
+
+- Không commit riêng từng file.
+- Không commit từng bước trung gian trong lúc đang triển khai.
+- Gom toàn bộ thay đổi thuộc cùng một task/fix/PHASE, kiểm tra xong rồi mới tạo **một commit tổng hợp**.
+- Nếu một task sửa nhiều file, phải dùng cơ chế batch commit (ví dụ Git tree/commit hoặc tương đương) thay vì API cập nhật file nào commit file đó.
+- Khi merge PR, ưu tiên **squash merge** để `main` chỉ nhận một commit cho task/PHASE đó.
+- Chỉ tách nhiều commit khi thay đổi thực sự là nhiều công việc độc lập, cần rollback riêng, hoặc người dùng yêu cầu rõ ràng.
+- Không gom các task không liên quan vào cùng một commit.
+
+Ví dụ đúng:
+
+- PHASE 5 sửa 12 file → 1 commit: `feat: hoàn thành phase 5 giỏ hàng mobile`
+- Một lần fix lỗi ảnh 404 sửa 4 file → 1 commit: `fix: sửa toàn bộ đường dẫn ảnh sản phẩm bị 404`
+
+Ví dụ không nên làm:
+
+- `feat: sửa file cart.tsx`
+- `fix: sửa service cart`
+- `docs: cập nhật roadmap`
+- `docs: cập nhật handoff`
+
+nếu tất cả các thay đổi trên cùng thuộc một PHASE/task duy nhất.
+
 ### Ngôn ngữ commit
 
 Tất cả commit do AI/GPT tạo cho repository này phải viết bằng **tiếng Việt**.
