@@ -34,6 +34,7 @@ public class ProductDetailDTO : ProductDTO
     public string? Collection { get; set; }
     public string? Specs { get; set; }
     public List<ProductVariantDTO> Variants { get; set; } = [];
+    public List<ProductVariantInventoryDTO> VariantInventory { get; set; } = [];
     public List<ReviewDTO> Reviews { get; set; } = [];
     public DateTime CreatedAt { get; set; }
 }
@@ -43,6 +44,15 @@ public class ProductVariantDTO
     public string Size { get; set; } = string.Empty;
     public string Color { get; set; } = string.Empty;
     public string Sku { get; set; } = string.Empty;
+}
+
+public class ProductVariantInventoryDTO
+{
+    public string Size { get; set; } = string.Empty;
+    public string Color { get; set; } = string.Empty;
+    public int Stock { get; set; }
+    public int Reserved { get; set; }
+    public int Available { get; set; }
 }
 
 public class ProductFilterDTO

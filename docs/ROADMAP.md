@@ -6,7 +6,7 @@ Roadmap này là thứ tự triển khai chính. Không nhảy phase khi phần 
 
 - [x] PHASE 1 — Chốt branding + dữ liệu
 - [x] PHASE 2 — Nâng cấp Home
-- [ ] PHASE 3 — Product Detail hoàn chỉnh
+- [x] PHASE 3 — Product Detail hoàn chỉnh
 - [ ] PHASE 4 — Wishlist + Add to Cart
 - [ ] PHASE 5 — Cart thật
 - [ ] PHASE 6 — Checkout + Address + Shipping + Payment
@@ -71,17 +71,49 @@ Ranh giới phase:
 
 ## PHASE 3 — Product Detail hoàn chỉnh
 
+Đã triển khai:
+
+- gallery ảnh có swipe, thumbnail, counter và fallback ảnh chính;
+- chọn màu có swatch và trạng thái unavailable;
+- chọn size có trạng thái unavailable;
+- size guide trẻ em 90–150 theo chiều cao;
+- chọn số lượng và tự giới hạn theo tồn kho;
+- API Product Detail trả thêm tồn kho thật từ `TonKhoBienThe` khi có;
+- selector tự suy ra màu/size từ `DanhSachMau/DanhSachSize`, `BienThe` hoặc `TonKhoBienThe`;
+- sản phẩm `out-of-stock` vẫn mở được Product Detail thay vì 404;
+- mô tả HTML được chuyển thành text dễ đọc trên mobile;
+- thông tin SKU/danh mục/giới tính/độ tuổi/specs;
+- hiển thị review đã duyệt ở chế độ read-only;
+- sản phẩm liên quan qua `/api/products/{id}/related`;
+- Share sản phẩm;
+- skeleton loading và error/retry state;
+- state màu/size/số lượng đã sẵn sàng để PHASE 4 nối Wishlist/Add to Cart.
+
+### Dữ liệu hiện tại
+
+Seed hiện chưa có album ảnh phụ hoặc bản ghi `TonKhoBienThe` mẫu. Vì vậy với dữ liệu hiện tại:
+
+- gallery dùng ảnh chính;
+- tồn kho dùng `SanPham.TonKho`;
+- khi sau này có dữ liệu biến thể thật, UI tự chuyển sang tồn kho size + màu mà không cần đổi màn hình.
+
+PHASE 3 không cần migration database mới.
+
+### Validation
+
+Đã static-review TypeScript/C# và sửa các lỗi cú pháp/logic tìm thấy trên branch. Môi trường công cụ hiện tại vẫn không thể chạy build local của người dùng; cần runtime validation sau khi pull.
+
+## PHASE 4 — Wishlist + Add to Cart
+
 Mục tiêu tiếp theo:
 
-- gallery ảnh sản phẩm;
-- chọn màu;
-- chọn size;
-- size guide;
-- chọn số lượng;
-- hiển thị tồn kho;
-- mô tả/thông số rõ ràng;
-- chuẩn bị CTA cho PHASE 4;
-- sản phẩm liên quan ở mức phù hợp trước khi recommendation đầy đủ ở PHASE 9.
+- wishlist thật trên ProductCard/Product Detail;
+- Add to Cart dùng đúng màu, size và số lượng đã chọn;
+- yêu cầu đăng nhập khi API cần token;
+- xử lý hết hàng/biến thể hết hàng;
+- cập nhật cart badge sau khi thêm;
+- feedback thành công/thất bại rõ ràng;
+- không làm Cart screen đầy đủ trước PHASE 5.
 
 ## Nguyên tắc triển khai
 

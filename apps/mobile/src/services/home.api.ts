@@ -85,6 +85,10 @@ export const shopApi = {
     );
   },
 
+  getRelatedProducts(productId: number, count = 6) {
+    return apiRequest<Product[]>(`/api/products/${productId}/related?count=${count}`);
+  },
+
   getProductsByCategory(category: string, page = 1, pageSize = 20) {
     const query = `Category=${encodeURIComponent(category)}&Page=${page}&PageSize=${pageSize}`;
     return apiRequest<PagedResult<Product>>(`/api/products?${query}`);

@@ -21,6 +21,38 @@ export type Product = {
   sizes: string[];
 };
 
+export type ProductVariant = {
+  size: string;
+  color: string;
+  sku: string;
+};
+
+export type ProductVariantInventory = {
+  size: string;
+  color: string;
+  stock: number;
+  reserved: number;
+  available: number;
+};
+
+export type ProductReview = {
+  id: number;
+  productId: number;
+  customerName: string;
+  rating: number;
+  comment: string;
+  createdAt: string;
+  orderId?: number;
+  images?: string[];
+  videoUrl?: string | null;
+  size?: string | null;
+  color?: string | null;
+  adminReply?: string | null;
+  repliedAt?: string | null;
+  helpfulCount?: number;
+  isVerifiedPurchase?: boolean;
+};
+
 export type ProductDetail = Product & {
   style?: string | null;
   ageGroup?: string | null;
@@ -29,6 +61,10 @@ export type ProductDetail = Product & {
   menu?: string | null;
   collection?: string | null;
   specs?: string | null;
+  variants: ProductVariant[];
+  variantInventory: ProductVariantInventory[];
+  reviews: ProductReview[];
+  createdAt?: string;
 };
 
 export type Category = {
