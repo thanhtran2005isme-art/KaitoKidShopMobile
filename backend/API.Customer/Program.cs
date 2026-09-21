@@ -4,6 +4,8 @@ using API.Customer.Services.Shipping;
 using DbHelper;
 using Shared.Authorization;
 using Shared.Extensions;
+using Microsoft.Extensions.FileProviders;
+using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -135,6 +137,19 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseStaticFiles();
+
+// Reuse the monorepo web public directory as shared media storage in local/dev runs.
+// This keeps existing database URLs such as /slide_1.jpg working through API.Customer.
+var sharedWebPublicPath = Path.GetFullPath(
+    Path.Combine(app.Environment.ContentRootPath, "..", "..", "apps", "web", "public"));
+if (Directory.Exists(sharedWebPublicPath))
+{
+    app.UseStaticFiles(new StaticFileOptions
+    {
+        FileProvider = new PhysicalFileProvider(sharedWebPublicPath)
+    });
+}
+
 app.UseCors("AllowFrontend");
 app.UseRequestLogging();
 app.UseGlobalExceptionHandler();
@@ -143,6 +158,30 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+
+// The seed database references product images that have never existed in the repository.
+// Return a lightweight placeholder instead of a noisy 404. If a real file is added under
+// a static-file provider later, UseStaticFiles() handles it before this fallback endpoint.
+app.MapGet("/products/{**imagePath}", () =>
+    Results.Text(
+        """
+        <svg xmlns="http://www.w3.org/2000/svg" width="800" height="1000" viewBox="0 0 800 1000">
+          <defs>
+            <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stop-color="#f5f3ff"/>
+              <stop offset="100%" stop-color="#ede9fe"/>
+            </linearGradient>
+          </defs>
+          <rect width="800" height="1000" fill="url(#bg)"/>
+          <circle cx="400" cy="410" r="120" fill="#ddd6fe"/>
+          <path d="M330 355h140l58 78-58 52v190H330V485l-58-52 58-78z" fill="#8b5cf6"/>
+          <text x="400" y="760" text-anchor="middle" font-family="Arial, sans-serif" font-size="54" font-weight="700" fill="#4c1d95">KaitoKid</text>
+          <text x="400" y="820" text-anchor="middle" font-family="Arial, sans-serif" font-size="28" fill="#6d28d9">Hình ảnh sản phẩm đang cập nhật</text>
+        </svg>
+        """,
+        "image/svg+xml",
+        Encoding.UTF8));
+
 app.MapHub<API.Customer.Hubs.ChatHub>("/hubs/chat");
 
 // Banner an toàn ở console khi khởi động
