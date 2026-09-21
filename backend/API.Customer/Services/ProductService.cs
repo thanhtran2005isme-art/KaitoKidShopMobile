@@ -66,7 +66,9 @@ public class ProductService(CustomerDbContext db) : IProductService
     {
         var product = await db.Products
             .Include(p => p.Reviews.Where(r => r.Status == "approved"))
-            .FirstOrDefaultAsync(p => p.Id == id && p.Status == "active");
+            .FirstOrDefaultAsync(p =>
+                p.Id == id &&
+                (p.Status == "active" || p.Status == "out-of-stock"));
 
         if (product is null) return null;
 
@@ -83,7 +85,9 @@ public class ProductService(CustomerDbContext db) : IProductService
     {
         var product = await db.Products
             .Include(p => p.Reviews.Where(r => r.Status == "approved"))
-            .FirstOrDefaultAsync(p => p.Slug == slug && p.Status == "active");
+            .FirstOrDefaultAsync(p =>
+                p.Slug == slug &&
+                (p.Status == "active" || p.Status == "out-of-stock"));
 
         if (product is null) return null;
 
@@ -201,7 +205,9 @@ public class ProductService(CustomerDbContext db) : IProductService
             Reserved = v.Reserved,
             Available = v.Available
         }).ToList(),
-        Reviews = p.Reviews.Select(r => new ReviewDTO
+        Reviews = p.Reviews
+            .OrderByDescending(r => r.CreatedAt)
+            .Select(r => new ReviewDTO
         {
             Id = r.Id,
             ProductId = r.ProductId,
