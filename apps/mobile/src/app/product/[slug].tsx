@@ -31,7 +31,7 @@ import {
 } from '@/utils/product-detail';
 
 function formatPrice(value: number) {
-  return \`\${Math.round(value).toLocaleString('vi-VN')}đ\`;
+  return `${Math.round(value).toLocaleString('vi-VN')}đ`;
 }
 
 function uniqueValues(values?: string[]) {
@@ -299,8 +299,8 @@ export default function ProductDetailScreen() {
       product.name,
       formatPrice(product.price),
       product.shortDescription || BRAND.promise,
-      \`KaitoKid · \${product.category}\`,
-    ].join('\\n');
+      `KaitoKid · ${product.category}`,
+    ].join('\n');
 
     await Share.share({ message });
   };
@@ -427,11 +427,11 @@ export default function ProductDetailScreen() {
                     ? 'Sản phẩm đang hết hàng'
                     : hasVariantInventory && selectedColor && selectedSize
                       ? availableStock > 0
-                        ? \`Còn \${availableStock} sản phẩm ở biến thể này\`
+                        ? `Còn ${availableStock} sản phẩm ở biến thể này`
                         : 'Biến thể này đang hết hàng'
                       : hasVariantInventory
                         ? 'Chọn màu và size để xem tồn kho chính xác'
-                        : \`Còn \${product.stock} sản phẩm\`}
+                        : `Còn ${product.stock} sản phẩm`}
                 </Text>
                 <Text style={styles.stockHelper}>
                   {hasVariantInventory
@@ -456,8 +456,8 @@ export default function ProductDetailScreen() {
                 {selectionComplete
                   ? [
                       selectedColor || null,
-                      selectedSize ? \`Size \${selectedSize}\` : null,
-                      \`SL \${quantity}\`,
+                      selectedSize ? `Size ${selectedSize}` : null,
+                      `SL ${quantity}`,
                     ]
                       .filter(Boolean)
                       .join(' · ')
@@ -498,7 +498,7 @@ export default function ProductDetailScreen() {
               <Text style={styles.specTitle}>Thông tin sản phẩm</Text>
               {facts.map((item, index) => (
                 <View
-                  key={\`\${item.label}-\${item.value}-\${index}\`}
+                  key={`${item.label}-${item.value}-${index}`}
                   style={styles.specRow}>
                   <Text style={styles.specLabel}>{item.label}</Text>
                   <Text style={styles.specValue}>{item.value}</Text>
