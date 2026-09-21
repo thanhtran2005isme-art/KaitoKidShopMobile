@@ -39,7 +39,7 @@ public class CustomerDbContext(DbContextOptions<CustomerDbContext> options) : Db
     {
         modelBuilder.Entity<Product>(e =>
         {
-            e.HasIndex(p => p.Slug).IsUnique().HasFilter("[Slug] IS NOT NULL");
+            e.HasIndex(p => p.Slug).IsUnique();
             e.HasIndex(p => p.Status);
         });
 

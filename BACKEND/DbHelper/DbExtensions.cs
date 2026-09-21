@@ -10,10 +10,10 @@ namespace DbHelper;
 public static class DbExtensions
 {
     /// <summary>
-    /// Dang ky DbContext voi SQL Server + AuditInterceptor
-    /// Usage: builder.Services.AddSqlServerDb&lt;MyDbContext&gt;(config);
+    /// Dang ky DbContext voi MySQL + AuditInterceptor
+    /// Usage: builder.Services.AddMySqlDb&lt;MyDbContext&gt;(config);
     /// </summary>
-    public static IServiceCollection AddSqlServerDb<TContext>(
+    public static IServiceCollection AddMySqlDb<TContext>(
         this IServiceCollection services,
         IConfiguration config,
         string connectionStringName = "DefaultConnection")
@@ -24,7 +24,7 @@ public static class DbExtensions
 
         services.AddDbContext<TContext>(options =>
         {
-            options.UseSqlServer(connectionString);
+            options.UseMySQL(connectionString);
             options.AddInterceptors(new AuditInterceptor());
         });
 

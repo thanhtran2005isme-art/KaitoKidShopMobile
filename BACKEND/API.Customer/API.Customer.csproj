@@ -9,9 +9,9 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.5" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.5" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.0-preview.5.25277.114" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="10.0.0-preview.5.25277.114" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="10.0.0-preview.5.25277.114">
+    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.9" />
+    <PackageReference Include="MySql.EntityFrameworkCore" Version="10.0.9" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="10.0.9">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
@@ -22,6 +22,11 @@
     <!-- Tìm kiếm bằng hình ảnh: ONNX Runtime chạy model CLIP vision + ImageSharp tiền xử lý ảnh -->
     <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.20.1" />
     <PackageReference Include="SixLabors.ImageSharp" Version="3.1.12" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Legacy SQL Server migrations are preserved for history but excluded from compilation. -->
+    <Compile Remove="Migrations\\**\\*.cs" />
   </ItemGroup>
 
   <ItemGroup>
