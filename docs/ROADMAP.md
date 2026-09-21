@@ -2,6 +2,8 @@
 
 Roadmap này là thứ tự triển khai chính. Không nhảy phase khi phần phụ thuộc cốt lõi của phase trước chưa ổn định.
 
+**Spec chi tiết cho toàn bộ phần còn lại PHASE 5 → PHASE 10:** `docs/PHASES_5_10.md`. File đó là checklist triển khai/acceptance chính cho các phase chưa hoàn thành.
+
 ## Trạng thái
 
 - [x] PHASE 1 — Chốt branding + dữ liệu
@@ -139,6 +141,8 @@ Migration này idempotent và chỉ bảo đảm các cột reservation cần th
 
 ## PHASE 5 — Cart thật
 
+**Chi tiết bắt buộc:** đọc mục PHASE 5 trong `docs/PHASES_5_10.md` trước khi sửa code.
+
 Mục tiêu tiếp theo:
 
 - load danh sách item thật từ `/api/cart`;
@@ -151,6 +155,23 @@ Mục tiêu tiếp theo:
 - cross-sell;
 - combo discount;
 - chuẩn bị CTA checkout cho PHASE 6.
+
+## PHASE 6 → PHASE 10
+
+Chi tiết đầy đủ về mục tiêu, API backend, mobile UI/state, dependency, ranh giới và checklist nghiệm thu của PHASE 6–10 nằm trong:
+
+`docs/PHASES_5_10.md`
+
+Thứ tự bắt buộc:
+
+```text
+PHASE 5 Cart
+→ PHASE 6 Checkout
+→ PHASE 7 Orders
+→ PHASE 8 Reviews / Notifications / Account
+→ PHASE 9 Collections / Lookbook / Recommendation
+→ PHASE 10 Polish / Performance / Testing
+```
 
 ## Nguyên tắc triển khai
 

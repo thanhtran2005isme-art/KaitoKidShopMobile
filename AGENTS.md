@@ -10,9 +10,10 @@ Before making non-trivial changes, read:
 2. `docs/AI_HANDOFF.md` — current project state
 3. `docs/BRAND.md` — KaitoKid brand/data rules
 4. `docs/ROADMAP.md` — current implementation phase
-5. `docs/ARCHITECTURE.md` — stable system architecture
-6. The task-relevant sections of `docs/DECISIONS.md` and `docs/TROUBLESHOOTING.md`
-7. Relevant source files and recent Git history for the area being changed
+5. `docs/PHASES_5_10.md` — detailed implementation spec for remaining PHASE 5–10
+6. `docs/ARCHITECTURE.md` — stable system architecture
+7. The task-relevant sections of `docs/DECISIONS.md` and `docs/TROUBLESHOOTING.md`
+8. Relevant source files and recent Git history for the area being changed
 
 Do not assume an old chat transcript is the source of truth. Git and the repository documentation are the durable project memory.
 
@@ -89,6 +90,7 @@ Do not use long-lived branches as project memory. Branches are for work in progr
 - Put stable system structure in `docs/ARCHITECTURE.md`.
 - Keep brand positioning and catalog rules in `docs/BRAND.md`.
 - Keep phase status and next work in `docs/ROADMAP.md`.
+- Keep detailed remaining PHASE 5–10 implementation scope/checklists in `docs/PHASES_5_10.md`.
 - Record important technical choices in `docs/DECISIONS.md`.
 - Record repeatable fixes in `docs/TROUBLESHOOTING.md`.
 - Move older chronological detail to `docs/history/YYYY-MM.md`.
