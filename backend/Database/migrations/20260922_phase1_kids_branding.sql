@@ -53,7 +53,8 @@ UPDATE TrangTinh SET NoiDung='<h2>Về KAITO KID</h2><p>KAITO KID là thương h
 UPDATE TrangTinh SET TieuDe='Hướng dẫn chọn size cho bé', NoiDung='<h2>Hướng dẫn chọn size cho bé</h2><p>Size KAITO KID ưu tiên theo chiều cao của bé (90-150). Hãy đo chiều cao và cân nặng thực tế; nếu bé nằm giữa hai size hoặc thích mặc rộng, ưu tiên size lớn hơn.</p>' WHERE Slug='huong-dan-chon-size';
 
 UPDATE ChiTietDonHang SET TenSanPham='Áo Thun Bé Trai Cổ Tròn Basic', HinhAnhSP='/products/ao-thun-be-trai-1.jpg', KichCo='120' WHERE SanPhamId=1;
-UPDATE ChiTietDonHang SET TenSanPham='Áo Polo Bé Trai Cổ Bẻ', HinhAnhSP='/products/polo-be-trai-1.jpg', KichCo='120' WHERE SanPhamId=8;
+UPDATE ChiTietDonHang SET TenSanPham='Áo Polo Bé Trai Cổ Bẻ', HinhAnhSP='/products/polo-be-trai-1.jpg', DonGia=399000, KichCo='120' WHERE SanPhamId=8;
+UPDATE DonHang SET TamTinh=997000, PhiVanChuyen=0, GiamGia=0, TongTien=997000 WHERE Id=1;
 UPDATE ChiTietDonHang SET TenSanPham='Quần Jean Bé Trai Slim Co Giãn', HinhAnhSP='/products/jean-be-trai-1.jpg', KichCo='130' WHERE SanPhamId=9;
 UPDATE ChiTietDonHang SET TenSanPham='Áo Hoodie Trẻ Em Unisex', HinhAnhSP='/products/hoodie-tre-em-1.jpg', KichCo='130' WHERE SanPhamId=6;
 
