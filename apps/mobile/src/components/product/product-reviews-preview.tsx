@@ -50,7 +50,7 @@ export function ProductReviewsPreview({
                       {review.customerName || 'Khách hàng KaitoKid'}
                     </Text>
                     <Text style={styles.meta}>
-                      {stars}{date ? \` · \${date}\` : ''}
+                      {stars}{date ? ` · ${date}` : ''}
                     </Text>
                   </View>
                 </View>
@@ -61,7 +61,7 @@ export function ProductReviewsPreview({
 
                 {review.size || review.color ? (
                   <Text style={styles.variant}>
-                    {review.size ? \`Size \${review.size}\` : ''}
+                    {review.size ? `Size ${review.size}` : ''}
                     {review.size && review.color ? ' · ' : ''}
                     {review.color || ''}
                   </Text>
