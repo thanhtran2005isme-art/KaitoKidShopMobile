@@ -5,6 +5,7 @@ import { ActivityIndicator, FlatList, Pressable, ScrollView, StyleSheet, Text, V
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ProductCard } from '@/components/product/product-card';
+import { BRAND } from '@/constants/brand';
 import { useProductGrid } from '@/hooks/use-product-grid';
 import { resolveMediaUrl } from '@/services/api-client';
 import { shopApi } from '@/services/home.api';
@@ -78,7 +79,7 @@ export default function CategoriesScreen() {
     <SafeAreaView edges={['top']} style={styles.safeArea}>
       <View style={styles.header}>
         <Text style={styles.title}>Danh mục</Text>
-        <Text style={styles.subtitle}>Chọn nhóm sản phẩm phù hợp với bé</Text>
+        <Text style={styles.subtitle}>{BRAND.categorySubtitle}</Text>
       </View>
 
       {loadingCategories ? (
