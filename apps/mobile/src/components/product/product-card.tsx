@@ -1,159 +1,224 @@
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useState } from 'react';
+import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { BRAND_COLORS } from '@/constants/brand';
+import { useAuth } from '@/context/AuthContext';
+import { useShopping } from '@/context/ShoppingContext';
 import { resolveMediaUrl } from '@/services/api-client';
 import type { Product } from '@/types/shop';
+import { productColorValue } from '@/utils/product-detail';
 
 function formatPrice(value: number) {
   return `${Math.round(value).toLocaleString('vi-VN')}đ`;
 }
 
-const COLOR_MAP: Record<string, string> = {
-  'đen': '#111827',
-  'trắng': '#FFFFFF',
-  'xám': '#9CA3AF',
-  'xanh navy': '#1E3A8A',
-  'xanh da trời': '#60A5FA',
-  'xanh đậm': '#1D4ED8',
-  'xanh nhạt': '#93C5FD',
-  'xanh pastel': '#BFDBFE',
-  'xanh rêu': '#4D7C0F',
-  'hồng': '#F9A8D4',
-  'hồng pastel': '#FBCFE8',
-  'hồng nhạt': '#FCE7F3',
-  'be': '#D6C3A5',
-  'nâu': '#92400E',
-  'đỏ đô': '#991B1B',
-  'tím': '#8B5CF6',
-  'tím nhạt': '#C4B5FD',
-  'cam': '#FB923C',
-};
-
-function colorValue(name: string) {
-  return COLOR_MAP[name.trim().toLowerCase()] || '#D1D5DB';
-}
-
-export function ProductCard({ product, width = 168 }: { product: Product; width?: number }) {
+export function ProductCard({
+  product,
+  width = 168,
+}: {
+  product: Product;
+  width?: number;
+}) {
   const router = useRouter();
+  const { token } = useAuth();
+  const { isWishlisted, toggleWishlist } = useShopping();
+  const [wishlistBusy, setWishlistBusy] = useState(false);
+
   const image = resolveMediaUrl(product.image);
   const discount =
     product.oldPrice && product.oldPrice > product.price
       ? Math.round((1 - product.price / product.oldPrice) * 100)
       : 0;
 
-  const isOutOfStock = product.stock <= 0 || product.status === 'out-of-stock';
-  const isLowStock = !isOutOfStock && product.stock <= 5;
+  const availableStock = product.availableStock ?? product.stock;
+  const isOutOfStock =
+    availableStock <= 0 || product.status === 'out-of-stock';
+  const isLowStock = !isOutOfStock && availableStock <= 5;
   const colors = product.colors || [];
   const visibleColors = colors.slice(0, 3);
+  const wished = isWishlisted(product.id);
+
+  const openProduct = () => {
+    router.push({
+      pathname: '/product/[slug]',
+      params: { slug: product.slug || String(product.id) },
+    });
+  };
+
+  const openLoginForProduct = () => {
+    const productPath = `/product/${product.slug || product.id}`;
+    router.push({
+      pathname: '/auth/login',
+      params: { redirect: productPath },
+    });
+  };
+
+  const handleWishlist = async () => {
+    if (wishlistBusy) return;
+
+    if (!token) {
+      openLoginForProduct();
+      return;
+    }
+
+    try {
+      setWishlistBusy(true);
+      await toggleWishlist(product.id);
+    } catch (error) {
+      Alert.alert(
+        'Danh sách yêu thích',
+        error instanceof Error
+          ? error.message
+          : 'Không thể cập nhật danh sách yêu thích.',
+      );
+    } finally {
+      setWishlistBusy(false);
+    }
+  };
 
   return (
-    <Pressable
-      accessibilityHint="Mở chi tiết sản phẩm"
-      accessibilityLabel={product.name}
-      accessibilityRole="button"
-      onPress={() =>
-        router.push({
-          pathname: '/product/[slug]',
-          params: { slug: product.slug || String(product.id) },
-        })
-      }
-      style={({ pressed }) => [
+    <View
+      style={[
         styles.card,
         { width },
-        pressed && styles.pressed,
         isOutOfStock && styles.outOfStockCard,
       ]}>
-      <View style={styles.imageWrap}>
-        {image ? (
-          <Image
-            contentFit="cover"
-            source={{ uri: image }}
-            style={styles.image}
-            transition={180}
-          />
-        ) : (
-          <Text style={styles.imageFallback}>👚</Text>
-        )}
-
-        <View style={styles.badges}>
-          {discount > 0 ? (
-            <View style={styles.saleBadge}>
-              <Text style={styles.saleText}>-{discount}%</Text>
-            </View>
-          ) : null}
-          {product.isNew ? (
-            <View style={styles.newBadge}>
-              <Text style={styles.newText}>MỚI</Text>
-            </View>
-          ) : null}
-          {product.isBestSeller ? (
-            <View style={styles.bestBadge}>
-              <Text style={styles.bestText}>HOT</Text>
-            </View>
-          ) : null}
-        </View>
-
-        {isOutOfStock || isLowStock ? (
-          <View style={[styles.stockBadge, isOutOfStock ? styles.stockOut : styles.stockLow]}>
-            <Text style={styles.stockText}>{isOutOfStock ? 'HẾT HÀNG' : 'SẮP HẾT'}</Text>
-          </View>
-        ) : null}
-      </View>
-
-      <View style={styles.copy}>
-        <Text numberOfLines={1} style={styles.category}>
-          {product.category}
-        </Text>
-
-        <Text numberOfLines={2} style={styles.name}>
-          {product.name}
-        </Text>
-
-        <View style={styles.priceRow}>
-          <Text style={styles.price}>{formatPrice(product.price)}</Text>
-          {product.oldPrice && product.oldPrice > product.price ? (
-            <Text style={styles.oldPrice}>{formatPrice(product.oldPrice)}</Text>
-          ) : null}
-        </View>
-
-        <View style={styles.detailRow}>
-          {visibleColors.length ? (
-            <View style={styles.colors}>
-              {visibleColors.map((color) => (
-                <View
-                  key={color}
-                  accessibilityLabel={color}
-                  style={[
-                    styles.colorDot,
-                    {
-                      backgroundColor: colorValue(color),
-                      borderColor: color.toLowerCase().includes('trắng')
-                        ? '#D1D5DB'
-                        : 'rgba(17,24,39,0.08)',
-                    },
-                  ]}
-                />
-              ))}
-              {colors.length > visibleColors.length ? (
-                <Text style={styles.moreColors}>+{colors.length - visibleColors.length}</Text>
-              ) : null}
-            </View>
+      <Pressable
+        accessibilityHint="Mở chi tiết sản phẩm"
+        accessibilityLabel={product.name}
+        accessibilityRole="button"
+        onPress={openProduct}
+        style={({ pressed }) => [
+          styles.cardPressable,
+          pressed && styles.pressed,
+        ]}>
+        <View style={styles.imageWrap}>
+          {image ? (
+            <Image
+              contentFit="cover"
+              source={{ uri: image }}
+              style={styles.image}
+              transition={180}
+            />
           ) : (
-            <View />
+            <Text style={styles.imageFallback}>👚</Text>
           )}
 
-          {product.rating > 0 ? (
-            <Text style={styles.rating}>★ {product.rating.toFixed(1)}</Text>
+          <View style={styles.badges}>
+            {discount > 0 ? (
+              <View style={styles.saleBadge}>
+                <Text style={styles.saleText}>-{discount}%</Text>
+              </View>
+            ) : null}
+
+            {product.isNew ? (
+              <View style={styles.newBadge}>
+                <Text style={styles.newText}>MỚI</Text>
+              </View>
+            ) : null}
+
+            {product.isBestSeller ? (
+              <View style={styles.bestBadge}>
+                <Text style={styles.bestText}>HOT</Text>
+              </View>
+            ) : null}
+          </View>
+
+          {isOutOfStock || isLowStock ? (
+            <View
+              style={[
+                styles.stockBadge,
+                isOutOfStock ? styles.stockOut : styles.stockLow,
+              ]}>
+              <Text style={styles.stockText}>
+                {isOutOfStock ? 'HẾT HÀNG' : 'SẮP HẾT'}
+              </Text>
+            </View>
           ) : null}
         </View>
 
-        {product.soldCount > 0 ? (
-          <Text style={styles.sold}>Đã bán {product.soldCount}</Text>
-        ) : null}
-      </View>
-    </Pressable>
+        <View style={styles.copy}>
+          <Text numberOfLines={1} style={styles.category}>
+            {product.category}
+          </Text>
+
+          <Text numberOfLines={2} style={styles.name}>
+            {product.name}
+          </Text>
+
+          <View style={styles.priceRow}>
+            <Text style={styles.price}>{formatPrice(product.price)}</Text>
+            {product.oldPrice && product.oldPrice > product.price ? (
+              <Text style={styles.oldPrice}>
+                {formatPrice(product.oldPrice)}
+              </Text>
+            ) : null}
+          </View>
+
+          <View style={styles.detailRow}>
+            {visibleColors.length ? (
+              <View style={styles.colors}>
+                {visibleColors.map((color) => (
+                  <View
+                    key={color}
+                    accessibilityLabel={color}
+                    style={[
+                      styles.colorDot,
+                      {
+                        backgroundColor: productColorValue(color),
+                        borderColor: color.toLowerCase().includes('trắng')
+                          ? '#D1D5DB'
+                          : 'rgba(17,24,39,0.08)',
+                      },
+                    ]}
+                  />
+                ))}
+                {colors.length > visibleColors.length ? (
+                  <Text style={styles.moreColors}>
+                    +{colors.length - visibleColors.length}
+                  </Text>
+                ) : null}
+              </View>
+            ) : (
+              <View />
+            )}
+
+            {product.rating > 0 ? (
+              <Text style={styles.rating}>★ {product.rating.toFixed(1)}</Text>
+            ) : null}
+          </View>
+
+          {product.soldCount > 0 ? (
+            <Text style={styles.sold}>Đã bán {product.soldCount}</Text>
+          ) : null}
+        </View>
+      </Pressable>
+
+      <Pressable
+        accessibilityLabel={
+          wished ? 'Bỏ khỏi danh sách yêu thích' : 'Thêm vào danh sách yêu thích'
+        }
+        accessibilityRole="button"
+        disabled={wishlistBusy}
+        hitSlop={8}
+        onPress={() => void handleWishlist()}
+        style={({ pressed }) => [
+          styles.wishlistButton,
+          wished && styles.wishlistButtonActive,
+          pressed && styles.wishlistPressed,
+          wishlistBusy && styles.wishlistBusy,
+        ]}>
+        <Text
+          style={[
+            styles.wishlistIcon,
+            wished && styles.wishlistIconActive,
+          ]}>
+          {wishlistBusy ? '…' : wished ? '♥' : '♡'}
+        </Text>
+      </Pressable>
+    </View>
   );
 }
 
@@ -162,15 +227,18 @@ const styles = StyleSheet.create({
     backgroundColor: BRAND_COLORS.surface,
     borderRadius: 22,
     padding: 8,
-    gap: 9,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: BRAND_COLORS.line,
+    position: 'relative',
+  },
+  cardPressable: {
+    gap: 9,
   },
   pressed: {
     opacity: 0.84,
     transform: [{ scale: 0.99 }],
   },
-  outOfStockCard: { opacity: 0.68 },
+  outOfStockCard: { opacity: 0.72 },
   imageWrap: {
     aspectRatio: 0.8,
     borderRadius: 17,
@@ -182,6 +250,37 @@ const styles = StyleSheet.create({
   },
   image: { width: '100%', height: '100%' },
   imageFallback: { fontSize: 44 },
+  wishlistButton: {
+    position: 'absolute',
+    top: 14,
+    right: 14,
+    zIndex: 3,
+    width: 34,
+    height: 34,
+    borderRadius: 13,
+    backgroundColor: 'rgba(255,255,255,0.94)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(17,24,39,0.08)',
+  },
+  wishlistButtonActive: {
+    backgroundColor: '#FEF2F2',
+    borderColor: '#FECACA',
+  },
+  wishlistPressed: {
+    transform: [{ scale: 0.94 }],
+  },
+  wishlistBusy: { opacity: 0.58 },
+  wishlistIcon: {
+    color: BRAND_COLORS.ink,
+    fontSize: 21,
+    lineHeight: 23,
+    fontWeight: '900',
+  },
+  wishlistIconActive: {
+    color: BRAND_COLORS.danger,
+  },
   badges: {
     position: 'absolute',
     left: 8,
