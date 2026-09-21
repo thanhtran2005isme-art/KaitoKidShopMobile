@@ -79,3 +79,17 @@ Khi thêm dữ liệu hoặc UI mới:
 - giữ tone thân thiện, rõ ràng với phụ huynh;
 - ưu tiên thông tin thực dụng thay vì marketing quá mức;
 - nếu thêm category/product mới, đảm bảo tên, slug, mô tả, size và `NhomTuoi` đồng nhất với định vị trên.
+
+
+## Màu UI hiện tại
+
+Home mobile dùng bảng màu tập trung tại `apps/mobile/src/constants/brand.ts`:
+
+- Primary: `#7C3AED`
+- Primary dark: `#5B21B6`
+- Accent: `#F97316`
+- Canvas: `#F8FAFC`
+- Surface: `#FFFFFF`
+- Ink: `#111827`
+
+Khi thêm component Home/Product mới, ưu tiên dùng `BRAND_COLORS` thay vì hard-code lại màu thương hiệu.
