@@ -52,8 +52,9 @@ export default function CartScreen() {
               : 'Giỏ hàng đang trống'}
         </Text>
         <Text style={styles.description}>
-          Sản phẩm bạn thêm đã được đồng bộ với backend. Màn quản lý chi tiết,
-          tăng giảm số lượng và thanh toán sẽ được hoàn thiện ở bước tiếp theo.
+          {cartCount && cartCount > 0
+            ? 'Sản phẩm trong giỏ đã được đồng bộ và đang được giữ tồn kho trong thời gian giới hạn.'
+            : 'Hãy chọn màu, size và thêm những món phù hợp cho bé vào giỏ hàng.'}
         </Text>
 
         <View style={styles.actions}>
