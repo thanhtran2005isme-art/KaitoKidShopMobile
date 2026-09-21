@@ -180,6 +180,7 @@ public class ProductService(CustomerDbContext db) : IProductService
         Price = p.Price,
         OldPrice = p.OldPrice,
         Stock = p.Stock,
+        AvailableStock = p.Available,
         Status = p.Status,
         Image = p.Image,
         Images = Deserialize<List<string>>(p.Images) ?? [],
