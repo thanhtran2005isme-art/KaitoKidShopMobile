@@ -77,8 +77,16 @@ export default function ProductDetailScreen() {
 
         setProduct(detail);
 
-        const colors = uniqueValues(detail.colors);
-        const sizes = uniqueValues(detail.sizes);
+        const colors = uniqueValues([
+          ...(detail.colors || []),
+          ...(detail.variantInventory || []).map((item) => item.color),
+          ...(detail.variants || []).map((item) => item.color),
+        ]);
+        const sizes = uniqueValues([
+          ...(detail.sizes || []),
+          ...(detail.variantInventory || []).map((item) => item.size),
+          ...(detail.variants || []).map((item) => item.size),
+        ]);
 
         if (colors.length === 1) setSelectedColor(colors[0]);
         if (sizes.length === 1) setSelectedSize(sizes[0]);
@@ -107,13 +115,23 @@ export default function ProductDetailScreen() {
   }, [slug, retryKey]);
 
   const colors = useMemo(
-    () => uniqueValues(product?.colors),
-    [product?.colors],
+    () =>
+      uniqueValues([
+        ...(product?.colors || []),
+        ...(product?.variantInventory || []).map((item) => item.color),
+        ...(product?.variants || []).map((item) => item.color),
+      ]),
+    [product?.colors, product?.variantInventory, product?.variants],
   );
 
   const sizes = useMemo(
-    () => uniqueValues(product?.sizes),
-    [product?.sizes],
+    () =>
+      uniqueValues([
+        ...(product?.sizes || []),
+        ...(product?.variantInventory || []).map((item) => item.size),
+        ...(product?.variants || []).map((item) => item.size),
+      ]),
+    [product?.sizes, product?.variantInventory, product?.variants],
   );
 
   const variantInventory = useMemo(
