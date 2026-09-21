@@ -62,17 +62,15 @@ public class CartReservationSweeper(
                 variant.Reserved = Math.Max(0, variant.Reserved - grp.Qty);
                 variant.UpdatedAt = now;
             }
-            else
-            {
-                var product = await db.Products.FirstOrDefaultAsync(
-                    p => p.Id == grp.ProductId,
-                    ct);
 
-                if (product != null)
-                {
-                    product.Reserved = Math.Max(0, product.Reserved - grp.Qty);
-                    product.UpdatedAt = now;
-                }
+            var product = await db.Products.FirstOrDefaultAsync(
+                p => p.Id == grp.ProductId,
+                ct);
+
+            if (product != null)
+            {
+                product.Reserved = Math.Max(0, product.Reserved - grp.Qty);
+                product.UpdatedAt = now;
             }
         }
 
