@@ -10,6 +10,7 @@ This file is intentionally concise. It describes the current state needed to con
 - Default branch: `main`
 - Project name used in docs/UI: KaitoKidShop
 - Structure: full-stack monorepo
+- Git convention: mọi commit do AI/GPT tạo phải có phần mô tả bằng **tiếng Việt**; có thể giữ tiền tố Conventional Commits như `feat:`, `fix:`, `docs:`.
 
 ## Current structure
 
@@ -129,5 +130,6 @@ A NuGet warning about a known vulnerability in `Microsoft.OpenApi 2.0.0` has bee
 4. Read task-relevant decisions/troubleshooting.
 5. Inspect the relevant current files.
 6. Check recent Git history/PRs when the reason for existing code matters.
+7. Khi tạo commit mới, viết commit message bằng tiếng Việt theo quy tắc trong `AGENTS.md`.
 
 For exact historical changes, use Git rather than relying on this file.
