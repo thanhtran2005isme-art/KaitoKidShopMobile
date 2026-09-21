@@ -11,7 +11,7 @@ This file is intentionally concise. It describes the current state needed to con
 - Project name used in docs/UI: KaitoKidShop
 - Brand: **KaitoKid = thời trang trẻ em 0–12 tuổi**
 - Brand rules: `docs/BRAND.md`
-- Current roadmap: PHASE 1 hoàn tất, tiếp theo PHASE 2 — Nâng cấp Home
+- Current roadmap: PHASE 1–2 hoàn tất, tiếp theo PHASE 3 — Product Detail hoàn chỉnh
 - Roadmap source: `docs/ROADMAP.md`
 - Structure: full-stack monorepo
 - Git convention: mọi commit do AI/GPT tạo phải có phần mô tả bằng **tiếng Việt**; có thể giữ tiền tố Conventional Commits như `feat:`, `fix:`, `docs:`.
@@ -119,14 +119,18 @@ As of 2026-09-21:
 - API.Auth starts on port 5053.
 - API.Customer starts on port 5265 with correct local DB credentials.
 - Expo/Metro starts on port 8081.
-- The mobile home screen successfully loads categories and product data from API.Customer.
+- The mobile home screen loads categories and product data from API.Customer.
+- PHASE 2 Home UI đã được nâng cấp: header, cart badge có token, hero auto-slide + dots, promo strip, root categories, discovery tiles, product cards và skeleton loading.
+- Login mobile hiện dùng `AuthContext.login(email, password)` để lưu access token/session cho các API được bảo vệ.
 - Expo Web renders the mobile app successfully at `127.0.0.1:8081`.
 - API.Customer serves shared media from `apps/web/public` so existing banner URLs such as `/slide_1.jpg` resolve on port 5265.
 - Seed product image paths under `/products/` currently have no source files in the repository; API.Customer returns a branded placeholder instead of 404 until real product media is added.
 
 ## Known non-blocking item
 
-A NuGet warning about a known vulnerability in `Microsoft.OpenApi 2.0.0` has been observed during API.Auth build. It did not block startup, but dependency remediation should be handled separately rather than mixed into unrelated changes.
+- PHASE 2 đã static-review nhưng chưa chạy được `npm/tsc` trong môi trường công cụ do không có DNS/network tới GitHub. Cần xác nhận runtime trên máy local sau khi pull.
+- Wishlist/Add-to-cart thật chưa nằm trong PHASE 2; chúng thuộc PHASE 4. Cart đầy đủ thuộc PHASE 5.
+- A NuGet warning about a known vulnerability in `Microsoft.OpenApi 2.0.0` has been observed during API.Auth build. It did not block startup, but dependency remediation should be handled separately rather than mixed into unrelated changes.
 
 ## How a new AI/chat should resume
 
