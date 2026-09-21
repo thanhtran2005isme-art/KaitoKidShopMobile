@@ -1,6 +1,6 @@
 # AI Handoff — Current State
 
-Last updated: 2026-09-21
+Last updated: 2026-09-22
 
 This file is intentionally concise. It describes the current state needed to continue work quickly. Historical detail belongs in `docs/history/`, and exact code history belongs in Git.
 
@@ -9,6 +9,10 @@ This file is intentionally concise. It describes the current state needed to con
 - GitHub: `thanhtran2005isme-art/KaitoKidShopMobile`
 - Default branch: `main`
 - Project name used in docs/UI: KaitoKidShop
+- Brand: **KaitoKid = thời trang trẻ em 0–12 tuổi**
+- Brand rules: `docs/BRAND.md`
+- Current roadmap: PHASE 1 hoàn tất, tiếp theo PHASE 2 — Nâng cấp Home
+- Roadmap source: `docs/ROADMAP.md`
 - Structure: full-stack monorepo
 - Git convention: mọi commit do AI/GPT tạo phải có phần mô tả bằng **tiếng Việt**; có thể giữ tiền tố Conventional Commits như `feat:`, `fix:`, `docs:`.
 
@@ -62,6 +66,8 @@ KaitoKidShop/
 - Backend DbContexts register through `AddMariaDb<TContext>()`
 - Legacy SQL Server migrations remain as history and are excluded from compilation.
 - Initial/fresh MariaDB schema source: `backend/Database/KaitoKid_MariaDB.sql`
+- Dữ liệu seed đã chuẩn hóa sang trẻ em.
+- Database local hiện tại cần chạy `backend/Database/migrations/20260922_phase1_kids_branding.sql` sau khi pull PHASE 1.
 
 ## Local database credentials
 
@@ -126,10 +132,12 @@ A NuGet warning about a known vulnerability in `Microsoft.OpenApi 2.0.0` has bee
 
 1. Read `AGENTS.md`.
 2. Read this file.
-3. Read `docs/ARCHITECTURE.md`.
-4. Read task-relevant decisions/troubleshooting.
-5. Inspect the relevant current files.
-6. Check recent Git history/PRs when the reason for existing code matters.
-7. Khi tạo commit mới, viết commit message bằng tiếng Việt theo quy tắc trong `AGENTS.md`.
+3. Read `docs/BRAND.md`.
+4. Read `docs/ROADMAP.md`.
+5. Read `docs/ARCHITECTURE.md`.
+6. Read task-relevant decisions/troubleshooting.
+7. Inspect the relevant current files.
+8. Check recent Git history/PRs when the reason for existing code matters.
+9. Khi tạo commit mới, viết commit message bằng tiếng Việt theo quy tắc trong `AGENTS.md`.
 
 For exact historical changes, use Git rather than relying on this file.
