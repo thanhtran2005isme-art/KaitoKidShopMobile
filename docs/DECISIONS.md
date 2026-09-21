@@ -97,3 +97,16 @@ This file records durable decisions and their rationale. It is not a chronologic
 **Quy ước dữ liệu:** Sản phẩm mẫu dùng `NhomTuoi = TreEm`; `GioiTinh = Nam/Nu/Unisex` được UI diễn giải thành bé trai/bé gái/unisex. Size trẻ em ưu tiên theo chiều cao 90–150.
 
 **Hệ quả:** Mọi dữ liệu, copy, banner, collection và UI mới phải tuân theo `docs/BRAND.md`. Không thêm lại nội dung kiểu công sở người lớn, body/quyến rũ hoặc category nam/nữ người lớn nếu không có quyết định thay đổi thương hiệu mới.
+
+
+## D010 — Product Detail dùng tồn kho biến thể thật khi có
+
+**Ngày:** 2026-09-22
+
+**Quyết định:** Product Detail ưu tiên tồn kho khả dụng từ `TonKhoBienThe` theo cặp `(size, màu)`. Nếu sản phẩm chưa có dữ liệu biến thể, UI fallback về `SanPham.TonKho` và danh sách `DanhSachMau/DanhSachSize`.
+
+**Lý do:** Add to Cart ở PHASE 4 phải dựa trên lựa chọn size/màu hợp lệ và không được giả định mọi tổ hợp đều còn hàng khi backend đã có tồn kho biến thể.
+
+**Quy tắc:** `Available = Stock - Reserved` là số lượng dùng để quyết định biến thể còn hàng. Product Detail vẫn được phép mở sản phẩm có trạng thái `out-of-stock` để người dùng xem thông tin; các danh sách bán hàng vẫn có thể lọc chỉ `active`.
+
+**Hệ quả:** Khi nối Add to Cart, phải tái sử dụng state màu/size/số lượng của Product Detail và tôn trọng `variantInventory`; không tự tạo stock giả ở mobile.
