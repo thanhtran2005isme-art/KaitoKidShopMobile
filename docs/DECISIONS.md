@@ -71,3 +71,16 @@ This file records durable decisions and their rationale. It is not a chronologic
 **Rationale:** Chat memory is not a reliable store for an entire repository, every commit, and a long-running transcript.
 
 **Consequence:** Keep `AI_HANDOFF.md` current and concise. Move old chronology to `docs/history/` rather than letting one file grow indefinitely.
+
+
+## D008 — Viết commit message bằng tiếng Việt
+
+**Ngày:** 2026-09-22
+
+**Quyết định:** Mọi commit do AI/GPT tạo trong repository KaitoKidShop phải có phần mô tả bằng tiếng Việt.
+
+**Lý do:** Dự án được người phát triển theo dõi và trao đổi chủ yếu bằng tiếng Việt. Commit tiếng Việt giúp lịch sử Git dễ đọc, dễ tra cứu và giúp các phiên ChatGPT/AI sau hiểu nhanh mục đích thay đổi.
+
+**Quy ước:** Có thể dùng tiền tố Conventional Commits bằng tiếng Anh như `feat:`, `fix:`, `docs:`, `chore:`, `refactor:`; phần mô tả sau tiền tố phải là tiếng Việt. Ví dụ: `fix: sửa ảnh sản phẩm bị 404`.
+
+**Hệ quả:** Trước khi commit, AI phải kiểm tra commit message đã mô tả đúng thay đổi và dùng tiếng Việt, trừ khi người dùng yêu cầu rõ ràng một ngôn ngữ khác.
