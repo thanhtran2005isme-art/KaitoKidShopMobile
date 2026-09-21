@@ -13,12 +13,34 @@ if not exist "%MOBILE%\package.json" (
   exit /b 1
 )
 
+where npm >nul 2>&1
+if errorlevel 1 (
+  echo [LOI] Khong tim thay npm trong PATH. Hay cai Node.js truoc.
+  pause
+  exit /b 1
+)
+
 pushd "%MOBILE%"
 
-if not exist "node_modules" (
-  echo [SETUP] Installing mobile dependencies...
+if not exist "node_modules\.bin\expo.cmd" (
+  echo [SETUP] Mobile dependencies thieu hoac chua day du.
+  echo [SETUP] Dang chay npm install...
   call npm install
-  if errorlevel 1 goto :error
+  if errorlevel 1 goto :install_error
+)
+
+if not exist "node_modules\.bin\expo.cmd" (
+  echo.
+  echo [LOI] npm install xong nhung van khong tim thay Expo CLI:
+  echo       %MOBILE%\node_modules\.bin\expo.cmd
+  echo.
+  echo Thu chay thu cong:
+  echo   cd /d "%MOBILE%"
+  echo   npm install
+  pause
+  popd
+  endlocal
+  exit /b 1
 )
 
 where adb >nul 2>&1
@@ -38,7 +60,7 @@ echo [EXPO] Project: %MOBILE%
 echo [EXPO] Starting Metro on port 8081...
 echo.
 
-call npx expo start --lan --port 8081 -c
+call ".\node_modules\.bin\expo.cmd" start --lan --port 8081 -c
 if errorlevel 1 goto :expo_error
 
 popd
@@ -58,10 +80,15 @@ pause
 endlocal
 exit /b %EXPO_EXIT%
 
-:error
+:install_error
+set "INSTALL_EXIT=%ERRORLEVEL%"
 echo.
-echo [LOI] Khong the cai dependencies cho Mobile.
+echo ==================================================
+echo [LOI] npm install that bai voi ma loi %INSTALL_EXIT%.
+echo Cua so nay duoc giu lai de ban doc/copy log loi.
+echo ==================================================
+echo.
 popd
 pause
 endlocal
-exit /b 1
+exit /b %INSTALL_EXIT%
