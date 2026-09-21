@@ -45,7 +45,8 @@ export function ProductCard({ product, width = 168 }: { product: Product; width?
 
   const isOutOfStock = product.stock <= 0 || product.status === 'out-of-stock';
   const isLowStock = !isOutOfStock && product.stock <= 5;
-  const visibleColors = product.colors?.slice(0, 3) || [];
+  const colors = product.colors || [];
+  const visibleColors = colors.slice(0, 3);
 
   return (
     <Pressable
@@ -135,8 +136,8 @@ export function ProductCard({ product, width = 168 }: { product: Product; width?
                   ]}
                 />
               ))}
-              {product.colors.length > visibleColors.length ? (
-                <Text style={styles.moreColors}>+{product.colors.length - visibleColors.length}</Text>
+              {colors.length > visibleColors.length ? (
+                <Text style={styles.moreColors}>+{colors.length - visibleColors.length}</Text>
               ) : null}
             </View>
           ) : (
