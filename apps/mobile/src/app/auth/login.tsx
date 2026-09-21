@@ -1,5 +1,5 @@
 import { LinearGradient } from 'expo-linear-gradient';
-import { Link, router } from 'expo-router';
+import { Link, router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { Alert, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -7,6 +7,10 @@ import { useAuth } from '@/context/AuthContext';
 
 export default function LoginScreen() {
   const { login } = useAuth();
+  const params = useLocalSearchParams<{ redirect?: string | string[] }>();
+  const redirect = Array.isArray(params.redirect)
+    ? params.redirect[0]
+    : params.redirect;
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -15,7 +19,11 @@ export default function LoginScreen() {
     try {
       setLoading(true);
       await login(email, password);
-      router.replace('/(tabs)');
+      router.replace(
+        redirect && redirect.startsWith('/')
+          ? (redirect as any)
+          : '/(tabs)',
+      );
     } catch (error) {
       Alert.alert('Đăng nhập thất bại', error instanceof Error ? error.message : 'Vui lòng thử lại');
     } finally {
