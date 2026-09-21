@@ -1,3 +1,4 @@
+using System.Text.Json;
 using API.Customer.Data;
 using API.Customer.DTOs;
 using API.Customer.Models;
@@ -30,8 +31,8 @@ public class CartService(CustomerDbContext db) : ICartService
                 v.Color == c.Color);
 
             var available = matchedVariant != null
-                ? Math.Max(0, matchedVariant.Stock - matchedVariant.Reserved)
-                : c.Product.Stock; // Fallback dùng stock SanPham
+                ? matchedVariant.Available
+                : c.Product.Available;
 
             return new CartItemDTO
             {
@@ -52,31 +53,59 @@ public class CartService(CustomerDbContext db) : ICartService
 
     public async Task<CartItemDTO> AddToCartAsync(int userId, AddToCartDTO dto)
     {
-        // Tìm variant để check stock
-        var variant = await db.VariantStocks.FirstOrDefaultAsync(v =>
-            v.ProductId == dto.ProductId && v.Size == dto.Size && v.Color == dto.Color);
+        if (dto.Quantity < 1)
+            throw new InvalidOperationException("Số lượng phải lớn hơn 0");
+
+        dto.Size = dto.Size?.Trim() ?? string.Empty;
+        dto.Color = dto.Color?.Trim() ?? string.Empty;
+
         var product = await db.Products.FindAsync(dto.ProductId)
             ?? throw new InvalidOperationException("Sản phẩm không tồn tại");
 
+        if (product.Status != "active")
+            throw new InvalidOperationException("Sản phẩm hiện không thể thêm vào giỏ hàng");
+
+        var allowedSizes = DeserializeList(product.Sizes);
+        var allowedColors = DeserializeList(product.Colors);
+
+        if (allowedSizes.Count > 0 &&
+            !allowedSizes.Contains(dto.Size, StringComparer.OrdinalIgnoreCase))
+            throw new InvalidOperationException("Kích cỡ đã chọn không hợp lệ");
+
+        if (allowedColors.Count > 0 &&
+            !allowedColors.Contains(dto.Color, StringComparer.OrdinalIgnoreCase))
+            throw new InvalidOperationException("Màu sắc đã chọn không hợp lệ");
+
+        var hasVariantInventory = await db.VariantStocks
+            .AnyAsync(v => v.ProductId == dto.ProductId);
+
+        var variant = await db.VariantStocks.FirstOrDefaultAsync(v =>
+            v.ProductId == dto.ProductId &&
+            v.Size == dto.Size &&
+            v.Color == dto.Color);
+
+        if (hasVariantInventory && variant is null)
+            throw new InvalidOperationException("Biến thể size/màu đã chọn không tồn tại hoặc không còn bán");
+
         var availableStock = variant != null
-            ? variant.Stock - variant.Reserved
-            : product.Stock;
+            ? Math.Min(variant.Available, product.Available)
+            : product.Available;
 
         if (availableStock < dto.Quantity)
-            throw new InvalidOperationException($"Chỉ còn {availableStock} sản phẩm khả dụng cho size {dto.Size} - màu {dto.Color}");
+            throw new InvalidOperationException(
+                $"Chỉ còn {availableStock} sản phẩm khả dụng cho size {dto.Size} - màu {dto.Color}");
 
         var existing = await db.CartItems.FirstOrDefaultAsync(c =>
-            c.UserId == userId && c.ProductId == dto.ProductId &&
-            c.Size == dto.Size && c.Color == dto.Color);
+            c.UserId == userId &&
+            c.ProductId == dto.ProductId &&
+            c.Size == dto.Size &&
+            c.Color == dto.Color);
 
-        // dto.Quantity là số lượng cần cộng vào cart (cũng chính là số cần reserve thêm).
         var quantityDelta = dto.Quantity;
         var reserveUntil = DateTime.UtcNow.AddMinutes(ReservationMinutes);
 
         if (existing != null)
         {
-            // Cộng dồn — số lượng thêm dto.Quantity đã được check ở trên (availableStock < dto.Quantity).
-            // availableStock đã trừ phần đang reserve (gồm cả phần của user này), nên không cần check tổng nữa.
             existing.Quantity += dto.Quantity;
             existing.ReservedUntil = reserveUntil;
         }
@@ -94,21 +123,21 @@ public class CartService(CustomerDbContext db) : ICartService
             db.CartItems.Add(existing);
         }
 
-        // Reserve stock thật
+        product.Reserved += quantityDelta;
+        product.UpdatedAt = DateTime.UtcNow;
+
         if (variant != null)
         {
             variant.Reserved += quantityDelta;
             variant.UpdatedAt = DateTime.UtcNow;
         }
-        else
-        {
-            // Fallback: không có variant entry, dùng product.Stock — nhưng không reserve được granular
-            // → bỏ qua reserve, chỉ check stock
-        }
 
         await db.SaveChangesAsync();
 
-        var availableAfter = variant != null ? Math.Max(0, variant.Stock - variant.Reserved) : product.Stock;
+        var availableAfter = variant != null
+            ? Math.Min(variant.Available, product.Available)
+            : product.Available;
+
         return new CartItemDTO
         {
             Id = existing.Id,
@@ -127,32 +156,52 @@ public class CartService(CustomerDbContext db) : ICartService
 
     public async Task<CartItemDTO?> UpdateQuantityAsync(int userId, int cartItemId, int quantity)
     {
-        var item = await db.CartItems.Include(c => c.Product)
+        var item = await db.CartItems
+            .Include(c => c.Product)
             .FirstOrDefaultAsync(c => c.Id == cartItemId && c.UserId == userId);
+
         if (item is null) return null;
         if (quantity < 1) return null;
 
         var variant = await db.VariantStocks.FirstOrDefaultAsync(v =>
-            v.ProductId == item.ProductId && v.Size == item.Size && v.Color == item.Color);
+            v.ProductId == item.ProductId &&
+            v.Size == item.Size &&
+            v.Color == item.Color);
 
         var oldQty = item.Quantity;
         var delta = quantity - oldQty;
 
+        var productAvailableForItem =
+            item.Product.Stock - item.Product.Reserved + oldQty;
+
+        if (quantity > productAvailableForItem)
+            throw new InvalidOperationException(
+                $"Chỉ còn {productAvailableForItem} sản phẩm khả dụng");
+
         if (variant != null)
         {
-            // Check available
-            var available = variant.Stock - variant.Reserved + oldQty; // cộng lại phần đang giữ của item này
-            if (quantity > available)
-                throw new InvalidOperationException($"Chỉ còn {available} sản phẩm khả dụng");
+            var variantAvailableForItem =
+                variant.Stock - variant.Reserved + oldQty;
+
+            if (quantity > variantAvailableForItem)
+                throw new InvalidOperationException(
+                    $"Chỉ còn {variantAvailableForItem} sản phẩm khả dụng cho biến thể này");
+
             variant.Reserved = Math.Max(0, variant.Reserved + delta);
             variant.UpdatedAt = DateTime.UtcNow;
         }
+
+        item.Product.Reserved = Math.Max(0, item.Product.Reserved + delta);
+        item.Product.UpdatedAt = DateTime.UtcNow;
 
         item.Quantity = quantity;
         item.ReservedUntil = DateTime.UtcNow.AddMinutes(ReservationMinutes);
         await db.SaveChangesAsync();
 
-        var availableAfter = variant != null ? Math.Max(0, variant.Stock - variant.Reserved) : item.Product.Stock;
+        var availableAfter = variant != null
+            ? Math.Min(variant.Available, item.Product.Available)
+            : item.Product.Available;
+
         return new CartItemDTO
         {
             Id = item.Id,
@@ -250,7 +299,7 @@ public class CartService(CustomerDbContext db) : ICartService
             Size = "",
             Color = "",
             Quantity = 0,
-            AvailableStock = p.Stock,
+            AvailableStock = p.Available,
         }).ToList();
     }
 
@@ -295,20 +344,40 @@ public class CartService(CustomerDbContext db) : ICartService
         return result;
     }
 
-    private Task ReleaseReservation(CartItem item)
+    private async Task ReleaseReservation(CartItem item)
     {
-        // Trả lại số lượng vào variant.Reserved
-        return ReleaseVariantReserve(item.ProductId, item.Size, item.Color, item.Quantity);
-    }
+        var now = DateTime.UtcNow;
 
-    private async Task ReleaseVariantReserve(int productId, string size, string color, int qty)
-    {
         var variant = await db.VariantStocks.FirstOrDefaultAsync(v =>
-            v.ProductId == productId && v.Size == size && v.Color == color);
+            v.ProductId == item.ProductId &&
+            v.Size == item.Size &&
+            v.Color == item.Color);
+
         if (variant != null)
         {
-            variant.Reserved = Math.Max(0, variant.Reserved - qty);
-            variant.UpdatedAt = DateTime.UtcNow;
+            variant.Reserved = Math.Max(0, variant.Reserved - item.Quantity);
+            variant.UpdatedAt = now;
+        }
+
+        var product = await db.Products.FindAsync(item.ProductId);
+        if (product != null)
+        {
+            product.Reserved = Math.Max(0, product.Reserved - item.Quantity);
+            product.UpdatedAt = now;
+        }
+    }
+
+    private static List<string> DeserializeList(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json)) return [];
+
+        try
+        {
+            return JsonSerializer.Deserialize<List<string>>(json) ?? [];
+        }
+        catch
+        {
+            return [];
         }
     }
 }

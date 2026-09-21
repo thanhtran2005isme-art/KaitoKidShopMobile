@@ -19,18 +19,18 @@ import { ProductSection } from '@/components/home/product-section';
 import { PromoStrip } from '@/components/home/promo-strip';
 import { BRAND, BRAND_COLORS } from '@/constants/brand';
 import { useAuth } from '@/context/AuthContext';
-import { useCartBadge } from '@/hooks/use-cart-badge';
+import { useShopping } from '@/context/ShoppingContext';
 import { useHomeData } from '@/hooks/use-home-data';
 import { resolveMediaUrl } from '@/services/api-client';
 
 export default function HomeScreen() {
-  const { token, user } = useAuth();
-  const { count: cartCount, refresh: refreshCartCount } = useCartBadge(token);
+  const { user } = useAuth();
+  const { cartCount, refreshCartCount, refreshWishlist } = useShopping();
   const { data, error, loading, refreshing, refresh, reload } = useHomeData();
 
   const handleRefresh = useCallback(async () => {
-    await Promise.all([refresh(), refreshCartCount()]);
-  }, [refresh, refreshCartCount]);
+    await Promise.all([refresh(), refreshCartCount(), refreshWishlist()]);
+  }, [refresh, refreshCartCount, refreshWishlist]);
 
   const userName =
     user?.name ||

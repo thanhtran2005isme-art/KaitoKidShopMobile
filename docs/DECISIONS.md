@@ -110,3 +110,26 @@ This file records durable decisions and their rationale. It is not a chronologic
 **Quy tắc:** `Available = Stock - Reserved` là số lượng dùng để quyết định biến thể còn hàng. Product Detail vẫn được phép mở sản phẩm có trạng thái `out-of-stock` để người dùng xem thông tin; các danh sách bán hàng vẫn có thể lọc chỉ `active`.
 
 **Hệ quả:** Khi nối Add to Cart, phải tái sử dụng state màu/size/số lượng của Product Detail và tôn trọng `variantInventory`; không tự tạo stock giả ở mobile.
+
+
+## D011 — Dùng ShoppingContext làm state mua sắm chung trên mobile
+
+**Ngày:** 2026-09-22
+
+**Quyết định:** Wishlist state và cart badge được quản lý tập trung trong `ShoppingContext`, đặt bên trong `AuthProvider`.
+
+**Lý do:** ProductCard xuất hiện ở Home, Category, Search, Related Products và Wishlist. Nếu mỗi card tự gọi Wishlist/Cart API sẽ gây nhiều request trùng và state không đồng bộ giữa các màn.
+
+**Hệ quả:** Các màn/component cần wishlist hoặc cart count phải dùng `useShopping()`. Không tạo lại hook cart badge riêng theo từng màn.
+
+## D012 — Reserve tồn kho ở cả cấp sản phẩm và biến thể
+
+**Ngày:** 2026-09-22
+
+**Quyết định:** Khi item được thêm vào giỏ, backend tăng `SanPham.SoLuongDaGiu` cho tổng sản phẩm và, nếu có variant, đồng thời tăng `TonKhoBienThe.SoLuongDaGiu` cho đúng cặp size/màu.
+
+**Lý do:** Seed hiện chưa có `TonKhoBienThe` nhưng production có thể có. Chỉ reserve variant làm tồn tổng trên ProductCard sai; chỉ reserve product làm mất kiểm soát size/màu. Hai cấp phải đồng bộ.
+
+**Quy tắc:** `AvailableStock = Stock - Reserved`. Add/update/remove/cart-expiry/checkout phải cập nhật reserve đối xứng. Request Add to Cart phải validate product đang `active`, quantity > 0, size/màu hợp lệ và variant tồn tại nếu sản phẩm có inventory biến thể.
+
+**Hệ quả:** Không được bypass reservation bằng cách ghi trực tiếp vào `GioHang`. Luồng Cart/Checkout tiếp theo phải đi qua CartService để giữ invariant tồn kho.

@@ -15,6 +15,8 @@ public class Product
     [Column("Gia", TypeName = "decimal(18,0)")] public decimal Price { get; set; }
     [Column("GiaCu", TypeName = "decimal(18,0)")] public decimal? OldPrice { get; set; }
     [Column("TonKho")] public int Stock { get; set; }
+    [Column("SoLuongDaGiu")] public int Reserved { get; set; }
+    [NotMapped] public int Available => Math.Max(0, Stock - Reserved);
     [Column("TrangThai")] public string Status { get; set; } = "active";
     [Column("HinhAnh")] public string Image { get; set; } = string.Empty;
     [Column("DanhSachAnh")] public string? Images { get; set; }

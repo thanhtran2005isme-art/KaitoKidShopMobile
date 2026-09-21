@@ -148,3 +148,44 @@ The three slider images exist in `apps/web/public`, so API.Customer additionally
 The seeded `/products/*.jpg` files do not exist anywhere in the repository (including the pre-monorepo history that was checked during the fix). API.Customer therefore returns a lightweight KaitoKid SVG placeholder for missing `/products/*` requests rather than returning 404.
 
 When real product files are added to a configured static directory, static-file middleware takes precedence automatically and the fallback is not used.
+
+
+## Add to Cart báo lỗi cột `SoLuongDaGiu` hoặc `GiuDenLuc`
+
+PHASE 4 dùng reservation tồn kho ở cả cấp sản phẩm và biến thể.
+
+Nếu API.Customer log lỗi kiểu:
+
+```text
+Unknown column 'SoLuongDaGiu'
+Unknown column 'GiuDenLuc'
+```
+
+hãy chạy migration:
+
+```bat
+"C:\xampp\mysql\bin\mysql.exe" -u root kaitokid < backend\Database\migrations\20260922_phase4_cart_reservation.sql
+```
+
+sau đó restart `run.bat`.
+
+Migration dùng `ADD COLUMN IF NOT EXISTS`, nên có thể chạy lại an toàn.
+
+## Wishlist/Add to Cart trả 401
+
+Wishlist và Cart đều là API có `[Authorize]`.
+
+Kiểm tra:
+
+1. Đăng nhập qua mobile để `AuthContext` lưu access token.
+2. Sau login, `ShoppingContext` phải tự refresh wishlist/cart count.
+3. Nếu token cũ hết hạn, logout/login lại.
+4. Không hard-code Bearer token vào source hoặc `.env`.
+
+## Add to Cart báo size/màu không hợp lệ
+
+Backend PHASE 4 kiểm tra lựa chọn với `DanhSachSize`, `DanhSachMau` và `TonKhoBienThe`.
+
+- Nếu sản phẩm có variant inventory, cặp size + màu phải tồn tại thật.
+- Nếu chưa có variant inventory, backend dùng tồn khả dụng cấp sản phẩm nhưng vẫn validate size/màu đã khai báo.
+- Không gửi giá trị tự chế từ UI.

@@ -18,6 +18,8 @@ import { ProductSizeGuide } from '@/components/product/product-size-guide';
 import { ProductCard } from '@/components/product/product-card';
 import { QuantitySelector } from '@/components/product/quantity-selector';
 import { BRAND, BRAND_COLORS } from '@/constants/brand';
+import { useAuth } from '@/context/AuthContext';
+import { useShopping } from '@/context/ShoppingContext';
 import { shopApi } from '@/services/home.api';
 import type {
   Product,
@@ -46,6 +48,8 @@ function uniqueValues(values?: string[]) {
 
 export default function ProductDetailScreen() {
   const router = useRouter();
+  const { token } = useAuth();
+  const { addToCart, isWishlisted, toggleWishlist } = useShopping();
   const params = useLocalSearchParams<{ slug?: string | string[] }>();
   const slug = Array.isArray(params.slug) ? params.slug[0] : params.slug;
 
@@ -57,6 +61,18 @@ export default function ProductDetailScreen() {
   const [selectedSize, setSelectedSize] = useState<string | null>(null);
   const [quantity, setQuantity] = useState(1);
   const [sizeGuideVisible, setSizeGuideVisible] = useState(false);
+  const [actionBusy, setActionBusy] = useState<'cart' | 'wishlist' | null>(null);
+  const [feedback, setFeedback] = useState<{
+    type: 'success' | 'error';
+    text: string;
+  } | null>(null);
+
+  useEffect(() => {
+    if (!feedback) return;
+
+    const timer = setTimeout(() => setFeedback(null), 3200);
+    return () => clearTimeout(timer);
+  }, [feedback]);
 
   useEffect(() => {
     if (!slug) return;
@@ -221,7 +237,7 @@ export default function ProductDetailScreen() {
       return selectedInventory?.available || 0;
     }
 
-    return Math.max(0, product.stock);
+    return Math.max(0, product.availableStock ?? product.stock);
   })();
 
   useEffect(() => {
@@ -286,15 +302,32 @@ export default function ProductDetailScreen() {
     product.oldPrice && product.oldPrice > product.price
       ? product.oldPrice - product.price
       : 0;
-  const isOutOfStock = product.stock <= 0 || product.status === 'out-of-stock';
+  const productAvailableStock = Math.max(
+    0,
+    product.availableStock ?? product.stock,
+  );
+  const isOutOfStock =
+    productAvailableStock <= 0 || product.status === 'out-of-stock';
   const isLowStock = !isOutOfStock && availableStock > 0 && availableStock <= 5;
   const canShowSizeGuide = supportsKidSizeGuide(sizes);
   const selectionComplete =
     (!colors.length || Boolean(selectedColor)) &&
     (!sizes.length || Boolean(selectedSize));
   const currentSku = selectedVariant?.sku || product.sku;
+  const wished = isWishlisted(product.id);
+  const selectedOutOfStock = selectionComplete && availableStock <= 0;
+
+  const productPath = `/product/${product.slug || product.id}`;
+
+  const requireLogin = () => {
+    router.push({
+      pathname: '/auth/login',
+      params: { redirect: productPath },
+    });
+  };
 
   const chooseColor = (color: string) => {
+    setFeedback(null);
     setSelectedColor(color);
     setQuantity(1);
 
@@ -304,11 +337,124 @@ export default function ProductDetailScreen() {
   };
 
   const chooseSize = (size: string) => {
+    setFeedback(null);
     setSelectedSize(size);
     setQuantity(1);
 
     if (selectedColor && !combinationExists(size, selectedColor)) {
       setSelectedColor(null);
+    }
+  };
+
+  const handleWishlist = async () => {
+    if (actionBusy) return;
+
+    if (!token) {
+      requireLogin();
+      return;
+    }
+
+    try {
+      setActionBusy('wishlist');
+      const result = await toggleWishlist(product.id);
+      setFeedback({
+        type: 'success',
+        text:
+          result === 'added'
+            ? 'Đã lưu sản phẩm vào danh sách yêu thích.'
+            : 'Đã bỏ sản phẩm khỏi danh sách yêu thích.',
+      });
+    } catch (error) {
+      setFeedback({
+        type: 'error',
+        text:
+          error instanceof Error
+            ? error.message
+            : 'Không thể cập nhật danh sách yêu thích.',
+      });
+    } finally {
+      setActionBusy(null);
+    }
+  };
+
+  const handleAddToCart = async () => {
+    if (actionBusy) return;
+
+    if (!token) {
+      requireLogin();
+      return;
+    }
+
+    if (!selectionComplete) {
+      setFeedback({
+        type: 'error',
+        text: 'Vui lòng chọn đầy đủ màu sắc và kích cỡ.',
+      });
+      return;
+    }
+
+    if (isOutOfStock || availableStock <= 0) {
+      setFeedback({
+        type: 'error',
+        text: 'Sản phẩm hoặc biến thể này hiện đã hết hàng.',
+      });
+      return;
+    }
+
+    try {
+      setActionBusy('cart');
+
+      const item = await addToCart({
+        productId: product.id,
+        size: selectedSize || '',
+        color: selectedColor || '',
+        quantity,
+      });
+
+      setProduct((current) => {
+        if (!current) return current;
+
+        if (
+          current.variantInventory?.length &&
+          selectedSize &&
+          selectedColor
+        ) {
+          return {
+            ...current,
+            availableStock: Math.max(
+              0,
+              (current.availableStock ?? current.stock) - quantity,
+            ),
+            variantInventory: current.variantInventory.map((variant) =>
+              variant.size === selectedSize &&
+              variant.color === selectedColor
+                ? { ...variant, available: item.availableStock }
+                : variant,
+            ),
+          };
+        }
+
+        return {
+          ...current,
+          availableStock: item.availableStock,
+        };
+      });
+
+      setFeedback({
+        type: 'success',
+        text: `Đã thêm ${quantity} sản phẩm vào giỏ hàng.`,
+      });
+      setQuantity(1);
+    } catch (error) {
+      setFeedback({
+        type: 'error',
+        text:
+          error instanceof Error
+            ? error.message
+            : 'Không thể thêm sản phẩm vào giỏ hàng.',
+      });
+    } finally {
+      setActionBusy(null);
     }
   };
 
@@ -330,6 +476,7 @@ export default function ProductDetailScreen() {
   return (
     <SafeAreaView edges={['top']} style={styles.safeArea}>
       <ScrollView
+        style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}>
         <View style={styles.mediaSection}>
@@ -559,6 +706,91 @@ export default function ProductDetailScreen() {
         </View>
       </ScrollView>
 
+      <SafeAreaView edges={['bottom']} style={styles.actionBarSafe}>
+        {feedback ? (
+          <View
+            style={[
+              styles.feedback,
+              feedback.type === 'success'
+                ? styles.feedbackSuccess
+                : styles.feedbackError,
+            ]}>
+            <Text
+              style={[
+                styles.feedbackText,
+                feedback.type === 'success'
+                  ? styles.feedbackTextSuccess
+                  : styles.feedbackTextError,
+              ]}>
+              {feedback.text}
+            </Text>
+          </View>
+        ) : null}
+
+        <View style={styles.actionRow}>
+          <Pressable
+            accessibilityLabel={
+              wished
+                ? 'Bỏ khỏi danh sách yêu thích'
+                : 'Thêm vào danh sách yêu thích'
+            }
+            disabled={actionBusy != null}
+            onPress={() => void handleWishlist()}
+            style={({ pressed }) => [
+              styles.wishlistAction,
+              wished && styles.wishlistActionActive,
+              pressed && styles.actionPressed,
+              actionBusy === 'wishlist' && styles.actionDisabled,
+            ]}>
+            <Text
+              style={[
+                styles.wishlistActionIcon,
+                wished && styles.wishlistActionIconActive,
+              ]}>
+              {actionBusy === 'wishlist' ? '…' : wished ? '♥' : '♡'}
+            </Text>
+          </Pressable>
+
+          <Pressable
+            accessibilityLabel="Thêm sản phẩm vào giỏ hàng"
+            disabled={actionBusy != null || isOutOfStock || selectedOutOfStock}
+            onPress={() => void handleAddToCart()}
+            style={({ pressed }) => [
+              styles.cartAction,
+              (actionBusy != null || isOutOfStock || selectedOutOfStock) &&
+                styles.cartActionDisabled,
+              pressed &&
+                !isOutOfStock &&
+                !selectedOutOfStock &&
+                styles.actionPressed,
+            ]}>
+            <View style={styles.cartActionCopy}>
+              <Text style={styles.cartActionTitle}>
+                {isOutOfStock
+                  ? 'Hết hàng'
+                  : selectedOutOfStock
+                    ? 'Biến thể hết hàng'
+                    : actionBusy === 'cart'
+                    ? 'Đang thêm...'
+                    : selectionComplete
+                      ? 'Thêm vào giỏ'
+                      : 'Chọn màu & size'}
+              </Text>
+              {!isOutOfStock && !selectedOutOfStock ? (
+                <Text style={styles.cartActionPrice}>
+                  {formatPrice(product.price * quantity)}
+                </Text>
+              ) : null}
+            </View>
+            {!isOutOfStock &&
+            !selectedOutOfStock &&
+            actionBusy !== 'cart' ? (
+              <Text style={styles.cartActionArrow}>→</Text>
+            ) : null}
+          </Pressable>
+        </View>
+      </SafeAreaView>
+
       <ProductSizeGuide
         availableSizes={sizes}
         onClose={() => setSizeGuideVisible(false)}
@@ -573,8 +805,11 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: BRAND_COLORS.canvas,
   },
+  scroll: {
+    flex: 1,
+  },
   scrollContent: {
-    paddingBottom: 38,
+    paddingBottom: 34,
   },
   center: {
     flex: 1,
@@ -934,6 +1169,107 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '800',
     textAlign: 'right',
+  },
+  actionBarSafe: {
+    backgroundColor: BRAND_COLORS.surface,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: BRAND_COLORS.line,
+    paddingHorizontal: 14,
+    paddingTop: 10,
+  },
+  feedback: {
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    marginBottom: 8,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  feedbackSuccess: {
+    backgroundColor: '#ECFDF5',
+    borderColor: '#A7F3D0',
+  },
+  feedbackError: {
+    backgroundColor: '#FEF2F2',
+    borderColor: '#FECACA',
+  },
+  feedbackText: {
+    fontSize: 10,
+    lineHeight: 15,
+    fontWeight: '800',
+    textAlign: 'center',
+  },
+  feedbackTextSuccess: {
+    color: '#047857',
+  },
+  feedbackTextError: {
+    color: '#B91C1C',
+  },
+  actionRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  wishlistAction: {
+    width: 54,
+    height: 54,
+    borderRadius: 17,
+    backgroundColor: BRAND_COLORS.surface,
+    borderWidth: 1,
+    borderColor: BRAND_COLORS.line,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  wishlistActionActive: {
+    backgroundColor: '#FEF2F2',
+    borderColor: '#FECACA',
+  },
+  wishlistActionIcon: {
+    color: BRAND_COLORS.ink,
+    fontSize: 27,
+    lineHeight: 29,
+    fontWeight: '900',
+  },
+  wishlistActionIconActive: {
+    color: BRAND_COLORS.danger,
+  },
+  cartAction: {
+    flex: 1,
+    minHeight: 54,
+    borderRadius: 17,
+    backgroundColor: BRAND_COLORS.primary,
+    paddingHorizontal: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  cartActionDisabled: {
+    backgroundColor: '#9CA3AF',
+  },
+  cartActionCopy: {
+    flex: 1,
+    gap: 2,
+  },
+  cartActionTitle: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '900',
+  },
+  cartActionPrice: {
+    color: '#EDE9FE',
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  cartActionArrow: {
+    color: '#FFFFFF',
+    fontSize: 20,
+    fontWeight: '900',
+  },
+  actionPressed: {
+    opacity: 0.8,
+    transform: [{ scale: 0.99 }],
+  },
+  actionDisabled: {
+    opacity: 0.55,
   },
   relatedSection: {
     gap: 12,
