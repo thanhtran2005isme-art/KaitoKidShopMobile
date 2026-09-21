@@ -11,7 +11,7 @@ This file is intentionally concise. It describes the current state needed to con
 - Project name used in docs/UI: KaitoKidShop
 - Brand: **KaitoKid = thời trang trẻ em 0–12 tuổi**
 - Brand rules: `docs/BRAND.md`
-- Current roadmap: PHASE 1–3 hoàn tất, tiếp theo PHASE 4 — Wishlist + Add to Cart
+- Current roadmap: PHASE 1–4 hoàn tất, tiếp theo PHASE 5 — Cart thật
 - Roadmap source: `docs/ROADMAP.md`
 - Structure: full-stack monorepo
 - Git convention: mọi commit do AI/GPT tạo phải có phần mô tả bằng **tiếng Việt**; có thể giữ tiền tố Conventional Commits như `feat:`, `fix:`, `docs:`.
@@ -68,6 +68,7 @@ KaitoKidShop/
 - Initial/fresh MariaDB schema source: `backend/Database/KaitoKid_MariaDB.sql`
 - Dữ liệu seed đã chuẩn hóa sang trẻ em.
 - Database local hiện tại cần chạy `backend/Database/migrations/20260922_phase1_kids_branding.sql` sau khi pull PHASE 1.
+- PHASE 4 thêm migration idempotent `backend/Database/migrations/20260922_phase4_cart_reservation.sql` để bảo đảm các cột reservation của giỏ hàng tồn tại.
 
 ## Local database credentials
 
@@ -112,7 +113,7 @@ Starts API.Auth, API.Customer, API.Admin and API.Gateway after loading local DB 
 
 ## Verified working state
 
-As of 2026-09-21:
+As of 2026-09-22:
 
 - MariaDB is reachable locally.
 - Database `kaitokid` exists with 51 base tables.
@@ -122,7 +123,10 @@ As of 2026-09-21:
 - The mobile home screen loads categories and product data from API.Customer.
 - PHASE 2 Home UI đã được nâng cấp: header, cart badge có token, hero auto-slide + dots, promo strip, root categories, discovery tiles, product cards và skeleton loading.
 - PHASE 3 Product Detail đã hoàn chỉnh phần xem/chọn: gallery, màu, size, size guide, số lượng, tồn kho, specs, review read-only, share và related products.
-- API Product Detail trả `variantInventory` từ `TonKhoBienThe` nếu có; nếu chưa có dữ liệu biến thể thì mobile fallback về `SanPham.TonKho`.
+- PHASE 4 đã nối Wishlist + Add to Cart thật. Mobile dùng `ShoppingContext` để đồng bộ wishlist và cart badge toàn app.
+- Có màn `/wishlist`; ProductCard/Product Detail đều toggle wishlist qua API.Customer.
+- Product Detail gửi Add to Cart đúng size/màu/số lượng; cart badge Home/tab cập nhật ngay sau khi thêm.
+- API Product Detail trả `variantInventory` từ `TonKhoBienThe` nếu có; nếu chưa có dữ liệu biến thể thì mobile fallback về tồn kho khả dụng cấp sản phẩm.
 - Product Detail cho phép mở cả sản phẩm `active` và `out-of-stock`; Home/Search vẫn chỉ liệt kê sản phẩm đang bán.
 - Login mobile hiện dùng `AuthContext.login(email, password)` để lưu access token/session cho các API được bảo vệ.
 - Expo Web renders the mobile app successfully at `127.0.0.1:8081`.
@@ -132,8 +136,9 @@ As of 2026-09-21:
 ## Known non-blocking item
 
 - PHASE 2 đã static-review nhưng chưa chạy được `npm/tsc` trong môi trường công cụ do không có DNS/network tới GitHub. Cần xác nhận runtime trên máy local sau khi pull.
-- Wishlist/Add-to-cart thật chưa được nối; chúng là PHASE 4. Cart đầy đủ thuộc PHASE 5.
-- Seed hiện chưa có ảnh phụ hoặc `TonKhoBienThe` mẫu; Product Detail đã có fallback tương thích và không cần migration mới cho PHASE 3.
+- Wishlist/Add-to-cart đã được nối ở PHASE 4. Cart screen đầy đủ vẫn thuộc PHASE 5.
+- Seed hiện chưa có ảnh phụ hoặc `TonKhoBienThe` mẫu; Add to Cart dùng product-level reservation fallback qua `SanPham.SoLuongDaGiu`.
+- Sau khi pull PHASE 4 cần chạy migration reservation và restart API.Customer trước khi test Add to Cart.
 - A NuGet warning about a known vulnerability in `Microsoft.OpenApi 2.0.0` has been observed during API.Auth build. It did not block startup, but dependency remediation should be handled separately rather than mixed into unrelated changes.
 
 ## How a new AI/chat should resume
