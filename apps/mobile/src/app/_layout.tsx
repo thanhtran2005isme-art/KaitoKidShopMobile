@@ -4,7 +4,9 @@ import { useColorScheme } from 'react-native';
 
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
 import { AuthProvider } from '@/context/AuthContext';
+import { installWebWarningFilter } from '@/utils/web-warning-filter';
 
+installWebWarningFilter();
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
