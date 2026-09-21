@@ -100,7 +100,9 @@ public class OrderService(
         foreach (var item in cartItems)
         {
             item.Product.Stock -= item.Quantity;
+            item.Product.Reserved = Math.Max(0, item.Product.Reserved - item.Quantity);
             item.Product.SoldCount += item.Quantity;
+            item.Product.UpdatedAt = DateTime.UtcNow;
             if (item.Product.Stock <= 0)
                 item.Product.Status = "out-of-stock";
 
