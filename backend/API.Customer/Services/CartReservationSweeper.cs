@@ -62,13 +62,25 @@ public class CartReservationSweeper(
                 variant.Reserved = Math.Max(0, variant.Reserved - grp.Qty);
                 variant.UpdatedAt = now;
             }
+            else
+            {
+                var product = await db.Products.FirstOrDefaultAsync(
+                    p => p.Id == grp.ProductId,
+                    ct);
+
+                if (product != null)
+                {
+                    product.Reserved = Math.Max(0, product.Reserved - grp.Qty);
+                    product.UpdatedAt = now;
+                }
+            }
         }
 
         db.CartItems.RemoveRange(expired);
         await db.SaveChangesAsync(ct);
 
         logger.LogInformation(
-            "CartReservationSweeper: released {Items} expired cart items across {Groups} variants",
+            "CartReservationSweeper: released {Items} expired cart items across {Groups} stock groups",
             expired.Count, releaseGroups.Count);
     }
 }
