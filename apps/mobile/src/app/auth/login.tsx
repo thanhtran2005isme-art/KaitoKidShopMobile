@@ -14,7 +14,7 @@ export default function LoginScreen() {
   const handleLogin = async () => {
     try {
       setLoading(true);
-      await login({ email, password });
+      await login(email, password);
       router.replace('/(tabs)');
     } catch (error) {
       Alert.alert('Đăng nhập thất bại', error instanceof Error ? error.message : 'Vui lòng thử lại');
