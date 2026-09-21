@@ -133,3 +133,25 @@ This file records durable decisions and their rationale. It is not a chronologic
 **Quy tắc:** `AvailableStock = Stock - Reserved`. Add/update/remove/cart-expiry/checkout phải cập nhật reserve đối xứng. Request Add to Cart phải validate product đang `active`, quantity > 0, size/màu hợp lệ và variant tồn tại nếu sản phẩm có inventory biến thể.
 
 **Hệ quả:** Không được bypass reservation bằng cách ghi trực tiếp vào `GioHang`. Luồng Cart/Checkout tiếp theo phải đi qua CartService để giữ invariant tồn kho.
+
+
+## D013 — Một task/fix/PHASE chỉ dùng một commit mặc định
+
+**Ngày:** 2026-09-22
+
+**Quyết định:** Mặc định mỗi yêu cầu sửa, mỗi task hoặc mỗi PHASE chỉ tạo **một commit tổng hợp**.
+
+**Lý do:** Việc commit từng file hoặc từng bước nhỏ làm lịch sử Git rất dài và khó đọc. PHASE 4 đã tạo quá nhiều commit trung gian dù về mặt người dùng đó là một công việc duy nhất.
+
+**Quy tắc triển khai:**
+
+- Không commit ngay sau mỗi lần sửa file.
+- Hoàn thành toàn bộ phạm vi task, static review/build/test phù hợp, cập nhật docs cần thiết, rồi mới commit một lần.
+- Khi công cụ cập nhật từng file có hành vi auto-commit, AI phải dùng batch Git tree/commit hoặc cơ chế tương đương để gom nhiều file vào một commit.
+- PR của một task/PHASE nên dùng squash merge để `main` chỉ có một commit đại diện.
+- Chỉ tách nhiều commit nếu có các thay đổi độc lập cần rollback/review riêng hoặc người dùng yêu cầu.
+- Không squash nhiều task không liên quan vào một commit.
+
+**Quy ước tên:** Commit vẫn phải tuân D008 — phần mô tả bằng tiếng Việt. Ví dụ: `feat: hoàn thành phase 5 giỏ hàng mobile`.
+
+**Hệ quả:** Các phiên AI/GPT sau phải tránh cách làm “mỗi file một commit”. Git history trên `main` nên phản ánh các đơn vị công việc có ý nghĩa ở cấp task/fix/PHASE.

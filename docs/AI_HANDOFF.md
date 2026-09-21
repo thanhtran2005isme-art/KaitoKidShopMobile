@@ -15,6 +15,7 @@ This file is intentionally concise. It describes the current state needed to con
 - Roadmap source: `docs/ROADMAP.md`
 - Structure: full-stack monorepo
 - Git convention: mọi commit do AI/GPT tạo phải có phần mô tả bằng **tiếng Việt**; có thể giữ tiền tố Conventional Commits như `feat:`, `fix:`, `docs:`.
+- Commit granularity: mặc định **một task/fix/PHASE = một commit duy nhất**; không commit từng file/từng bước. Với PR, ưu tiên squash merge để `main` chỉ có một commit cho công việc đó.
 
 ## Current structure
 
@@ -152,5 +153,6 @@ As of 2026-09-22:
 7. Inspect the relevant current files.
 8. Check recent Git history/PRs when the reason for existing code matters.
 9. Khi tạo commit mới, viết commit message bằng tiếng Việt theo quy tắc trong `AGENTS.md`.
+10. Gom toàn bộ thay đổi của cùng một task/fix/PHASE vào một commit; không tạo chuỗi commit nhỏ theo từng file.
 
 For exact historical changes, use Git rather than relying on this file.
