@@ -7,16 +7,6 @@ public class LoginDTO
     public string? RecaptchaToken { get; set; }
 }
 
-public class RegisterDTO
-{
-    public string Email { get; set; } = string.Empty;
-    public string Password { get; set; } = string.Empty;
-    public string Name { get; set; } = string.Empty;
-    public string? Phone { get; set; }
-    public string? RecaptchaToken { get; set; }
-    public string? OtpCode { get; set; }     // bắt buộc nếu RequireOtpForRegister=true
-}
-
 public class ChangePasswordDTO
 {
     public string CurrentPassword { get; set; } = string.Empty;
