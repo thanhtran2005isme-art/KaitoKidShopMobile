@@ -1,6 +1,6 @@
 # KaitoKidShop
 
-Full-stack monorepo gồm Mobile, Web và ASP.NET Core backend.
+Full-stack monorepo của **KaitoKid — thương hiệu thời trang trẻ em 0–12 tuổi**, gồm Mobile, Web và ASP.NET Core backend.
 
 ## Cấu trúc
 
@@ -30,6 +30,8 @@ KaitoKidShop/
 │  └─ stop-all.ps1
 ├─ docs/
 │  ├─ AI_HANDOFF.md
+│  ├─ BRAND.md
+│  ├─ ROADMAP.md
 │  ├─ ARCHITECTURE.md
 │  ├─ DECISIONS.md
 │  ├─ TROUBLESHOOTING.md
@@ -46,9 +48,11 @@ Khi bắt đầu một phiên làm việc mới, đọc theo thứ tự:
 
 1. `AGENTS.md`
 2. `docs/AI_HANDOFF.md`
-3. `docs/ARCHITECTURE.md`
-4. Tài liệu liên quan trong `docs/DECISIONS.md` và `docs/TROUBLESHOOTING.md`
-5. Git history/source code liên quan đến task
+3. `docs/BRAND.md`
+4. `docs/ROADMAP.md`
+5. `docs/ARCHITECTURE.md`
+6. Tài liệu liên quan trong `docs/DECISIONS.md` và `docs/TROUBLESHOOTING.md`
+7. Git history/source code liên quan đến task
 
 `AI_HANDOFF.md` chỉ giữ trạng thái hiện tại. Lịch sử cũ được chuyển sang `docs/history/` để file handoff không phình vô hạn.
 

@@ -55,7 +55,7 @@ CREATE TABLE DanhMuc (
 
 CREATE TABLE SanPham (
     Id              INT AUTO_INCREMENT   PRIMARY KEY,
-    TenSanPham      VARCHAR(200)       NOT NULL,               -- Áo Thun Nam Cổ Tròn Basic
+    TenSanPham      VARCHAR(200)       NOT NULL,               -- Áo Thun Bé Trai Cổ Tròn Basic
     DanhMucId       INT                 NULL,                   -- FK đến DanhMuc
     DanhMuc         VARCHAR(100)       NOT NULL,               -- Tên danh mục: Ao, Quan, Vay
     DanhMucPhu      VARCHAR(100)       NULL,                   -- Danh mục phụ: Ao Thun, Ao So Mi
@@ -921,153 +921,142 @@ VALUES
     (3, 'Trần Minh Hoàng', 'hoang@gmail.com', '$2a$11$K8GpahMYCWMKJxBzXjH1/.7JYOqFHvFMiYJJSlELOUB8.p4kK6Wm6', '0923456789', 'user'),
     (4, 'Lê Phương Linh', 'linh@gmail.com', '$2a$11$K8GpahMYCWMKJxBzXjH1/.7JYOqFHvFMiYJJSlELOUB8.p4kK6Wm6', '0934567890', 'user');
 
-INSERT INTO DanhMuc (TenDanhMuc, Slug, MoTa, ThuTu) VALUES
-    ('Áo',        'ao',       'Tất cả các loại áo',          1),
-    ('Quần',      'quan',     'Tất cả các loại quần',        2),
-    ('Váy',       'vay',      'Váy các kiểu',                3),
-    ('Đầm',       'dam',      'Đầm dự tiệc, đầm công sở',   4),
-    ('Phụ kiện',  'phu-kien', 'Túi, mũ, thắt lưng, kính',   5);
+INSERT INTO DanhMuc (TenDanhMuc, Slug, MoTa, ThuTu, GioiTinh) VALUES
+    ('Áo bé',          'ao-be',          'Áo mặc hằng ngày dành cho trẻ em 0-12 tuổi',                 1, 'treem'),
+    ('Quần bé',        'quan-be',        'Quần dài, jean, kaki và short thoải mái cho bé',             2, 'treem'),
+    ('Váy bé gái',     'vay-be-gai',     'Váy năng động, dễ vận động dành cho bé gái',                 3, 'treem'),
+    ('Đầm bé gái',     'dam-be-gai',     'Đầm đi chơi, sinh nhật và dịp đặc biệt dành cho bé gái',     4, 'treem'),
+    ('Phụ kiện bé',    'phu-kien-be',    'Mũ, túi và phụ kiện an toàn, dễ phối đồ cho trẻ em',         5, 'treem');
 
-INSERT INTO DanhMuc (TenDanhMuc, Slug, MoTa, DanhMucChaId, ThuTu) VALUES
-    ('Áo thun',       'ao-thun',      'Áo thun nam nữ',         1, 1),
-    ('Áo sơ mi',      'ao-so-mi',     'Áo sơ mi công sở',       1, 2),
-    ('Áo khoác',      'ao-khoac',     'Áo khoác, hoodie',       1, 3),
-    ('Áo polo',       'ao-polo',      'Áo polo nam nữ',         1, 4),
-    ('Quần jean',     'quan-jean',    'Quần jean các kiểu',     2, 1),
-    ('Quần kaki',     'quan-kaki',    'Quần kaki, chinos',      2, 2),
-    ('Quần short',    'quan-short',   'Quần short, quần đùi',   2, 3);
+INSERT INTO DanhMuc (TenDanhMuc, Slug, MoTa, DanhMucChaId, ThuTu, GioiTinh) VALUES
+    ('Áo thun bé',     'ao-thun-be',     'Áo thun mềm, thoáng và dễ vận động',                         1, 1, 'treem'),
+    ('Áo sơ mi bé',    'ao-so-mi-be',    'Áo sơ mi đi học, đi chơi cho bé',                            1, 2, 'treem'),
+    ('Áo khoác bé',    'ao-khoac-be',    'Hoodie, bomber và áo khoác nhẹ cho trẻ em',                  1, 3, 'treem'),
+    ('Áo polo bé',     'ao-polo-be',     'Áo polo gọn gàng cho bé đi học và đi chơi',                  1, 4, 'treem'),
+    ('Quần jean bé',   'quan-jean-be',   'Jean co giãn, ưu tiên sự thoải mái khi vận động',            2, 1, 'treem'),
+    ('Quần kaki bé',   'quan-kaki-be',   'Kaki mềm, phù hợp đi học và các dịp cần lịch sự',             2, 2, 'treem'),
+    ('Quần short bé',  'quan-short-be',  'Short nhẹ, thoáng dành cho hoạt động hằng ngày',              2, 3, 'treem');
 
 INSERT INTO BoSuuTap (TenBoSuuTap, Slug, MoTa, ThuTu) VALUES
-    ('Spring/Summer 2025',     'spring-summer-2025',   'Bộ sưu tập Xuân Hè 2025 - Tươi mát, năng động',  1),
-    ('Streetwear Collection',  'streetwear',           'Phong cách đường phố cá tính',                     2),
-    ('Office Essentials',      'office-essentials',    'Trang phục công sở thanh lịch',                    3),
-    ('Weekend Casual',         'weekend-casual',       'Thoải mái cho ngày cuối tuần',                     4);
+    ('Ngày Đến Trường',       'ngay-den-truong',      'Trang phục gọn gàng, thoải mái cho bé đi học',                    1),
+    ('Chơi Cả Ngày',          'choi-ca-ngay',         'Các thiết kế mềm, co giãn cho bé vận động tự do',                 2),
+    ('Tiệc Nhỏ Của Bé',       'tiec-nho-cua-be',      'Váy, đầm và outfit xinh xắn cho sinh nhật, lễ và cuối tuần',      3),
+    ('Cuối Tuần Phiêu Lưu',   'cuoi-tuan-phieu-luu', 'Phong cách năng động cho chuyến đi chơi cùng gia đình',            4);
 
-INSERT INTO SanPham (TenSanPham, DanhMucId, DanhMuc, DanhMucPhu, GioiTinh, Gia, GiaCu, TonKho, TrangThai, HinhAnh, MoTaNgan, MoTaChiTiet, MaSanPham, Slug, LaSanPhamMoi, DangGiamGia, BanChayNhat, DiemDanhGia, SoLuongDaBan, DanhSachMau, DanhSachSize, BoSuuTapId) VALUES
--- Áo thun
-('Áo Thun Nam Cổ Tròn Basic',         6, 'Ao', 'Áo thun',   'Nam',      299000, NULL,   150, 'active', '/products/ao-thun-nam-1.jpg',
- 'Áo thun cotton 100%, form regular fit',
- '<p>Áo thun nam cổ tròn chất liệu cotton 100% mềm mại, thoáng mát. Form regular fit phù hợp mọi vóc dáng.</p><ul><li>Chất liệu: Cotton 100%</li><li>Form: Regular fit</li><li>Xuất xứ: Việt Nam</li></ul>',
- 'KK-AT-001', 'ao-thun-nam-co-tron-basic', 1, 0, 1, 4.5, 234,
- '["Đen","Trắng","Xám","Xanh navy"]', '["S","M","L","XL","XXL"]', 1),
+INSERT INTO SanPham (TenSanPham, DanhMucId, DanhMuc, DanhMucPhu, NhomTuoi, GioiTinh, Gia, GiaCu, TonKho, TrangThai, HinhAnh, MoTaNgan, MoTaChiTiet, MaSanPham, Slug, LaSanPhamMoi, DangGiamGia, BanChayNhat, DiemDanhGia, SoLuongDaBan, DanhSachMau, DanhSachSize, BoSuuTapId) VALUES
+('Áo Thun Bé Trai Cổ Tròn Basic', 6, 'Áo bé', 'Áo thun bé', 'TreEm', 'Nam', 299000, NULL, 150, 'active', '/products/ao-thun-be-trai-1.jpg',
+ 'Áo thun cotton mềm, thoáng mát cho bé vận động cả ngày',
+ '<p>Áo thun bé trai cổ tròn từ cotton mềm, thấm hút tốt và dễ phối đồ. Form thoải mái giúp bé chạy nhảy tự nhiên.</p><ul><li>Độ tuổi: 2-12 tuổi</li><li>Chất liệu: Cotton mềm</li><li>Ưu tiên: Thoáng, dễ vận động</li></ul>',
+ 'KK-AT-001', 'ao-thun-be-trai-co-tron-basic', 1, 0, 1, 4.5, 234,
+ '["Xanh navy","Trắng","Xám","Xanh da trời"]', '["90","100","110","120","130","140","150"]', 2),
 
-('Áo Thun Nữ Oversize In Hình',       6, 'Ao', 'Áo thun',   'Nu',       349000, 450000, 80,  'active', '/products/ao-thun-nu-1.jpg',
- 'Áo thun oversize phong cách Hàn Quốc',
- '<p>Áo thun nữ oversize in hình trendy, chất cotton pha co giãn thoải mái.</p>',
- 'KK-AT-002', 'ao-thun-nu-oversize-in-hinh', 1, 1, 0, 4.8, 156,
- '["Trắng","Đen","Be"]', '["Freesize"]', 1),
+('Áo Thun Bé Gái Oversize In Hình', 6, 'Áo bé', 'Áo thun bé', 'TreEm', 'Nu', 349000, 450000, 80, 'active', '/products/ao-thun-be-gai-1.jpg',
+ 'Áo thun oversize đáng yêu, mềm và dễ phối cho bé gái',
+ '<p>Áo thun bé gái form rộng vừa phải, chất liệu co giãn nhẹ, phù hợp đi học, đi chơi và hoạt động cuối tuần.</p>',
+ 'KK-AT-002', 'ao-thun-be-gai-oversize-in-hinh', 1, 1, 0, 4.8, 156,
+ '["Trắng","Hồng pastel","Be"]', '["90","100","110","120","130","140"]', 2),
 
-('Áo Thun Unisex Tie-Dye',            6, 'Ao', 'Áo thun',   'Unisex',   399000, NULL,   60,  'active', '/products/ao-thun-tiedye-1.jpg',
- 'Áo thun tie-dye phong cách streetwear',
- '<p>Áo thun unisex tie-dye độc đáo, mỗi chiếc là duy nhất.</p>',
- 'KK-AT-003', 'ao-thun-unisex-tie-dye', 1, 0, 0, 4.3, 89,
- '["Tím","Xanh","Cam"]', '["S","M","L","XL"]', 2),
+('Áo Thun Trẻ Em Tie-Dye Unisex', 6, 'Áo bé', 'Áo thun bé', 'TreEm', 'Unisex', 399000, NULL, 60, 'active', '/products/ao-thun-tre-em-tiedye-1.jpg',
+ 'Áo tie-dye nhiều màu cho bé thích phong cách năng động',
+ '<p>Thiết kế tie-dye vui mắt, form unisex và chất vải mềm giúp bé thoải mái khi vui chơi.</p>',
+ 'KK-AT-003', 'ao-thun-tre-em-tie-dye', 1, 0, 0, 4.3, 89,
+ '["Tím","Xanh","Cam"]', '["100","110","120","130","140","150"]', 4),
 
--- Áo sơ mi
-('Áo Sơ Mi Nam Trắng Công Sở',        7, 'Ao', 'Áo sơ mi',  'Nam',      499000, NULL,   100, 'active', '/products/ao-somi-nam-1.jpg',
- 'Áo sơ mi trắng slim fit, chất liệu cao cấp',
- '<p>Áo sơ mi nam trắng form slim fit, chất liệu cotton pha polyester ít nhăn.</p>',
- 'KK-SM-001', 'ao-so-mi-nam-trang-cong-so', 0, 0, 1, 4.7, 312,
- '["Trắng"]', '["S","M","L","XL"]', 3),
+('Áo Sơ Mi Bé Trai Trắng Đi Học', 7, 'Áo bé', 'Áo sơ mi bé', 'TreEm', 'Nam', 499000, NULL, 100, 'active', '/products/ao-so-mi-be-trai-1.jpg',
+ 'Áo sơ mi trắng gọn gàng, ít nhăn cho bé đi học và dự lễ',
+ '<p>Áo sơ mi bé trai chất cotton pha mềm, dễ giặt, form vừa người và không gây bí khi mặc lâu.</p>',
+ 'KK-SM-001', 'ao-so-mi-be-trai-trang-di-hoc', 0, 0, 1, 4.7, 312,
+ '["Trắng"]', '["100","110","120","130","140","150"]', 1),
 
-('Áo Sơ Mi Nữ Cổ V Thanh Lịch',      7, 'Ao', 'Áo sơ mi',  'Nu',       459000, 599000, 70,  'active', '/products/ao-somi-nu-1.jpg',
- 'Áo sơ mi nữ cổ V, phù hợp đi làm và dạo phố',
- '<p>Áo sơ mi nữ cổ V chất lụa mềm mại, form regular phù hợp nhiều dáng người.</p>',
- 'KK-SM-002', 'ao-so-mi-nu-co-v', 1, 1, 0, 4.6, 178,
- '["Trắng","Hồng nhạt","Xanh pastel"]', '["S","M","L"]', 3),
+('Áo Sơ Mi Bé Gái Cổ Sen', 7, 'Áo bé', 'Áo sơ mi bé', 'TreEm', 'Nu', 459000, 599000, 70, 'active', '/products/ao-so-mi-be-gai-1.jpg',
+ 'Áo sơ mi cổ sen nhẹ nhàng dành cho bé gái',
+ '<p>Thiết kế cổ sen mềm mại, form thoải mái, phù hợp đi học, đi chơi hoặc phối cùng chân váy.</p>',
+ 'KK-SM-002', 'ao-so-mi-be-gai-co-sen', 1, 1, 0, 4.6, 178,
+ '["Trắng","Hồng nhạt","Xanh pastel"]', '["100","110","120","130","140"]', 1),
 
--- Áo khoác
-('Áo Khoác Hoodie Unisex Basic',      8, 'Ao', 'Áo khoác',  'Unisex',   599000, NULL,   90,  'active', '/products/hoodie-1.jpg',
- 'Hoodie unisex nỉ bông dày dặn, ấm áp',
- '<p>Áo hoodie unisex chất nỉ bông cotton, mũ trùm có dây rút, túi kangaroo phía trước.</p>',
- 'KK-AK-001', 'ao-khoac-hoodie-unisex-basic', 1, 0, 1, 4.9, 445,
- '["Đen","Xám","Xanh rêu","Be"]', '["S","M","L","XL"]', 2),
+('Áo Hoodie Trẻ Em Unisex', 8, 'Áo bé', 'Áo khoác bé', 'TreEm', 'Unisex', 599000, NULL, 90, 'active', '/products/hoodie-tre-em-1.jpg',
+ 'Hoodie nỉ mềm, ấm và dễ mặc cho cả bé trai lẫn bé gái',
+ '<p>Hoodie trẻ em có mũ, túi trước và bề mặt nỉ mềm. Form rộng vừa giúp bé mặc thêm áo bên trong.</p>',
+ 'KK-AK-001', 'ao-hoodie-tre-em-unisex', 1, 0, 1, 4.9, 445,
+ '["Xám","Xanh navy","Be","Tím nhạt"]', '["100","110","120","130","140","150"]', 4),
 
-('Áo Khoác Bomber Nam',               8, 'Ao', 'Áo khoác',  'Nam',      799000, 999000, 45,  'active', '/products/bomber-nam-1.jpg',
- 'Áo bomber phong cách quân đội, chất dù nhẹ',
- '<p>Áo khoác bomber nam chất dù nhẹ, chống gió nhẹ, phù hợp thời tiết se lạnh.</p>',
- 'KK-AK-002', 'ao-khoac-bomber-nam', 0, 1, 0, 4.4, 123,
- '["Đen","Xanh rêu","Nâu"]', '["M","L","XL"]', 2),
+('Áo Khoác Bomber Bé Trai', 8, 'Áo bé', 'Áo khoác bé', 'TreEm', 'Nam', 799000, 999000, 45, 'active', '/products/bomber-be-trai-1.jpg',
+ 'Bomber nhẹ, cản gió nhẹ cho bé đi chơi',
+ '<p>Áo bomber bé trai chất nhẹ, bo tay mềm và khóa kéo dễ sử dụng. Phù hợp thời tiết se lạnh.</p>',
+ 'KK-AK-002', 'ao-khoac-bomber-be-trai', 0, 1, 0, 4.4, 123,
+ '["Xanh navy","Xanh rêu","Nâu"]', '["100","110","120","130","140","150"]', 4),
 
--- Áo polo
-('Áo Polo Nam Cổ Bẻ Classic',         9, 'Ao', 'Áo polo',   'Nam',      399000, NULL,   120, 'active', '/products/polo-nam-1.jpg',
- 'Áo polo nam cổ bẻ, chất pique cotton',
- '<p>Áo polo nam cổ bẻ classic, chất pique cotton thoáng mát, phù hợp đi làm và đi chơi.</p>',
- 'KK-PL-001', 'ao-polo-nam-co-be-classic', 0, 0, 1, 4.6, 267,
- '["Đen","Trắng","Xanh navy","Đỏ đô"]', '["S","M","L","XL"]', 4);
+('Áo Polo Bé Trai Cổ Bẻ', 9, 'Áo bé', 'Áo polo bé', 'TreEm', 'Nam', 399000, NULL, 120, 'active', '/products/polo-be-trai-1.jpg',
+ 'Áo polo thoáng mát, lịch sự nhưng vẫn dễ vận động',
+ '<p>Áo polo bé trai chất pique cotton mềm, phù hợp đi học, đi chơi và các dịp gia đình.</p>',
+ 'KK-PL-001', 'ao-polo-be-trai-co-be', 0, 0, 1, 4.6, 267,
+ '["Xanh navy","Trắng","Đỏ đô"]', '["100","110","120","130","140","150"]', 1),
 
-INSERT INTO SanPham (TenSanPham, DanhMucId, DanhMuc, DanhMucPhu, GioiTinh, Gia, GiaCu, TonKho, TrangThai, HinhAnh, MoTaNgan, MoTaChiTiet, MaSanPham, Slug, LaSanPhamMoi, DangGiamGia, BanChayNhat, DiemDanhGia, SoLuongDaBan, DanhSachMau, DanhSachSize, BoSuuTapId) VALUES
--- Quần jean
-('Quần Jean Nam Slim Fit Xanh Đậm',   10, 'Quan', 'Quần jean', 'Nam',    599000, NULL,   85,  'active', '/products/jean-nam-1.jpg',
- 'Quần jean nam slim fit, co giãn thoải mái',
- '<p>Quần jean nam slim fit chất denim co giãn, thoải mái vận động. Wash xanh đậm classic.</p>',
- 'KK-QJ-001', 'quan-jean-nam-slim-fit-xanh-dam', 1, 0, 1, 4.7, 389,
- '["Xanh đậm","Xanh nhạt","Đen"]', '["29","30","31","32","33","34"]', NULL),
+('Quần Jean Bé Trai Slim Co Giãn', 10, 'Quần bé', 'Quần jean bé', 'TreEm', 'Nam', 599000, NULL, 85, 'active', '/products/jean-be-trai-1.jpg',
+ 'Jean mềm, co giãn nhẹ để bé vận động thoải mái',
+ '<p>Quần jean bé trai sử dụng denim co giãn, cạp dễ mặc và đường may êm, phù hợp đi học và đi chơi.</p>',
+ 'KK-QJ-001', 'quan-jean-be-trai-slim-co-gian', 1, 0, 1, 4.7, 389,
+ '["Xanh đậm","Xanh nhạt","Đen"]', '["100","110","120","130","140","150"]', 1),
 
-('Quần Jean Nữ Ống Rộng',             10, 'Quan', 'Quần jean', 'Nu',     549000, 699000, 65,  'active', '/products/jean-nu-1.jpg',
- 'Quần jean nữ ống rộng phong cách Y2K',
- '<p>Quần jean nữ ống rộng cạp cao, phong cách retro Y2K đang hot.</p>',
- 'KK-QJ-002', 'quan-jean-nu-ong-rong', 1, 1, 0, 4.5, 201,
- '["Xanh nhạt","Trắng"]', '["26","27","28","29","30"]', NULL),
+('Quần Jean Bé Gái Ống Rộng', 10, 'Quần bé', 'Quần jean bé', 'TreEm', 'Nu', 549000, 699000, 65, 'active', '/products/jean-be-gai-1.jpg',
+ 'Jean ống rộng mềm, phong cách và dễ phối cho bé gái',
+ '<p>Quần jean bé gái ống rộng có cạp thoải mái, denim mềm và kiểu dáng hiện đại nhưng vẫn phù hợp trẻ em.</p>',
+ 'KK-QJ-002', 'quan-jean-be-gai-ong-rong', 1, 1, 0, 4.5, 201,
+ '["Xanh nhạt","Trắng"]', '["100","110","120","130","140","150"]', 4),
 
--- Quần kaki
-('Quần Kaki Nam Ống Đứng',            11, 'Quan', 'Quần kaki', 'Nam',    499000, NULL,   95,  'active', '/products/kaki-nam-1.jpg',
- 'Quần kaki nam ống đứng, phù hợp công sở',
- '<p>Quần kaki nam ống đứng chất cotton pha spandex, ít nhăn, phù hợp đi làm.</p>',
- 'KK-QK-001', 'quan-kaki-nam-ong-dung', 0, 0, 1, 4.4, 198,
- '["Be","Đen","Xám","Xanh navy"]', '["29","30","31","32","33","34"]', 3),
+('Quần Kaki Bé Trai Đi Học', 11, 'Quần bé', 'Quần kaki bé', 'TreEm', 'Nam', 499000, NULL, 95, 'active', '/products/kaki-be-trai-1.jpg',
+ 'Kaki mềm, gọn gàng và ít nhăn cho bé đi học',
+ '<p>Quần kaki bé trai chất cotton pha co giãn, thiết kế dễ vận động và phù hợp đồng phục tự do.</p>',
+ 'KK-QK-001', 'quan-kaki-be-trai-di-hoc', 0, 0, 1, 4.4, 198,
+ '["Be","Xám","Xanh navy"]', '["100","110","120","130","140","150"]', 1),
 
--- Quần short
-('Quần Short Nam Thể Thao',           12, 'Quan', 'Quần short', 'Nam',   299000, NULL,   110, 'active', '/products/short-nam-1.jpg',
- 'Quần short nam thể thao, chất gió nhẹ',
- '<p>Quần short nam chất gió nhẹ, nhanh khô, có túi khóa kéo hai bên.</p>',
- 'KK-QS-001', 'quan-short-nam-the-thao', 1, 0, 0, 4.3, 156,
- '["Đen","Xám","Xanh navy"]', '["S","M","L","XL"]', 4),
+('Quần Short Bé Trai Thể Thao', 12, 'Quần bé', 'Quần short bé', 'TreEm', 'Nam', 299000, NULL, 110, 'active', '/products/short-be-trai-1.jpg',
+ 'Short nhẹ, nhanh khô cho hoạt động ngoài trời',
+ '<p>Quần short bé trai chất nhẹ, cạp co giãn và túi hai bên, phù hợp chạy nhảy, dã ngoại và thể thao.</p>',
+ 'KK-QS-001', 'quan-short-be-trai-the-thao', 1, 0, 0, 4.3, 156,
+ '["Đen","Xám","Xanh navy"]', '["90","100","110","120","130","140"]', 2),
 
--- Váy
-('Váy Midi Xếp Ly Thanh Lịch',        3, 'Vay', NULL,         'Nu',      599000, 799000, 50,  'active', '/products/vay-midi-1.jpg',
- 'Váy midi xếp ly chất voan, bay bổng nữ tính',
- '<p>Váy midi xếp ly chất voan mềm mại, cạp chun co giãn, phù hợp đi làm và dự tiệc.</p>',
- 'KK-VY-001', 'vay-midi-xep-ly-thanh-lich', 1, 1, 1, 4.8, 234,
- '["Đen","Be","Xanh pastel"]', '["S","M","L"]', 3),
+('Váy Bé Gái Xếp Ly Dịu Dàng', 3, 'Váy bé gái', NULL, 'TreEm', 'Nu', 599000, 799000, 50, 'active', '/products/vay-be-gai-xep-ly-1.jpg',
+ 'Váy xếp ly nhẹ, dễ xoay và phù hợp nhiều dịp',
+ '<p>Váy bé gái xếp ly với cạp mềm, lớp vải nhẹ và chiều dài phù hợp để bé vận động thoải mái.</p>',
+ 'KK-VY-001', 'vay-be-gai-xep-ly-diu-dang', 1, 1, 1, 4.8, 234,
+ '["Hồng pastel","Be","Xanh pastel"]', '["100","110","120","130","140"]', 3),
 
-('Váy Tennis Ngắn Năng Động',          3, 'Vay', NULL,         'Nu',      349000, NULL,   75,  'active', '/products/vay-tennis-1.jpg',
- 'Váy tennis ngắn phong cách sporty',
- '<p>Váy tennis ngắn có quần lót bên trong, chất thun co giãn 4 chiều.</p>',
- 'KK-VY-002', 'vay-tennis-ngan-nang-dong', 1, 0, 0, 4.5, 145,
- '["Trắng","Đen","Hồng"]', '["S","M","L"]', 1),
+('Váy Tennis Bé Gái Năng Động', 3, 'Váy bé gái', NULL, 'TreEm', 'Nu', 349000, NULL, 75, 'active', '/products/vay-tennis-be-gai-1.jpg',
+ 'Váy tennis có quần trong, tiện cho bé chạy nhảy',
+ '<p>Váy tennis bé gái có quần bảo hộ bên trong, chất thun co giãn và cạp mềm.</p>',
+ 'KK-VY-002', 'vay-tennis-be-gai-nang-dong', 1, 0, 0, 4.5, 145,
+ '["Trắng","Hồng","Xanh navy"]', '["100","110","120","130","140"]', 2),
 
--- Đầm
-('Đầm Dự Tiệc Cổ V Sang Trọng',       4, 'Dam', NULL,         'Nu',      899000, 1200000, 30, 'active', '/products/dam-du-tiec-1.jpg',
- 'Đầm dự tiệc cổ V chất lụa cao cấp',
- '<p>Đầm dự tiệc cổ V sâu, chất lụa satin bóng mượt, dáng ôm body quyến rũ.</p>',
- 'KK-DM-001', 'dam-du-tiec-co-v-sang-trong', 0, 1, 0, 4.9, 87,
- '["Đen","Đỏ đô","Xanh emerald"]', '["S","M","L"]', NULL),
+('Đầm Bé Gái Dự Tiệc Cổ Nơ', 4, 'Đầm bé gái', NULL, 'TreEm', 'Nu', 899000, 1200000, 30, 'active', '/products/dam-be-gai-du-tiec-1.jpg',
+ 'Đầm dự tiệc xinh xắn cho sinh nhật và dịp đặc biệt',
+ '<p>Đầm bé gái dáng xòe với chi tiết nơ nhẹ nhàng, lớp lót mềm và thiết kế ưu tiên sự thoải mái.</p>',
+ 'KK-DM-001', 'dam-be-gai-du-tiec-co-no', 0, 1, 0, 4.9, 87,
+ '["Hồng","Đỏ đô","Xanh pastel"]', '["100","110","120","130","140"]', 3),
 
-('Đầm Suông Công Sở Tay Lỡ',          4, 'Dam', NULL,         'Nu',      699000, NULL,   55,  'active', '/products/dam-cong-so-1.jpg',
- 'Đầm suông công sở thanh lịch, tay lỡ',
- '<p>Đầm suông công sở chất đũi mềm, tay lỡ che khuyết điểm bắp tay.</p>',
- 'KK-DM-002', 'dam-suong-cong-so-tay-lo', 1, 0, 1, 4.6, 167,
- '["Đen","Xám","Be"]', '["S","M","L","XL"]', 3),
+('Đầm Bé Gái Tay Lỡ Thanh Lịch', 4, 'Đầm bé gái', NULL, 'TreEm', 'Nu', 699000, NULL, 55, 'active', '/products/dam-be-gai-tay-lo-1.jpg',
+ 'Đầm tay lỡ nhẹ nhàng cho bé đi chơi và dự lễ',
+ '<p>Đầm bé gái form suông nhẹ, tay lỡ và chất vải mềm, phù hợp cho các dịp gia đình.</p>',
+ 'KK-DM-002', 'dam-be-gai-tay-lo-thanh-lich', 1, 0, 1, 4.6, 167,
+ '["Hồng nhạt","Be","Xanh pastel"]', '["100","110","120","130","140"]', 3),
 
--- Phụ kiện
-('Túi Tote Vải Canvas KaitoKid',       5, 'PhuKien', NULL,     'Unisex',  199000, NULL,   200, 'active', '/products/tui-tote-1.jpg',
- 'Túi tote vải canvas in logo KaitoKid',
- '<p>Túi tote vải canvas dày dặn, in logo KaitoKid, đựng được laptop 14 inch.</p>',
- 'KK-PK-001', 'tui-tote-vai-canvas-kaitokid', 1, 0, 0, 4.2, 312,
- '["Trắng","Đen"]', '["Freesize"]', NULL),
+('Túi Tote Mini KaitoKid Cho Bé', 5, 'Phụ kiện bé', NULL, 'TreEm', 'Unisex', 199000, NULL, 200, 'active', '/products/tui-tote-mini-be-1.jpg',
+ 'Túi tote mini nhẹ, phù hợp mang đồ cá nhân nhỏ của bé',
+ '<p>Túi tote mini KaitoKid làm từ canvas nhẹ, quai vừa tay và kích thước phù hợp trẻ em.</p>',
+ 'KK-PK-001', 'tui-tote-mini-kaitokid-cho-be', 1, 0, 0, 4.2, 312,
+ '["Trắng","Be","Xanh navy"]', '["Freesize"]', 4),
 
-('Mũ Lưỡi Trai Thêu Logo',            5, 'PhuKien', NULL,     'Unisex',  149000, 199000, 180, 'active', '/products/mu-luoi-trai-1.jpg',
- 'Mũ lưỡi trai thêu logo KaitoKid',
- '<p>Mũ lưỡi trai unisex, thêu logo KaitoKid, khóa điều chỉnh phía sau.</p>',
- 'KK-PK-002', 'mu-luoi-trai-theu-logo', 0, 1, 0, 4.1, 234,
- '["Đen","Trắng","Be","Xanh navy"]', '["Freesize"]', NULL),
+('Mũ Lưỡi Trai Trẻ Em Thêu Logo', 5, 'Phụ kiện bé', NULL, 'TreEm', 'Unisex', 149000, 199000, 180, 'active', '/products/mu-luoi-trai-tre-em-1.jpg',
+ 'Mũ nhẹ có khóa điều chỉnh phù hợp vòng đầu trẻ em',
+ '<p>Mũ lưỡi trai KaitoKid thêu logo, chất liệu nhẹ và có khóa điều chỉnh phía sau.</p>',
+ 'KK-PK-002', 'mu-luoi-trai-tre-em-theu-logo', 0, 1, 0, 4.1, 234,
+ '["Xanh navy","Trắng","Be","Hồng"]', '["Freesize"]', 2),
 
-('Thắt Lưng Da Nam Khóa Tự Động',     5, 'PhuKien', NULL,     'Nam',     299000, NULL,   90,  'active', '/products/that-lung-1.jpg',
- 'Thắt lưng da bò thật, khóa tự động',
- '<p>Thắt lưng da bò thật 100%, khóa tự động tiện lợi, bề mặt vân saffiano.</p>',
- 'KK-PK-003', 'that-lung-da-nam-khoa-tu-dong', 0, 0, 1, 4.7, 178,
- '["Đen","Nâu"]', '["Freesize"]', NULL);
+('Thắt Lưng Trẻ Em Khóa Tự Động', 5, 'Phụ kiện bé', NULL, 'TreEm', 'Unisex', 299000, NULL, 90, 'active', '/products/that-lung-tre-em-1.jpg',
+ 'Thắt lưng nhẹ, dễ điều chỉnh cho trang phục đi học và dự lễ',
+ '<p>Thắt lưng trẻ em bản nhỏ, khóa dễ sử dụng và chiều dài có thể điều chỉnh.</p>',
+ 'KK-PK-003', 'that-lung-tre-em-khoa-tu-dong', 0, 0, 1, 4.7, 178,
+ '["Đen","Nâu"]', '["Freesize"]', 1);
 
 INSERT INTO MaGiamGia (MaCoupon, LoaiGiamGia, GiaTri, DonToiThieu, GiamToiDa, SoLuotDung, NgayBatDau, NgayKetThuc, MoTa) VALUES
     ('WELCOME10',   'percent',  10, 200000,  100000, 1000, '2025-01-01', '2025-12-31', 'Giảm 10% cho khách mới, đơn từ 200K'),
@@ -1077,33 +1066,33 @@ INSERT INTO MaGiamGia (MaCoupon, LoaiGiamGia, GiaTri, DonToiThieu, GiamToiDa, So
     ('VIP30',       'percent',  30, 1000000, 500000, 100,  '2025-01-01', '2025-12-31', 'Giảm 30% cho khách VIP, đơn từ 1 triệu');
 
 INSERT INTO Banner (TieuDe, TieuDePhu, HinhAnh, LienKet, LoaiBanner, ViTri, ThuTu) VALUES
-    ('Spring/Summer 2025',     'Everyday Essentials',         '/slide_1.jpg', '/collections',  'slider', 'homepage', 1),
-    ('New Arrivals',           'Fresh & Trendy',              '/slide_2.jpg', '/new-in',       'slider', 'homepage', 2),
-    ('Summer Sale 50%',        'Giảm giá lên đến 50%',       '/slide_3.jpg', '/sale',         'slider', 'homepage', 3);
+    ('Bé Vui Đến Trường',      'Gọn gàng · Mềm mại · Dễ vận động', '/slide_1.jpg', '/categories/ao-be',          'slider', 'homepage', 1),
+    ('Mặc Xinh Chơi Cả Ngày',  'Outfit mới cho mọi cuộc phiêu lưu', '/slide_2.jpg', '/categories/quan-be',        'slider', 'homepage', 2),
+    ('Ưu Đãi Cho Bé',          'Deal nổi bật cho tủ đồ mới',        '/slide_3.jpg', '/categories/vay-be-gai',     'slider', 'homepage', 3);
 
 INSERT INTO Lookbook (TieuDe, TieuDePhu, MoTa, HinhAnh, LienKet, ThuTu) VALUES
-    ('Street Style Mùa Hè',       'Summer 2025',     'Phong cách đường phố năng động cho mùa hè',   '/lookbook/street-1.jpg',   '/collections', 1),
-    ('Office Chic',                'Công sở thanh lịch', 'Gợi ý trang phục công sở hiện đại',        '/lookbook/office-1.jpg',   '/collections', 2);
+    ('Ngày Đến Trường',     'Back to School', 'Gợi ý outfit gọn gàng, thoải mái cho bé đi học',             '/lookbook/school-1.jpg', '/categories/ao-be', 1),
+    ('Cuối Tuần Phiêu Lưu', 'Weekend Fun',    'Phối đồ năng động để bé tự do vui chơi cùng gia đình',       '/lookbook/weekend-1.jpg', '/categories/quan-be', 2);
 
 INSERT INTO MenuDieuHuong (TenMenu, LienKet, ViTri, ThuTu) VALUES
-    ('Nữ',            '/women',       'header', 1),
-    ('Nam',            '/men',         'header', 2),
-    ('Trẻ em',         '/kids',        'header', 3),
-    ('Bộ sưu tập',    '/collections', 'header', 4),
-    ('Sale',           '/sale',        'header', 5),
-    ('New In',         '/new-in',      'header', 6);
+    ('Bé gái',       '/categories/vay-be-gai',  'header', 1),
+    ('Bé trai',      '/categories/ao-be',        'header', 2),
+    ('Phụ kiện bé',  '/categories/phu-kien-be', 'header', 3),
+    ('Bộ sưu tập',   '/collections',             'header', 4),
+    ('Sale',          '/sale',                    'header', 5),
+    ('Hàng mới',      '/new-in',                  'header', 6);
 
 INSERT INTO MenuDieuHuong (TenMenu, LienKet, ViTri, MenuChaId, ThuTu) VALUES
-    ('Áo thun nữ',    '/women?category=ao-thun',  'header', 1, 1),
-    ('Áo sơ mi nữ',   '/women?category=ao-so-mi', 'header', 1, 2),
-    ('Váy',            '/women?category=vay',      'header', 1, 3),
-    ('Đầm',            '/women?category=dam',      'header', 1, 4);
+    ('Áo bé gái',      '/categories/ao-be',       'header', 1, 1),
+    ('Váy bé gái',     '/categories/vay-be-gai',  'header', 1, 2),
+    ('Đầm bé gái',     '/categories/dam-be-gai',  'header', 1, 3),
+    ('Phụ kiện bé gái','/categories/phu-kien-be', 'header', 1, 4);
 
 INSERT INTO MenuDieuHuong (TenMenu, LienKet, ViTri, MenuChaId, ThuTu) VALUES
-    ('Áo thun nam',    '/men?category=ao-thun',    'header', 2, 1),
-    ('Áo sơ mi nam',   '/men?category=ao-so-mi',   'header', 2, 2),
-    ('Quần jean',      '/men?category=quan-jean',  'header', 2, 3),
-    ('Quần kaki',      '/men?category=quan-kaki',  'header', 2, 4);
+    ('Áo bé trai',     '/categories/ao-be',       'header', 2, 1),
+    ('Quần bé trai',   '/categories/quan-be',     'header', 2, 2),
+    ('Áo khoác bé',    '/categories/ao-khoac-be', 'header', 2, 3),
+    ('Phụ kiện bé trai','/categories/phu-kien-be','header', 2, 4);
 
 INSERT INTO CauHinhCuaHang (MaCauHinh, GiaTri, NhomCauHinh, MoTa) VALUES
     ('storeName',       'KAITO KID',                       'general',  'Tên cửa hàng'),
@@ -1124,30 +1113,30 @@ INSERT INTO CauHinhCuaHang (MaCauHinh, GiaTri, NhomCauHinh, MoTa) VALUES
     ('maintenanceMode', 'false',                            'general',  'Chế độ bảo trì');
 
 INSERT INTO TrangTinh (TieuDe, Slug, NoiDung) VALUES
-    ('Giới thiệu',            'gioi-thieu',           '<h2>Về KAITO KID</h2><p>KAITO KID là thương hiệu thời trang Việt Nam, hướng tới phong cách trẻ trung, hiện đại với giá cả hợp lý. Chúng tôi cam kết mang đến những sản phẩm chất lượng, thiết kế phù hợp dáng người châu Á.</p>'),
+    ('Giới thiệu',            'gioi-thieu',           '<h2>Về KAITO KID</h2><p>KAITO KID là thương hiệu thời trang trẻ em 0-12 tuổi, ưu tiên sự mềm mại, thoải mái, dễ vận động và phong cách tươi vui phù hợp trẻ nhỏ.</p>'),
     ('Chính sách đổi trả',    'chinh-sach-doi-tra',   '<h2>Chính sách đổi trả</h2><p>Đổi trả miễn phí trong 7 ngày kể từ ngày nhận hàng nếu sản phẩm bị lỗi hoặc không đúng mô tả. Sản phẩm đổi trả phải còn nguyên tem mác, chưa qua sử dụng.</p>'),
     ('Chính sách vận chuyển',  'chinh-sach-van-chuyen', '<h2>Chính sách vận chuyển</h2><p>Miễn phí vận chuyển cho đơn hàng từ 499.000đ. Thời gian giao hàng: Nội thành 1-2 ngày, ngoại thành 2-4 ngày.</p>'),
-    ('Hướng dẫn chọn size',   'huong-dan-chon-size',  '<h2>Hướng dẫn chọn size</h2><p>Bảng size chuẩn KAITO KID được thiết kế phù hợp với dáng người Việt Nam. Nếu bạn phân vân giữa 2 size, hãy chọn size lớn hơn.</p>'),
+    ('Hướng dẫn chọn size',   'huong-dan-chon-size',  '<h2>Hướng dẫn chọn size cho bé</h2><p>Size KAITO KID ưu tiên theo chiều cao của bé (90-150). Hãy đo chiều cao và cân nặng thực tế; nếu bé nằm giữa hai size hoặc thích mặc rộng, ưu tiên size lớn hơn.</p>'),
     ('Chính sách bảo mật',    'chinh-sach-bao-mat',   '<h2>Chính sách bảo mật</h2><p>Chúng tôi cam kết bảo mật thông tin cá nhân của khách hàng. Thông tin của bạn chỉ được sử dụng cho mục đích xử lý đơn hàng và chăm sóc khách hàng.</p>');
 
 INSERT INTO DonHang (MaDonHang, NguoiDungId, TenNguoiNhan, SoDienThoai, Email, DiaChiGiao, TinhThanh, QuanHuyen, PhuongXa, TamTinh, PhiVanChuyen, GiamGia, TongTien, PhuongThucThanhToan, TrangThai) VALUES
-    ('KK-20250320-ABC123', 2, 'Nguyễn Thị Thảo', '0912345678', 'thao@gmail.com', '45 Lê Lợi, P.Bến Nghé, Q.1, TP.HCM', 'TP.HCM', 'Quận 1', 'Bến Nghé', 898000, 0, 0, 898000, 'COD', 'completed'),
+    ('KK-20250320-ABC123', 2, 'Nguyễn Thị Thảo', '0912345678', 'thao@gmail.com', '45 Lê Lợi, P.Bến Nghé, Q.1, TP.HCM', 'TP.HCM', 'Quận 1', 'Bến Nghé', 997000, 0, 0, 997000, 'COD', 'completed'),
     ('KK-20250322-DEF456', 3, 'Trần Minh Hoàng', '0923456789', 'hoang@gmail.com', '12 Trần Hưng Đạo, P.5, Q.5, TP.HCM', 'TP.HCM', 'Quận 5', 'Phường 5', 1198000, 30000, 100000, 1128000, 'shipping', 'VISA'),
     ('KK-20250325-GHI789', 4, 'Lê Phương Linh', '0934567890', 'linh@gmail.com', '78 Nguyễn Trãi, Thanh Xuân, Hà Nội', 'Hà Nội', 'Thanh Xuân', 'Nhân Chính', 599000, 30000, 0, 629000, 'Momo', 'confirmed');
 
 INSERT INTO ChiTietDonHang (DonHangId, SanPhamId, TenSanPham, HinhAnhSP, DonGia, KichCo, MauSac, SoLuong) VALUES
-    (1, 1, 'Áo Thun Nam Cổ Tròn Basic',       '/products/ao-thun-nam-1.jpg',  299000, 'L',  'Đen',         2),
-    (1, 8, 'Áo Polo Nam Cổ Bẻ Classic',        '/products/polo-nam-1.jpg',     299000, 'M',  'Xanh navy',   1),
-    (2, 9, 'Quần Jean Nam Slim Fit Xanh Đậm',  '/products/jean-nam-1.jpg',     599000, '32', 'Xanh đậm',    1),
-    (2, 6, 'Áo Khoác Hoodie Unisex Basic',     '/products/hoodie-1.jpg',       599000, 'L',  'Đen',         1),
-    (3, 6, 'Áo Khoác Hoodie Unisex Basic',     '/products/hoodie-1.jpg',       599000, 'M',  'Xám',         1);
+    (1, 1, 'Áo Thun Bé Trai Cổ Tròn Basic',      '/products/ao-thun-be-trai-1.jpg', 299000, '120', 'Xanh navy',  2),
+    (1, 8, 'Áo Polo Bé Trai Cổ Bẻ',              '/products/polo-be-trai-1.jpg',    399000, '120', 'Trắng',      1),
+    (2, 9, 'Quần Jean Bé Trai Slim Co Giãn',     '/products/jean-be-trai-1.jpg',    599000, '130', 'Xanh đậm',   1),
+    (2, 6, 'Áo Hoodie Trẻ Em Unisex',            '/products/hoodie-tre-em-1.jpg',   599000, '130', 'Xám',        1),
+    (3, 6, 'Áo Hoodie Trẻ Em Unisex',            '/products/hoodie-tre-em-1.jpg',   599000, '120', 'Be',         1);
 
 INSERT INTO DanhGia (SanPhamId, NguoiDungId, TenKhachHang, DonHangId, SoSao, NoiDung, TrangThai) VALUES
-    (1, 2, 'Nguyễn Thị Thảo', 1, 5, 'Vải rất mát, form chuẩn, giao hàng nhanh. Sẽ ủng hộ thêm!', 'approved'),
-    (1, 3, 'Trần Minh Hoàng', 2, 4, 'Chất lượng tốt, giá hợp lý. Đóng gói cẩn thận!', 'approved'),
-    (4, 2, 'Nguyễn Thị Thảo', 1, 5, 'Áo sơ mi đẹp lắm, mặc đi làm rất sang', 'approved'),
-    (6, 4, 'Lê Phương Linh',  3, 5, 'Hoodie ấm lắm, chất nỉ dày dặn, mặc mùa đông rất ổn', 'approved'),
-    (9, 3, 'Trần Minh Hoàng', 2, 4, 'Jean co giãn thoải mái, wash đẹp', 'approved');
+    (1, 2, 'Nguyễn Thị Thảo', 1, 5, 'Vải mềm, bé mặc mát và vận động thoải mái. Giao hàng nhanh!', 'approved'),
+    (1, 3, 'Trần Minh Hoàng', 2, 4, 'Form áo cho bé gọn gàng, chất vải dễ chịu và đóng gói cẩn thận.', 'approved'),
+    (4, 2, 'Nguyễn Thị Thảo', 1, 5, 'Áo sơ mi bé mặc đi học rất xinh, vải mềm và ít nhăn.', 'approved'),
+    (6, 4, 'Lê Phương Linh', 3, 5, 'Hoodie ấm, lớp nỉ mềm và bé mặc rất thoải mái.', 'approved'),
+    (9, 3, 'Trần Minh Hoàng', 2, 4, 'Jean co giãn tốt, bé chạy nhảy không bị cứng.', 'approved');
 
 INSERT INTO CauHinhTrangChu (TenSection, DanhSachSPId, ThuTu) VALUES
     ('newArrivals',     '[1,2,3,5,6,9,10,12]',  1),
@@ -1155,10 +1144,10 @@ INSERT INTO CauHinhTrangChu (TenSection, DanhSachSPId, ThuTu) VALUES
     ('saleProducts',    '[2,5,7,10,13,15,19]',   3);
 
 INSERT INTO HomepageBlock (BlockType, TieuDe, TieuDePhu, HinhAnh, LienKet, ThuTu) VALUES
-        ('categoryTile', 'Thời trang nữ',  'Bộ sưu tập mới',     '/images/slide_1.jpg', '/women', 1),
-        ('categoryTile', 'Thời trang nam', 'Phong cách hiện đại', '/images/slide_2.jpg', '/men',   2),
-        ('categoryTile', 'Trẻ em',         'Đáng yêu, thoải mái', '/images/slide_3.jpg', '/kids',  3),
-        ('categoryTile', 'Khuyến mãi',     'Săn deal hot',         '/images/slide_4.jpg', '/sale',  4);
+        ('categoryTile', 'Bé gái',       'Xinh xắn mỗi ngày',      '/slide_1.jpg', '/categories/vay-be-gai', 1),
+        ('categoryTile', 'Bé trai',       'Năng động, thoải mái',   '/slide_2.jpg', '/categories/ao-be',       2),
+        ('categoryTile', 'Đi học',        'Gọn gàng đến trường',    '/slide_3.jpg', '/categories/quan-be',     3),
+        ('categoryTile', 'Phụ kiện bé',   'Hoàn thiện outfit',       '/slide_1.jpg', '/categories/phu-kien-be', 4);
 
 INSERT INTO HomepageBlock (BlockType, TieuDe, MoTa, Icon, ThuTu) VALUES
         ('brandValue', 'Freeship đơn 499K', 'Miễn phí vận chuyển toàn quốc',         'truck',     1),

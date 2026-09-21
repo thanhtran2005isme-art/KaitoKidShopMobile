@@ -2,6 +2,8 @@ import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
+import { BRAND } from '@/constants/brand';
+
 export function HomeHeader() {
   const router = useRouter();
   const [search, setSearch] = useState('');
@@ -16,8 +18,8 @@ export function HomeHeader() {
     <View style={styles.container}>
       <View style={styles.topRow}>
         <View>
-          <Text style={styles.eyebrow}>THỜI TRANG TRẺ EM</Text>
-          <Text style={styles.brand}>KaitoKid</Text>
+          <Text style={styles.eyebrow}>{BRAND.tagline}</Text>
+          <Text style={styles.brand}>{BRAND.name}</Text>
         </View>
         <Pressable accessibilityRole="button" onPress={() => router.push('/cart')} style={styles.iconButton}>
           <Text style={styles.icon}>🛍️</Text>
@@ -30,7 +32,7 @@ export function HomeHeader() {
           enterKeyHint="search"
           onChangeText={setSearch}
           onSubmitEditing={submitSearch}
-          placeholder="Tìm áo, quần, váy..."
+          placeholder={BRAND.searchPlaceholder}
           placeholderTextColor="#9CA3AF"
           returnKeyType="search"
           style={styles.input}
