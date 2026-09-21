@@ -302,7 +302,11 @@ export default function ProductDetailScreen() {
       `KaitoKid · ${product.category}`,
     ].join('\n');
 
-    await Share.share({ message });
+    try {
+      await Share.share({ message });
+    } catch {
+      // Chia sẻ là hành động phụ, không làm gián đoạn màn chi tiết nếu nền tảng không hỗ trợ.
+    }
   };
 
   return (
@@ -464,7 +468,7 @@ export default function ProductDetailScreen() {
                   : 'Hãy chọn đủ màu và size trước khi mua'}
               </Text>
               <Text style={styles.selectionHelper}>
-                Thông tin này sẽ được dùng trực tiếp khi nối Add to Cart ở bước tiếp theo.
+                Lựa chọn màu, size và số lượng sẽ được giữ trong lúc bạn xem sản phẩm.
               </Text>
             </View>
 
