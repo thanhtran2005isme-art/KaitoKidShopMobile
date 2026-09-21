@@ -41,6 +41,7 @@ yarn-error.*
 **/.env.*
 !**/.env.example
 **/appsettings.Development.json
+/backend/db.local.bat
 
 # Generated large models
 *.onnx
