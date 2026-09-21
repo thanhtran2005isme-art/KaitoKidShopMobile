@@ -68,7 +68,15 @@ public class ProductService(CustomerDbContext db) : IProductService
             .Include(p => p.Reviews.Where(r => r.Status == "approved"))
             .FirstOrDefaultAsync(p => p.Id == id && p.Status == "active");
 
-        return product is null ? null : MapToDetailDTO(product);
+        if (product is null) return null;
+
+        var variantInventory = await db.VariantStocks
+            .Where(v => v.ProductId == product.Id)
+            .OrderBy(v => v.Size)
+            .ThenBy(v => v.Color)
+            .ToListAsync();
+
+        return MapToDetailDTO(product, variantInventory);
     }
 
     public async Task<ProductDetailDTO?> GetBySlugAsync(string slug)
@@ -77,7 +85,15 @@ public class ProductService(CustomerDbContext db) : IProductService
             .Include(p => p.Reviews.Where(r => r.Status == "approved"))
             .FirstOrDefaultAsync(p => p.Slug == slug && p.Status == "active");
 
-        return product is null ? null : MapToDetailDTO(product);
+        if (product is null) return null;
+
+        var variantInventory = await db.VariantStocks
+            .Where(v => v.ProductId == product.Id)
+            .OrderBy(v => v.Size)
+            .ThenBy(v => v.Color)
+            .ToListAsync();
+
+        return MapToDetailDTO(product, variantInventory);
     }
 
     public async Task<List<ProductDTO>> GetNewArrivalsAsync(int count = 8)
@@ -147,7 +163,7 @@ public class ProductService(CustomerDbContext db) : IProductService
         Sizes = Deserialize<List<string>>(p.Sizes) ?? []
     };
 
-    private static ProductDetailDTO MapToDetailDTO(Product p) => new()
+    private static ProductDetailDTO MapToDetailDTO(Product p, IReadOnlyCollection<VariantStock> variantInventory) => new()
     {
         Id = p.Id,
         Name = p.Name,
@@ -177,6 +193,14 @@ public class ProductService(CustomerDbContext db) : IProductService
         Colors = Deserialize<List<string>>(p.Colors) ?? [],
         Sizes = Deserialize<List<string>>(p.Sizes) ?? [],
         Variants = Deserialize<List<ProductVariantDTO>>(p.Variants) ?? [],
+        VariantInventory = variantInventory.Select(v => new ProductVariantInventoryDTO
+        {
+            Size = v.Size,
+            Color = v.Color,
+            Stock = v.Stock,
+            Reserved = v.Reserved,
+            Available = v.Available
+        }).ToList(),
         Reviews = p.Reviews.Select(r => new ReviewDTO
         {
             Id = r.Id,
