@@ -3,9 +3,10 @@ import { Link, router } from 'expo-router';
 import { useState } from 'react';
 import { Alert, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { login } from '../../services/auth.service';
+import { useAuth } from '@/context/AuthContext';
 
 export default function LoginScreen() {
+  const { login } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
