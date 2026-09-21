@@ -1120,7 +1120,7 @@ INSERT INTO TrangTinh (TieuDe, Slug, NoiDung) VALUES
     ('Chính sách bảo mật',    'chinh-sach-bao-mat',   '<h2>Chính sách bảo mật</h2><p>Chúng tôi cam kết bảo mật thông tin cá nhân của khách hàng. Thông tin của bạn chỉ được sử dụng cho mục đích xử lý đơn hàng và chăm sóc khách hàng.</p>');
 
 INSERT INTO DonHang (MaDonHang, NguoiDungId, TenNguoiNhan, SoDienThoai, Email, DiaChiGiao, TinhThanh, QuanHuyen, PhuongXa, TamTinh, PhiVanChuyen, GiamGia, TongTien, PhuongThucThanhToan, TrangThai) VALUES
-    ('KK-20250320-ABC123', 2, 'Nguyễn Thị Thảo', '0912345678', 'thao@gmail.com', '45 Lê Lợi, P.Bến Nghé, Q.1, TP.HCM', 'TP.HCM', 'Quận 1', 'Bến Nghé', 898000, 0, 0, 898000, 'COD', 'completed'),
+    ('KK-20250320-ABC123', 2, 'Nguyễn Thị Thảo', '0912345678', 'thao@gmail.com', '45 Lê Lợi, P.Bến Nghé, Q.1, TP.HCM', 'TP.HCM', 'Quận 1', 'Bến Nghé', 997000, 0, 0, 997000, 'COD', 'completed'),
     ('KK-20250322-DEF456', 3, 'Trần Minh Hoàng', '0923456789', 'hoang@gmail.com', '12 Trần Hưng Đạo, P.5, Q.5, TP.HCM', 'TP.HCM', 'Quận 5', 'Phường 5', 1198000, 30000, 100000, 1128000, 'shipping', 'VISA'),
     ('KK-20250325-GHI789', 4, 'Lê Phương Linh', '0934567890', 'linh@gmail.com', '78 Nguyễn Trãi, Thanh Xuân, Hà Nội', 'Hà Nội', 'Thanh Xuân', 'Nhân Chính', 599000, 30000, 0, 629000, 'Momo', 'confirmed');
 
