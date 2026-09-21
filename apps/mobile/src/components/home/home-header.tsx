@@ -19,7 +19,8 @@ export function HomeHeader({ cartCount, userName }: HomeHeaderProps) {
     router.push({ pathname: '/search', params: { q } });
   };
 
-  const firstName = userName?.trim().split(/\s+/).at(-1);
+  const nameParts = userName?.trim().split(/\s+/) || [];
+  const firstName = nameParts.length ? nameParts[nameParts.length - 1] : undefined;
 
   return (
     <View style={styles.container}>
