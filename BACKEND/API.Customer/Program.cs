@@ -7,7 +7,7 @@ using Shared.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddMySqlDb<CustomerDbContext>(builder.Configuration);
+builder.Services.AddMariaDb<CustomerDbContext>(builder.Configuration);
 builder.Services.AddJwtAuthentication(builder.Configuration);
 
 // Permission-based authorization (RBAC granular) — dùng cho AdminShippingController

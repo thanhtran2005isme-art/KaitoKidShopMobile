@@ -6,7 +6,7 @@ using Shared.Extensions;
 var builder = WebApplication.CreateBuilder(args);
 
 // DbContext với AuditInterceptor từ DbHelper
-builder.Services.AddMySqlDb<AdminDbContext>(builder.Configuration);
+builder.Services.AddMariaDb<AdminDbContext>(builder.Configuration);
 
 // JWT Authentication từ Shared
 builder.Services.AddJwtAuthentication(builder.Configuration);

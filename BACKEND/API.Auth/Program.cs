@@ -5,7 +5,7 @@ using Shared.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddMySqlDb<AuthDbContext>(builder.Configuration);
+builder.Services.AddMariaDb<AuthDbContext>(builder.Configuration);
 builder.Services.AddJwtAuthentication(builder.Configuration);
 
 builder.Services.AddCors(options =>

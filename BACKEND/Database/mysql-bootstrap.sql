@@ -1,9 +1,10 @@
--- KaitoKid MySQL bootstrap
--- Change CHANGE_ME before running outside a disposable local environment.
+-- KaitoKid MariaDB/XAMPP bootstrap
+-- Target local: MariaDB 10.4.x bundled with XAMPP.
+-- Replace CHANGE_ME before running.
 
 CREATE DATABASE IF NOT EXISTS KaitoKid
   CHARACTER SET utf8mb4
-  COLLATE utf8mb4_0900_ai_ci;
+  COLLATE utf8mb4_unicode_ci;
 
 CREATE USER IF NOT EXISTS 'kaitokid'@'localhost'
   IDENTIFIED BY 'CHANGE_ME';

@@ -4,16 +4,13 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace DbHelper;
 
-/// <summary>
-/// Extension methods de dang ky DbContext trong Program.cs
-/// </summary>
 public static class DbExtensions
 {
     /// <summary>
-    /// Dang ky DbContext voi MySQL + AuditInterceptor
-    /// Usage: builder.Services.AddMySqlDb&lt;MyDbContext&gt;(config);
+    /// Dang ky DbContext voi MariaDB/XAMPP qua Pomelo + AuditInterceptor.
+    /// Target local: MariaDB 10.4.32.
     /// </summary>
-    public static IServiceCollection AddMySqlDb<TContext>(
+    public static IServiceCollection AddMariaDb<TContext>(
         this IServiceCollection services,
         IConfiguration config,
         string connectionStringName = "DefaultConnection")
@@ -22,9 +19,11 @@ public static class DbExtensions
         var connectionString = config.GetConnectionString(connectionStringName)
             ?? throw new InvalidOperationException($"Connection string '{connectionStringName}' not found");
 
+        var serverVersion = new MariaDbServerVersion(new Version(10, 4, 32));
+
         services.AddDbContext<TContext>(options =>
         {
-            options.UseMySQL(connectionString);
+            options.UseMySql(connectionString, serverVersion);
             options.AddInterceptors(new AuditInterceptor());
         });
 
