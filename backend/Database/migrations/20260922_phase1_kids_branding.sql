@@ -63,6 +63,38 @@ UPDATE DanhGia SET NoiDung='Áo sơ mi bé mặc đi học rất xinh, vải m�
 UPDATE DanhGia SET NoiDung='Hoodie ấm, lớp nỉ mềm và bé mặc rất thoải mái.' WHERE SanPhamId=6;
 UPDATE DanhGia SET NoiDung='Jean co giãn tốt, bé chạy nhảy không bị cứng.' WHERE SanPhamId=9;
 
+-- Đồng bộ mô tả chi tiết để Product Detail không còn nội dung thời trang người lớn.
+UPDATE SanPham SET MoTaChiTiet='<p>Áo thun bé trai cổ tròn từ cotton mềm, thấm hút tốt và dễ phối đồ. Form thoải mái giúp bé chạy nhảy tự nhiên.</p><ul><li>Độ tuổi: 2-12 tuổi</li><li>Chất liệu: Cotton mềm</li><li>Ưu tiên: Thoáng, dễ vận động</li></ul>' WHERE Id=1;
+UPDATE SanPham SET MoTaChiTiet='<p>Áo thun bé gái form rộng vừa phải, chất liệu co giãn nhẹ, phù hợp đi học, đi chơi và hoạt động cuối tuần.</p>' WHERE Id=2;
+UPDATE SanPham SET MoTaChiTiet='<p>Thiết kế tie-dye vui mắt, form unisex và chất vải mềm giúp bé thoải mái khi vui chơi.</p>' WHERE Id=3;
+UPDATE SanPham SET MoTaChiTiet='<p>Áo sơ mi bé trai chất cotton pha mềm, dễ giặt, form vừa người và không gây bí khi mặc lâu.</p>' WHERE Id=4;
+UPDATE SanPham SET MoTaChiTiet='<p>Thiết kế cổ sen mềm mại, form thoải mái, phù hợp đi học, đi chơi hoặc phối cùng chân váy.</p>' WHERE Id=5;
+UPDATE SanPham SET MoTaChiTiet='<p>Hoodie trẻ em có mũ, túi trước và bề mặt nỉ mềm. Form rộng vừa giúp bé mặc thêm áo bên trong.</p>' WHERE Id=6;
+UPDATE SanPham SET MoTaChiTiet='<p>Áo bomber bé trai chất nhẹ, bo tay mềm và khóa kéo dễ sử dụng. Phù hợp thời tiết se lạnh.</p>' WHERE Id=7;
+UPDATE SanPham SET MoTaChiTiet='<p>Áo polo bé trai chất pique cotton mềm, phù hợp đi học, đi chơi và các dịp gia đình.</p>' WHERE Id=8;
+UPDATE SanPham SET MoTaChiTiet='<p>Quần jean bé trai sử dụng denim co giãn, cạp dễ mặc và đường may êm, phù hợp đi học và đi chơi.</p>' WHERE Id=9;
+UPDATE SanPham SET MoTaChiTiet='<p>Quần jean bé gái ống rộng có cạp thoải mái, denim mềm và kiểu dáng hiện đại nhưng vẫn phù hợp trẻ em.</p>' WHERE Id=10;
+UPDATE SanPham SET MoTaChiTiet='<p>Quần kaki bé trai chất cotton pha co giãn, thiết kế dễ vận động và phù hợp đồng phục tự do.</p>' WHERE Id=11;
+UPDATE SanPham SET MoTaChiTiet='<p>Quần short bé trai chất nhẹ, cạp co giãn và túi hai bên, phù hợp chạy nhảy, dã ngoại và thể thao.</p>' WHERE Id=12;
+UPDATE SanPham SET MoTaChiTiet='<p>Váy bé gái xếp ly với cạp mềm, lớp vải nhẹ và chiều dài phù hợp để bé vận động thoải mái.</p>' WHERE Id=13;
+UPDATE SanPham SET MoTaChiTiet='<p>Váy tennis bé gái có quần bảo hộ bên trong, chất thun co giãn và cạp mềm.</p>' WHERE Id=14;
+UPDATE SanPham SET MoTaChiTiet='<p>Đầm bé gái dáng xòe với chi tiết nơ nhẹ nhàng, lớp lót mềm và thiết kế ưu tiên sự thoải mái.</p>' WHERE Id=15;
+UPDATE SanPham SET MoTaChiTiet='<p>Đầm bé gái form suông nhẹ, tay lỡ và chất vải mềm, phù hợp cho các dịp gia đình.</p>' WHERE Id=16;
+UPDATE SanPham SET MoTaChiTiet='<p>Túi tote mini KaitoKid làm từ canvas nhẹ, quai vừa tay và kích thước phù hợp trẻ em.</p>' WHERE Id=17;
+UPDATE SanPham SET MoTaChiTiet='<p>Mũ lưỡi trai KaitoKid thêu logo, chất liệu nhẹ và có khóa điều chỉnh phía sau.</p>' WHERE Id=18;
+UPDATE SanPham SET MoTaChiTiet='<p>Thắt lưng trẻ em bản nhỏ, khóa dễ sử dụng và chiều dài có thể điều chỉnh.</p>' WHERE Id=19;
+
+-- Đồng bộ menu điều hướng và các tile trang chủ.
+UPDATE MenuDieuHuong SET TenMenu='Bé gái', LienKet='/categories/vay-be-gai' WHERE ViTri='header' AND MenuChaId IS NULL AND ThuTu=1;
+UPDATE MenuDieuHuong SET TenMenu='Bé trai', LienKet='/categories/ao-be' WHERE ViTri='header' AND MenuChaId IS NULL AND ThuTu=2;
+UPDATE MenuDieuHuong SET TenMenu='Phụ kiện bé', LienKet='/categories/phu-kien-be' WHERE ViTri='header' AND MenuChaId IS NULL AND ThuTu=3;
+UPDATE MenuDieuHuong SET TenMenu='Hàng mới', LienKet='/new-in' WHERE ViTri='header' AND MenuChaId IS NULL AND ThuTu=6;
+
+UPDATE HomepageBlock SET TieuDe='Bé gái', TieuDePhu='Xinh xắn mỗi ngày', HinhAnh='/slide_1.jpg', LienKet='/categories/vay-be-gai' WHERE BlockType='categoryTile' AND ThuTu=1;
+UPDATE HomepageBlock SET TieuDe='Bé trai', TieuDePhu='Năng động, thoải mái', HinhAnh='/slide_2.jpg', LienKet='/categories/ao-be' WHERE BlockType='categoryTile' AND ThuTu=2;
+UPDATE HomepageBlock SET TieuDe='Đi học', TieuDePhu='Gọn gàng đến trường', HinhAnh='/slide_3.jpg', LienKet='/categories/quan-be' WHERE BlockType='categoryTile' AND ThuTu=3;
+UPDATE HomepageBlock SET TieuDe='Phụ kiện bé', TieuDePhu='Hoàn thiện outfit', HinhAnh='/slide_1.jpg', LienKet='/categories/phu-kien-be' WHERE BlockType='categoryTile' AND ThuTu=4;
+
 COMMIT;
 
 SELECT COUNT(*) AS san_pham_tre_em
