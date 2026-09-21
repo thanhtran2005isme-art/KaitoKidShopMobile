@@ -124,3 +124,27 @@ For USB/ADB development, the mobile launcher attempts reverse mappings for:
 - 8081
 - 5053
 - 5265
+
+
+## Expo Web warning: `props.pointerEvents is deprecated`
+
+The application source does not currently pass `pointerEvents` as a React Native prop. The warning is emitted by the Expo Router / React Navigation web dependency chain.
+
+A development-only filter in `apps/mobile/src/utils/web-warning-filter.ts` suppresses only this exact upstream warning while preserving all other `console.warn` output.
+
+Do not silence broader warnings. Remove the filter when the Expo Router navigation dependency includes the upstream `style.pointerEvents` fix.
+
+## Banner/product image 404s on API.Customer
+
+Database seed data contains URLs such as:
+
+```text
+/slide_1.jpg
+/products/jean-nu-1.jpg
+```
+
+The three slider images exist in `apps/web/public`, so API.Customer additionally serves that directory as shared static media.
+
+The seeded `/products/*.jpg` files do not exist anywhere in the repository (including the pre-monorepo history that was checked during the fix). API.Customer therefore returns a lightweight KaitoKid SVG placeholder for missing `/products/*` requests rather than returning 404.
+
+When real product files are added to a configured static directory, static-file middleware takes precedence automatically and the fallback is not used.
