@@ -33,8 +33,23 @@ For meaningful changes:
 2. Create a focused branch.
 3. Change only the required files.
 4. Validate the relevant code/configuration.
-5. Open a PR and merge only when clean.
-6. Update documentation when the project state, architecture, operational procedure, or a durable decision changes.
+5. Commit changes with a Vietnamese commit message.
+6. Open a PR and merge only when clean.
+7. Update documentation when the project state, architecture, operational procedure, or a durable decision changes.
+
+### Ngôn ngữ commit
+
+Tất cả commit do AI/GPT tạo cho repository này phải viết bằng **tiếng Việt**.
+
+Có thể giữ tiền tố Conventional Commits bằng tiếng Anh như `feat:`, `fix:`, `docs:`, `chore:`, `refactor:`, nhưng phần mô tả sau tiền tố phải là tiếng Việt, rõ ràng và nói đúng nội dung thay đổi.
+
+Ví dụ:
+
+- `feat: hoàn thiện giỏ hàng trên mobile`
+- `fix: sửa đường dẫn ảnh sản phẩm bị 404`
+- `docs: cập nhật trạng thái dự án cho phiên làm việc mới`
+
+Không dùng commit message chung chung như `update`, `fix stuff`, `changes` hoặc mô tả hoàn toàn bằng tiếng Anh, trừ khi người dùng yêu cầu khác một cách rõ ràng.
 
 Do not use long-lived branches as project memory. Branches are for work in progress; merged history belongs in Git.
 
