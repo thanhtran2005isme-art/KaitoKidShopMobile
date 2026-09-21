@@ -84,3 +84,16 @@ This file records durable decisions and their rationale. It is not a chronologic
 **Quy ước:** Có thể dùng tiền tố Conventional Commits bằng tiếng Anh như `feat:`, `fix:`, `docs:`, `chore:`, `refactor:`; phần mô tả sau tiền tố phải là tiếng Việt. Ví dụ: `fix: sửa ảnh sản phẩm bị 404`.
 
 **Hệ quả:** Trước khi commit, AI phải kiểm tra commit message đã mô tả đúng thay đổi và dùng tiếng Việt, trừ khi người dùng yêu cầu rõ ràng một ngôn ngữ khác.
+
+
+## D009 — Chốt KaitoKid là thời trang trẻ em 0–12 tuổi
+
+**Ngày:** 2026-09-22
+
+**Quyết định:** KaitoKid được định vị thống nhất là thương hiệu thời trang trẻ em 0–12 tuổi, không phải shop thời trang nam/nữ người lớn.
+
+**Lý do:** Tên thương hiệu, mobile UI và định hướng sản phẩm cần cùng một thông điệp. Dữ liệu cũ trộn thời trang người lớn làm Home, category và Product Detail mâu thuẫn với thương hiệu.
+
+**Quy ước dữ liệu:** Sản phẩm mẫu dùng `NhomTuoi = TreEm`; `GioiTinh = Nam/Nu/Unisex` được UI diễn giải thành bé trai/bé gái/unisex. Size trẻ em ưu tiên theo chiều cao 90–150.
+
+**Hệ quả:** Mọi dữ liệu, copy, banner, collection và UI mới phải tuân theo `docs/BRAND.md`. Không thêm lại nội dung kiểu công sở người lớn, body/quyến rũ hoặc category nam/nữ người lớn nếu không có quyết định thay đổi thương hiệu mới.
