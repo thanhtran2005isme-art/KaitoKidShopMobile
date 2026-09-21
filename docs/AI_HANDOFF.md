@@ -12,7 +12,9 @@ This file is intentionally concise. It describes the current state needed to con
 - Brand: **KaitoKid = thời trang trẻ em 0–12 tuổi**
 - Brand rules: `docs/BRAND.md`
 - Current roadmap: PHASE 1–4 hoàn tất, tiếp theo PHASE 5 — Cart thật
+- PHASE 5–10 đã có acceptance criteria, API dependencies, UI/state scope và ranh giới chi tiết trong `docs/PHASES_5_10.md`.
 - Roadmap source: `docs/ROADMAP.md`
+- Detailed remaining PHASE 5–10 spec: `docs/PHASES_5_10.md`
 - Structure: full-stack monorepo
 - Git convention: mọi commit do AI/GPT tạo phải có phần mô tả bằng **tiếng Việt**; có thể giữ tiền tố Conventional Commits như `feat:`, `fix:`, `docs:`.
 - Commit granularity: mặc định **một task/fix/PHASE = một commit duy nhất**; không commit từng file/từng bước. Với PR, ưu tiên squash merge để `main` chỉ có một commit cho công việc đó.
@@ -148,11 +150,12 @@ As of 2026-09-22:
 2. Read this file.
 3. Read `docs/BRAND.md`.
 4. Read `docs/ROADMAP.md`.
-5. Read `docs/ARCHITECTURE.md`.
-6. Read task-relevant decisions/troubleshooting.
-7. Inspect the relevant current files.
-8. Check recent Git history/PRs when the reason for existing code matters.
-9. Khi tạo commit mới, viết commit message bằng tiếng Việt theo quy tắc trong `AGENTS.md`.
-10. Gom toàn bộ thay đổi của cùng một task/fix/PHASE vào một commit; không tạo chuỗi commit nhỏ theo từng file.
+5. Read `docs/PHASES_5_10.md` trước khi làm bất kỳ PHASE 5–10 nào.
+6. Read `docs/ARCHITECTURE.md`.
+7. Read task-relevant decisions/troubleshooting.
+8. Inspect the relevant current files.
+9. Check recent Git history/PRs when the reason for existing code matters.
+10. Khi tạo commit mới, viết commit message bằng tiếng Việt theo quy tắc trong `AGENTS.md`.
+11. Gom toàn bộ thay đổi của cùng một task/fix/PHASE vào một commit; không tạo chuỗi commit nhỏ theo từng file.
 
 For exact historical changes, use Git rather than relying on this file.
