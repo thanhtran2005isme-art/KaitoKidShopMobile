@@ -87,7 +87,9 @@ public class CartService(CustomerDbContext db) : ICartService
         if (hasVariantInventory && variant is null)
             throw new InvalidOperationException("Biến thể size/màu đã chọn không tồn tại hoặc không còn bán");
 
-        var availableStock = variant?.Available ?? product.Available;
+        var availableStock = variant != null
+            ? Math.Min(variant.Available, product.Available)
+            : product.Available;
 
         if (availableStock < dto.Quantity)
             throw new InvalidOperationException(
@@ -121,20 +123,20 @@ public class CartService(CustomerDbContext db) : ICartService
             db.CartItems.Add(existing);
         }
 
+        product.Reserved += quantityDelta;
+        product.UpdatedAt = DateTime.UtcNow;
+
         if (variant != null)
         {
             variant.Reserved += quantityDelta;
             variant.UpdatedAt = DateTime.UtcNow;
         }
-        else
-        {
-            product.Reserved += quantityDelta;
-            product.UpdatedAt = DateTime.UtcNow;
-        }
 
         await db.SaveChangesAsync();
 
-        var availableAfter = variant?.Available ?? product.Available;
+        var availableAfter = variant != null
+            ? Math.Min(variant.Available, product.Available)
+            : product.Available;
 
         return new CartItemDTO
         {
@@ -169,30 +171,36 @@ public class CartService(CustomerDbContext db) : ICartService
         var oldQty = item.Quantity;
         var delta = quantity - oldQty;
 
+        var productAvailableForItem =
+            item.Product.Stock - item.Product.Reserved + oldQty;
+
+        if (quantity > productAvailableForItem)
+            throw new InvalidOperationException(
+                $"Chỉ còn {productAvailableForItem} sản phẩm khả dụng");
+
         if (variant != null)
         {
-            var availableForItem = variant.Stock - variant.Reserved + oldQty;
-            if (quantity > availableForItem)
-                throw new InvalidOperationException($"Chỉ còn {availableForItem} sản phẩm khả dụng");
+            var variantAvailableForItem =
+                variant.Stock - variant.Reserved + oldQty;
+
+            if (quantity > variantAvailableForItem)
+                throw new InvalidOperationException(
+                    $"Chỉ còn {variantAvailableForItem} sản phẩm khả dụng cho biến thể này");
 
             variant.Reserved = Math.Max(0, variant.Reserved + delta);
             variant.UpdatedAt = DateTime.UtcNow;
         }
-        else
-        {
-            var availableForItem = item.Product.Stock - item.Product.Reserved + oldQty;
-            if (quantity > availableForItem)
-                throw new InvalidOperationException($"Chỉ còn {availableForItem} sản phẩm khả dụng");
 
-            item.Product.Reserved = Math.Max(0, item.Product.Reserved + delta);
-            item.Product.UpdatedAt = DateTime.UtcNow;
-        }
+        item.Product.Reserved = Math.Max(0, item.Product.Reserved + delta);
+        item.Product.UpdatedAt = DateTime.UtcNow;
 
         item.Quantity = quantity;
         item.ReservedUntil = DateTime.UtcNow.AddMinutes(ReservationMinutes);
         await db.SaveChangesAsync();
 
-        var availableAfter = variant?.Available ?? item.Product.Available;
+        var availableAfter = variant != null
+            ? Math.Min(variant.Available, item.Product.Available)
+            : item.Product.Available;
 
         return new CartItemDTO
         {
@@ -338,6 +346,8 @@ public class CartService(CustomerDbContext db) : ICartService
 
     private async Task ReleaseReservation(CartItem item)
     {
+        var now = DateTime.UtcNow;
+
         var variant = await db.VariantStocks.FirstOrDefaultAsync(v =>
             v.ProductId == item.ProductId &&
             v.Size == item.Size &&
@@ -346,15 +356,14 @@ public class CartService(CustomerDbContext db) : ICartService
         if (variant != null)
         {
             variant.Reserved = Math.Max(0, variant.Reserved - item.Quantity);
-            variant.UpdatedAt = DateTime.UtcNow;
-            return;
+            variant.UpdatedAt = now;
         }
 
         var product = await db.Products.FindAsync(item.ProductId);
         if (product != null)
         {
             product.Reserved = Math.Max(0, product.Reserved - item.Quantity);
-            product.UpdatedAt = DateTime.UtcNow;
+            product.UpdatedAt = now;
         }
     }
 
