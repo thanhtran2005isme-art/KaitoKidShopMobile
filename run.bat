@@ -42,8 +42,8 @@ start "KaitoKid - API.Customer" cmd /k "cd /d ""%BACKEND%\API.Customer"" && dotn
 
 timeout /t 2 /nobreak >nul
 
-echo [3/3] Starting Expo Mobile in a persistent window...
-start "KaitoKid - Expo Mobile" cmd /k "call ""%ROOT%scripts\run-mobile.bat"""
+echo [3/3] Starting Expo Mobile...
+start "KaitoKid - Expo Mobile" "%ROOT%scripts\run-mobile.bat"
 
 echo.
 echo Da mo 3 cua so: API.Auth, API.Customer, Expo Mobile.
