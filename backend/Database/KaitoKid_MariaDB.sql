@@ -55,7 +55,7 @@ CREATE TABLE DanhMuc (
 
 CREATE TABLE SanPham (
     Id              INT AUTO_INCREMENT   PRIMARY KEY,
-    TenSanPham      VARCHAR(200)       NOT NULL,               -- Áo Thun Nam Cổ Tròn Basic
+    TenSanPham      VARCHAR(200)       NOT NULL,               -- Áo Thun Bé Trai Cổ Tròn Basic
     DanhMucId       INT                 NULL,                   -- FK đến DanhMuc
     DanhMuc         VARCHAR(100)       NOT NULL,               -- Tên danh mục: Ao, Quan, Vay
     DanhMucPhu      VARCHAR(100)       NULL,                   -- Danh mục phụ: Ao Thun, Ao So Mi
@@ -1125,18 +1125,18 @@ INSERT INTO DonHang (MaDonHang, NguoiDungId, TenNguoiNhan, SoDienThoai, Email, D
     ('KK-20250325-GHI789', 4, 'Lê Phương Linh', '0934567890', 'linh@gmail.com', '78 Nguyễn Trãi, Thanh Xuân, Hà Nội', 'Hà Nội', 'Thanh Xuân', 'Nhân Chính', 599000, 30000, 0, 629000, 'Momo', 'confirmed');
 
 INSERT INTO ChiTietDonHang (DonHangId, SanPhamId, TenSanPham, HinhAnhSP, DonGia, KichCo, MauSac, SoLuong) VALUES
-    (1, 1, 'Áo Thun Nam Cổ Tròn Basic',       '/products/ao-thun-nam-1.jpg',  299000, 'L',  'Đen',         2),
-    (1, 8, 'Áo Polo Nam Cổ Bẻ Classic',        '/products/polo-nam-1.jpg',     299000, 'M',  'Xanh navy',   1),
-    (2, 9, 'Quần Jean Nam Slim Fit Xanh Đậm',  '/products/jean-nam-1.jpg',     599000, '32', 'Xanh đậm',    1),
-    (2, 6, 'Áo Khoác Hoodie Unisex Basic',     '/products/hoodie-1.jpg',       599000, 'L',  'Đen',         1),
-    (3, 6, 'Áo Khoác Hoodie Unisex Basic',     '/products/hoodie-1.jpg',       599000, 'M',  'Xám',         1);
+    (1, 1, 'Áo Thun Bé Trai Cổ Tròn Basic',      '/products/ao-thun-be-trai-1.jpg', 299000, '120', 'Xanh navy',  2),
+    (1, 8, 'Áo Polo Bé Trai Cổ Bẻ',              '/products/polo-be-trai-1.jpg',    399000, '120', 'Trắng',      1),
+    (2, 9, 'Quần Jean Bé Trai Slim Co Giãn',     '/products/jean-be-trai-1.jpg',    599000, '130', 'Xanh đậm',   1),
+    (2, 6, 'Áo Hoodie Trẻ Em Unisex',            '/products/hoodie-tre-em-1.jpg',   599000, '130', 'Xám',        1),
+    (3, 6, 'Áo Hoodie Trẻ Em Unisex',            '/products/hoodie-tre-em-1.jpg',   599000, '120', 'Be',         1);
 
 INSERT INTO DanhGia (SanPhamId, NguoiDungId, TenKhachHang, DonHangId, SoSao, NoiDung, TrangThai) VALUES
-    (1, 2, 'Nguyễn Thị Thảo', 1, 5, 'Vải rất mát, form chuẩn, giao hàng nhanh. Sẽ ủng hộ thêm!', 'approved'),
-    (1, 3, 'Trần Minh Hoàng', 2, 4, 'Chất lượng tốt, giá hợp lý. Đóng gói cẩn thận!', 'approved'),
-    (4, 2, 'Nguyễn Thị Thảo', 1, 5, 'Áo sơ mi đẹp lắm, mặc đi làm rất sang', 'approved'),
-    (6, 4, 'Lê Phương Linh',  3, 5, 'Hoodie ấm lắm, chất nỉ dày dặn, mặc mùa đông rất ổn', 'approved'),
-    (9, 3, 'Trần Minh Hoàng', 2, 4, 'Jean co giãn thoải mái, wash đẹp', 'approved');
+    (1, 2, 'Nguyễn Thị Thảo', 1, 5, 'Vải mềm, bé mặc mát và vận động thoải mái. Giao hàng nhanh!', 'approved'),
+    (1, 3, 'Trần Minh Hoàng', 2, 4, 'Form áo cho bé gọn gàng, chất vải dễ chịu và đóng gói cẩn thận.', 'approved'),
+    (4, 2, 'Nguyễn Thị Thảo', 1, 5, 'Áo sơ mi bé mặc đi học rất xinh, vải mềm và ít nhăn.', 'approved'),
+    (6, 4, 'Lê Phương Linh', 3, 5, 'Hoodie ấm, lớp nỉ mềm và bé mặc rất thoải mái.', 'approved'),
+    (9, 3, 'Trần Minh Hoàng', 2, 4, 'Jean co giãn tốt, bé chạy nhảy không bị cứng.', 'approved');
 
 INSERT INTO CauHinhTrangChu (TenSection, DanhSachSPId, ThuTu) VALUES
     ('newArrivals',     '[1,2,3,5,6,9,10,12]',  1),
