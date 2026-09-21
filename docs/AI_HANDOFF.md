@@ -114,6 +114,8 @@ As of 2026-09-21:
 - Expo/Metro starts on port 8081.
 - The mobile home screen successfully loads categories and product data from API.Customer.
 - Expo Web renders the mobile app successfully at `127.0.0.1:8081`.
+- API.Customer serves shared media from `apps/web/public` so existing banner URLs such as `/slide_1.jpg` resolve on port 5265.
+- Seed product image paths under `/products/` currently have no source files in the repository; API.Customer returns a branded placeholder instead of 404 until real product media is added.
 
 ## Known non-blocking item
 
