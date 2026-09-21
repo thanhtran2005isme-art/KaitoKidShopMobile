@@ -1,0 +1,142 @@
+# Architecture
+
+## Overview
+
+KaitoKidShop is a full-stack monorepo with separate mobile and web clients backed by ASP.NET Core services and a shared MariaDB database.
+
+```text
+                 ┌─────────────────┐
+                 │  apps/mobile    │
+                 │ Expo / RN       │
+                 └────────┬────────┘
+                          │
+                 Auth :5053 / Customer :5265
+                          │
+                 ┌────────▼────────┐
+                 │ ASP.NET Core    │
+                 │ backend APIs    │
+                 └────────┬────────┘
+                          │ Pomelo / EF Core
+                 ┌────────▼────────┐
+                 │ MariaDB 10.4.32 │
+                 │ kaitokid        │
+                 └─────────────────┘
+
+                 ┌─────────────────┐
+                 │   apps/web      │
+                 │ React + Vite    │
+                 └────────┬────────┘
+                          │
+                       APIs
+```
+
+## Top-level layout
+
+### `apps/mobile`
+
+Expo/React Native application.
+
+Important paths:
+
+- `src/app` — Expo Router screens/routes
+- `src/services/api-client.ts` — API.Customer HTTP client
+- `src/services/auth.service.ts` — API.Auth client
+- `app.config.js` — runtime Expo configuration and LAN API auto-detection
+- `package.json` — mobile dependencies/scripts
+
+API.Customer URL resolution:
+
+1. `EXPO_PUBLIC_API_URL`, when explicitly set
+2. Android emulator fallback when applicable
+3. Expo runtime `extra.apiUrl`, normally populated by LAN auto-detection
+4. platform fallback
+
+API.Auth currently reads `EXPO_PUBLIC_AUTH_API_URL`, with localhost fallback.
+
+For USB-connected Android development, `scripts/run-mobile.bat` attempts ADB reverse for ports 8081, 5053 and 5265.
+
+### `apps/web`
+
+Independent React + TypeScript + Vite client.
+
+This is not the same thing as Expo Web. A browser on port 8081 is rendering the mobile Expo application; the Vite application normally runs separately.
+
+### `backend`
+
+ASP.NET Core backend.
+
+Services:
+
+- `API.Auth` — authentication service, port 5053
+- `API.Customer` — customer/shop API, port 5265
+- `API.Admin` — admin API, port 5089
+- `API.Gateway` — API gateway, port 5155
+- `API.Customer.Tests` — tests
+- `DbHelper` — shared database registration/interceptors
+- `Shared` — shared backend functionality
+- `Database` — schema/migration/bootstrap assets
+
+Solution file:
+
+`backend/KaitoKidShop.slnx`
+
+## Persistence
+
+Current runtime database is MariaDB/MySQL-compatible.
+
+`DbHelper/DbExtensions.cs` registers DbContexts using:
+
+- Pomelo
+- `UseMySql`
+- `MariaDbServerVersion(10.4.32)`
+
+The consolidated MariaDB schema is:
+
+`backend/Database/KaitoKid_MariaDB.sql`
+
+Legacy SQL Server/T-SQL files and old EF migrations remain for history. They are not the source for a fresh MariaDB setup.
+
+## Local secret flow
+
+Committed code must not contain real database passwords.
+
+```text
+backend/db.local.example.bat
+            │ copy on first run
+            ▼
+backend/db.local.bat       (gitignored)
+            │
+            ▼
+scripts/load-db-local.bat
+            │
+            ▼
+ConnectionStrings__DefaultConnection
+            │ inherited by child processes
+            ▼
+ASP.NET Core APIs
+```
+
+## Development launch flow
+
+Root `run.bat` is optimized for mobile development:
+
+```text
+run.bat
+  ├─ load local MariaDB configuration
+  ├─ API.Auth :5053
+  ├─ API.Customer :5265
+  └─ Expo Mobile :8081
+```
+
+`scripts/run-backend.bat` starts all four backend services.
+
+`scripts/run-all.bat` is the broader full-stack launcher.
+
+## Source-of-truth rules
+
+- Current code/configuration: Git `main`
+- Current operational state: `docs/AI_HANDOFF.md`
+- Stable architecture: this file
+- Technical rationale: `docs/DECISIONS.md`
+- Repeatable fixes: `docs/TROUBLESHOOTING.md`
+- Older chronology: `docs/history/`
