@@ -208,7 +208,16 @@ public class ProductService(CustomerDbContext db) : IProductService
             CustomerName = r.CustomerName,
             Rating = r.Rating,
             Comment = r.Comment,
-            CreatedAt = r.CreatedAt
+            CreatedAt = r.CreatedAt,
+            OrderId = r.OrderId,
+            Images = Deserialize<List<string>>(r.Images) ?? [],
+            VideoUrl = r.VideoUrl,
+            Size = r.Size,
+            Color = r.Color,
+            AdminReply = r.AdminReply,
+            RepliedAt = r.RepliedAt,
+            HelpfulCount = r.HelpfulCount,
+            IsVerifiedPurchase = r.OrderId > 0
         }).ToList(),
         CreatedAt = p.CreatedAt
     };
