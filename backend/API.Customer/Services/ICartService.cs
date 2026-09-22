@@ -12,6 +12,7 @@ public interface ICartService
     Task<int> RemoveManyAsync(int userId, IEnumerable<int> cartItemIds);
     Task<int> MoveToWishlistAsync(int userId, IEnumerable<int> cartItemIds);
     Task<List<CartItemDTO>> GetCrossSellAsync(int userId, int limit = 4);
+    Task<List<ProductDTO>> GetCrossSellProductsAsync(int userId, int limit = 4);
     /// <summary>Mua lại từ 1 đơn cũ: thêm tất cả item vẫn còn bán vào giỏ.</summary>
     Task<ReorderResultDTO> ReorderAsync(int userId, int orderId);
 }

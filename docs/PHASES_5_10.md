@@ -25,10 +25,11 @@ Không triển khai theo trí nhớ của chat cũ nếu code/main đã thay đ�
 - PHASE 2 — Home
 - PHASE 3 — Product Detail
 - PHASE 4 — Wishlist + Add to Cart
+- PHASE 5 — Cart thật
 
 Tiếp theo phải làm:
 
-**PHASE 5 — Cart thật**
+**PHASE 6 — Checkout + Address + Shipping + Payment**
 
 Quy tắc Git:
 
@@ -1138,7 +1139,8 @@ Khi mở chat mới:
 3. đọc `docs/ROADMAP.md`;
 4. đọc file này;
 5. xác nhận `main` hiện tại;
-6. kiểm tra PHASE 4 runtime/migration nếu chưa được user xác nhận;
-7. bắt đầu **PHASE 5 — Cart thật** từ `apps/mobile/src/app/(tabs)/cart.tsx`, `ShoppingContext`, `shopping.api.ts` và `CartController/CartService`;
-8. hoàn tất toàn PHASE 5 trước khi commit;
-9. tạo **một commit tiếng Việt duy nhất** cho PHASE 5.
+6. xác nhận PHASE 5 runtime trên máy development nếu chưa được user xác nhận;
+7. bắt đầu **PHASE 6 — Checkout + Address + Shipping + Payment** từ selected cart IDs đã được chuẩn bị ở PHASE 5;
+8. mở rộng order contract để partial checkout chỉ xử lý `CartItemIds` đã chọn và giữ nguyên item không chọn;
+9. hoàn tất toàn PHASE 6 trước khi commit;
+10. tạo **một commit tiếng Việt duy nhất** cho PHASE 6.

@@ -28,3 +28,17 @@ export type AddToCartInput = {
   color: string;
   quantity: number;
 };
+
+export type ComboDiscountResult = {
+  eligible: boolean;
+  percent: number;
+  discount: number;
+  eligibleSubtotal: number;
+  categories: string[];
+  message?: string | null;
+};
+
+export type BulkCartResult = {
+  removed?: number;
+  moved?: number;
+};

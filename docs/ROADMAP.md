@@ -10,7 +10,7 @@ Roadmap này là thứ tự triển khai chính. Không nhảy phase khi phần 
 - [x] PHASE 2 — Nâng cấp Home
 - [x] PHASE 3 — Product Detail hoàn chỉnh
 - [x] PHASE 4 — Wishlist + Add to Cart
-- [ ] PHASE 5 — Cart thật
+- [x] PHASE 5 — Cart thật
 - [ ] PHASE 6 — Checkout + Address + Shipping + Payment
 - [ ] PHASE 7 — Orders + Tracking
 - [ ] PHASE 8 — Reviews + Notifications + Account
@@ -141,20 +141,25 @@ Migration này idempotent và chỉ bảo đảm các cột reservation cần th
 
 ## PHASE 5 — Cart thật
 
-**Chi tiết bắt buộc:** đọc mục PHASE 5 trong `docs/PHASES_5_10.md` trước khi sửa code.
+Đã triển khai:
 
-Mục tiêu tiếp theo:
+- Cart Mobile load danh sách item thật từ `/api/cart`;
+- `ShoppingContext` giữ `cartItems` làm nguồn state chung và derive cart badge từ dữ liệu giỏ;
+- tăng/giảm số lượng qua `PUT /api/cart/{id}`, khóa thao tác trong mutation và refresh khi backend báo lỗi stock;
+- xóa một item, xóa nhiều item, chọn tất cả/bỏ chọn tất cả;
+- chuyển item đã chọn sang Wishlist;
+- subtotal chỉ tính trên item đang chọn;
+- reservation countdown từ `reservedUntil`, hết hạn thì refresh từ backend thay vì tự release ở client;
+- combo discount hiển thị từ API backend;
+- cross-sell Mobile dùng endpoint tương thích riêng `/api/cart/cross-sell-products` trả `ProductDTO` đầy đủ để dùng `ProductCard`; endpoint `/api/cart/cross-sell` cũ được giữ cho Web;
+- CTA checkout lưu danh sách selected cart IDs để PHASE 6 dùng; chưa giả định backend hỗ trợ partial checkout;
+- loading/error/empty/pull-to-refresh và reset protected cart state khi logout.
 
-- load danh sách item thật từ `/api/cart`;
-- tăng/giảm số lượng;
-- xóa item;
-- chọn nhiều/select all;
-- move to wishlist;
-- subtotal;
-- low-stock/reservation countdown;
-- cross-sell;
-- combo discount;
-- chuẩn bị CTA checkout cho PHASE 6.
+### Validation
+
+Đã static-review contract TypeScript/C# và luồng reservation. Runtime cuối cần xác nhận trên máy development sau khi pull.
+
+**Tiếp theo:** PHASE 6 — Checkout + Address + Shipping + Payment.
 
 ## PHASE 6 → PHASE 10
 

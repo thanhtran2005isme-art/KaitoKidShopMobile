@@ -76,6 +76,18 @@ public class CartController(ICartService cartService, IComboDiscountService comb
     }
 
     /// <summary>
+    /// Cross-sell cho mobile: trả ProductDTO đầy đủ để ProductCard mở Product Detail
+    /// và người dùng tự chọn size/màu, không quick-add biến thể giả.
+    /// Endpoint cross-sell cũ được giữ nguyên để không phá Web.
+    /// </summary>
+    [HttpGet("cross-sell-products")]
+    public async Task<ActionResult<List<ProductDTO>>> CrossSellProducts([FromQuery] int limit = 4)
+    {
+        var items = await cartService.GetCrossSellProductsAsync(UserId, Math.Clamp(limit, 1, 20));
+        return Ok(items);
+    }
+
+    /// <summary>
     /// Đánh giá combo discount thật từ backend: ≥2 sản phẩm khác nhau cùng danh mục → giảm thêm 10%.
     /// FE gọi để hiển thị "Mua kèm giảm thêm" và áp giá khi checkout.
     /// </summary>

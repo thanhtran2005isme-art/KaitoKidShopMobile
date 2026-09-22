@@ -11,7 +11,7 @@ This file is intentionally concise. It describes the current state needed to con
 - Project name used in docs/UI: KaitoKidShop
 - Brand: **KaitoKid = thời trang trẻ em 0–12 tuổi**
 - Brand rules: `docs/BRAND.md`
-- Current roadmap: PHASE 1–4 hoàn tất, tiếp theo PHASE 5 — Cart thật
+- Current roadmap: PHASE 1–5 hoàn tất, tiếp theo PHASE 6 — Checkout + Address + Shipping + Payment
 - PHASE 5–10 đã có acceptance criteria, API dependencies, UI/state scope và ranh giới chi tiết trong `docs/PHASES_5_10.md`.
 - Roadmap source: `docs/ROADMAP.md`
 - Detailed remaining PHASE 5–10 spec: `docs/PHASES_5_10.md`
@@ -126,7 +126,7 @@ As of 2026-09-22:
 - The mobile home screen loads categories and product data from API.Customer.
 - PHASE 2 Home UI đã được nâng cấp: header, cart badge có token, hero auto-slide + dots, promo strip, root categories, discovery tiles, product cards và skeleton loading.
 - PHASE 3 Product Detail đã hoàn chỉnh phần xem/chọn: gallery, màu, size, size guide, số lượng, tồn kho, specs, review read-only, share và related products.
-- PHASE 4 đã nối Wishlist + Add to Cart thật. Mobile dùng `ShoppingContext` để đồng bộ wishlist và cart badge toàn app.
+- PHASE 4 đã nối Wishlist + Add to Cart thật. Mobile dùng `ShoppingContext` để đồng bộ wishlist và cart badge toàn app.\n- PHASE 5 đã hoàn thiện Cart thật: danh sách item, select all/bulk actions, quantity, remove, move-to-wishlist, subtotal selected, reservation countdown, combo discount và cross-sell.
 - Có màn `/wishlist`; ProductCard/Product Detail đều toggle wishlist qua API.Customer.
 - Product Detail gửi Add to Cart đúng size/màu/số lượng; cart badge Home/tab cập nhật ngay sau khi thêm.
 - API Product Detail trả `variantInventory` từ `TonKhoBienThe` nếu có; nếu chưa có dữ liệu biến thể thì mobile fallback về tồn kho khả dụng cấp sản phẩm.
@@ -139,7 +139,7 @@ As of 2026-09-22:
 ## Known non-blocking item
 
 - PHASE 2 đã static-review nhưng chưa chạy được `npm/tsc` trong môi trường công cụ do không có DNS/network tới GitHub. Cần xác nhận runtime trên máy local sau khi pull.
-- Wishlist/Add-to-cart đã được nối ở PHASE 4. Cart screen đầy đủ vẫn thuộc PHASE 5.
+- Wishlist/Add-to-cart và Cart screen đầy đủ đã được nối qua PHASE 4–5. Checkout/Address/Shipping/Payment thuộc PHASE 6.
 - Seed hiện chưa có ảnh phụ hoặc `TonKhoBienThe` mẫu; Add to Cart dùng product-level reservation fallback qua `SanPham.SoLuongDaGiu`.
 - Sau khi pull PHASE 4 cần chạy migration reservation và restart API.Customer trước khi test Add to Cart.
 - A NuGet warning about a known vulnerability in `Microsoft.OpenApi 2.0.0` has been observed during API.Auth build. It did not block startup, but dependency remediation should be handled separately rather than mixed into unrelated changes.
