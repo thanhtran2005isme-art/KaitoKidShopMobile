@@ -325,10 +325,11 @@ public class OrderService(
         var orderIds = orders.Select(o => o.Id).ToList();
         var reviewedSet = await db.Reviews
             .Where(r => r.UserId == userId && orderIds.Contains(r.OrderId))
-            .Select(r => new { r.OrderId, r.ProductId })
+            .Select(r => new { r.OrderId, r.ProductId, r.Size, r.Color })
             .ToListAsync();
         var reviewedKeys = reviewedSet
-            .Select(x => $"{x.OrderId}:{x.ProductId}")
+            .Select(x =>
+                $"{x.OrderId}:{x.ProductId}:{(string.IsNullOrEmpty(x.Size) ? "*" : x.Size)}:{(string.IsNullOrEmpty(x.Color) ? "*" : x.Color)}")
             .ToHashSet();
 
         return orders.Select(o => MapToDTO(o, reviewedKeys)).ToList();
@@ -343,10 +344,11 @@ public class OrderService(
 
         var reviewedSet = await db.Reviews
             .Where(r => r.UserId == userId && r.OrderId == orderId)
-            .Select(r => r.ProductId)
+            .Select(r => new { r.ProductId, r.Size, r.Color })
             .ToListAsync();
         var reviewedKeys = reviewedSet
-            .Select(pid => $"{orderId}:{pid}")
+            .Select(x =>
+                $"{orderId}:{x.ProductId}:{(string.IsNullOrEmpty(x.Size) ? "*" : x.Size)}:{(string.IsNullOrEmpty(x.Color) ? "*" : x.Color)}")
             .ToHashSet();
 
         return MapToDTO(order, reviewedKeys);
@@ -432,7 +434,11 @@ public class OrderService(
             Size = i.Size,
             Color = i.Color,
             Quantity = i.Quantity,
-            HasReviewed = reviewedKeys != null && reviewedKeys.Contains($"{o.Id}:{i.ProductId}"),
+            HasReviewed = reviewedKeys != null &&
+                (reviewedKeys.Contains($"{o.Id}:{i.ProductId}:{i.Size}:{i.Color}") ||
+                 reviewedKeys.Contains($"{o.Id}:{i.ProductId}:{i.Size}:*") ||
+                 reviewedKeys.Contains($"{o.Id}:{i.ProductId}:*:{i.Color}") ||
+                 reviewedKeys.Contains($"{o.Id}:{i.ProductId}:*:*")),
         }).ToList()
     };
 }

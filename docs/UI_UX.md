@@ -114,6 +114,27 @@ Quy tắc:
 - không dùng animation trang trí; motion chỉ dành cho loading/feedback cần thiết;
 - mỗi màn chỉ có một primary action rõ ràng khi có thể.
 
+## PHASE 8 Reviews + Notifications + Account design system
+
+PHASE 8 dùng mô hình **account hub + task screens**: Account là dashboard tổng quan, còn Review/Profile/Points/Vouchers/Notifications/Delete Account là các màn nhiệm vụ riêng.
+
+Quy tắc:
+
+- Account dashboard ưu tiên avatar, name/email/phone, member tier, loyalty points, total orders/spent và entry point rõ;
+- unread notification là global badge state nhỏ dưới Auth; profile/loyalty vẫn screen-local để tránh global context phình to;
+- notification list dùng `FlatList`, pagination, pull-to-refresh, unread text + badge; mark-read trước khi deep-link;
+- chỉ dùng `notification.link` khi backend thật sự trả internal path bắt đầu bằng `/`; không tự suy target từ type;
+- Review chỉ mở từ completed Order Item chưa review; route params chỉ là navigation hint, màn phải fetch lại order để kiểm tra;
+- Review form single-column, 1–5 sao, comment, purchased variant, tối đa 4 ảnh; submit có hard lock;
+- review công khai chỉ render dữ liệu `approved`; review mới pending được phản ánh qua `HasReviewed` ở Order Detail trước khi moderation hoàn tất;
+- Product Detail có verified-purchase badge, media, admin reply, Helpful và khả năng mở toàn bộ review đã duyệt;
+- Profile dùng label luôn hiển thị, field-local validation, KeyboardAvoidingView và avatar gallery picker;
+- Loyalty/Voucher chỉ hiển thị giá trị server trả; Mobile không tự sinh coupon, tier hoặc số điểm quy đổi;
+- delete-account có route riêng + keyword `DELETE` + destructive confirmation; protected state phải clear sau logout;
+- mọi action upload/redeem/submit/destructive có loading/disabled feedback và chống double tap;
+- action mới phải giữ vùng bấm khoảng 44px trở lên; icon overlay nhỏ phải tăng hitSlop;
+- PHASE 8 dùng `expo-image-picker` SDK 57 gallery-only; không xin camera/microphone và không làm video review vì flow video chưa cần cho core.
+
 ## Source of truth
 
 - Brand/data language: `docs/BRAND.md`

@@ -21,6 +21,7 @@ import { BRAND, BRAND_COLORS } from '@/constants/brand';
 import { useAuth } from '@/context/AuthContext';
 import { useShopping } from '@/context/ShoppingContext';
 import { shopApi } from '@/services/home.api';
+import { reviewsApi } from '@/services/reviews.api';
 import type {
   Product,
   ProductDetail,
@@ -62,6 +63,10 @@ export default function ProductDetailScreen() {
   const [quantity, setQuantity] = useState(1);
   const [sizeGuideVisible, setSizeGuideVisible] = useState(false);
   const [actionBusy, setActionBusy] = useState<'cart' | 'wishlist' | null>(null);
+  const [helpfulBusyId, setHelpfulBusyId] = useState<number | null>(null);
+  const [helpfulMarkedIds, setHelpfulMarkedIds] = useState<Set<number>>(
+    () => new Set(),
+  );
   const [feedback, setFeedback] = useState<{
     type: 'success' | 'error';
     text: string;
@@ -473,6 +478,48 @@ export default function ProductDetailScreen() {
     }
   };
 
+
+  const handleHelpful = async (reviewId: number) => {
+    if (helpfulBusyId != null || helpfulMarkedIds.has(reviewId)) return;
+
+    setHelpfulBusyId(reviewId);
+    setFeedback(null);
+
+    try {
+      await reviewsApi.markHelpful(reviewId);
+      setProduct((current) =>
+        current
+          ? {
+              ...current,
+              reviews: (current.reviews || []).map((review) =>
+                review.id === reviewId
+                  ? {
+                      ...review,
+                      helpfulCount: (review.helpfulCount || 0) + 1,
+                    }
+                  : review,
+              ),
+            }
+          : current,
+      );
+      setHelpfulMarkedIds((current) => {
+        const next = new Set(current);
+        next.add(reviewId);
+        return next;
+      });
+    } catch (helpfulError) {
+      setFeedback({
+        type: 'error',
+        text:
+          helpfulError instanceof Error
+            ? helpfulError.message
+            : 'Không thể đánh dấu đánh giá hữu ích.',
+      });
+    } finally {
+      setHelpfulBusyId(null);
+    }
+  };
+
   return (
     <SafeAreaView edges={['top']} style={styles.safeArea}>
       <ScrollView
@@ -676,6 +723,9 @@ export default function ProductDetailScreen() {
             </View>
 
             <ProductReviewsPreview
+              helpfulBusyId={helpfulBusyId}
+              helpfulMarkedIds={helpfulMarkedIds}
+              onHelpful={(reviewId) => void handleHelpful(reviewId)}
               rating={product.rating}
               reviews={product.reviews || []}
             />

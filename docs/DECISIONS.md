@@ -197,3 +197,25 @@ This file records durable decisions and their rationale. It is not a chronologic
 **Lý do:** Order code không phải secret đủ mạnh để dùng làm authorization. Nếu tracking public theo orderCode thì người biết/đoán mã có thể xem lịch sử đơn khác. Đồng thời nếu Mobile tự suy quyền hủy từ status, rule frontend có thể lệch backend.
 
 **Hệ quả:** Mobile luôn gửi Bearer token khi gọi tracking, chỉ render nút hủy khi `canCancel=true`, và vẫn xử lý backend reject như source of truth cuối cùng. Web `shippingApi.track` tiếp tục tương thích vì customer `apiClient` đã tự gắn JWT.
+
+
+## D017 — Review phải gắn đúng order và biến thể đã mua
+
+**Ngày:** 2026-09-22
+
+**Quyết định:** Tạo review chỉ hợp lệ khi `OrderId` thuộc user hiện tại, order đã `completed`, product nằm trong chính order đó và backend xác định được đúng size/color đã mua. Backend lưu size/color từ `OrderItem`, không tin metadata biến thể do client tự khai.
+
+**Lý do:** Check “user từng mua product” là chưa đủ; client có thể gửi một `OrderId` khác hoặc metadata size/color không khớp. Ngoài ra một order có thể chứa cùng product ở nhiều biến thể.
+
+**Hệ quả:** `OrderDTO.HasReviewed` dùng khóa `order + product + size + color`; review pending vẫn khóa submit trùng ở Order Detail. Product Detail chỉ công khai review `approved`, giữ moderation hiện có.
+
+
+## D018 — Delete Account phải giải phóng reservation qua CartService
+
+**Ngày:** 2026-09-22
+
+**Quyết định:** `DELETE /api/account` không được xóa trực tiếp các dòng `GioHang`. Trước khi xóa/ẩn danh dữ liệu tài khoản, backend phải gọi `CartService.ClearCartAsync(userId)` để release `SanPham.SoLuongDaGiu` và `TonKhoBienThe.SoLuongDaGiu`.
+
+**Lý do:** Xóa Cart trực tiếp làm tồn kho bị giữ ảo sau khi user hủy tài khoản, vi phạm invariant D012.
+
+**Hệ quả:** Delete-account tiếp tục giữ order history theo contract hiện có, xóa notification/wishlist/address, anonymize review display name, vô hiệu voucher cá nhân và Mobile logout để Auth/Notifications/Shopping/Checkout protected state tự clear.

@@ -13,7 +13,7 @@ Roadmap này là thứ tự triển khai chính. Không nhảy phase khi phần 
 - [x] PHASE 5 — Cart thật
 - [x] PHASE 6 — Checkout + Address + Shipping + Payment
 - [x] PHASE 7 — Orders + Tracking
-- [ ] PHASE 8 — Reviews + Notifications + Account
+- [x] PHASE 8 — Reviews + Notifications + Account
 - [ ] PHASE 9 — Collections + Lookbook + Recommendation
 - [ ] PHASE 10 — Polish UI + performance + testing
 
@@ -214,7 +214,39 @@ Orders/Tracking dùng durable design system trong `docs/UI_UX.md` + skill `ui-ux
 
 Đã static-review TypeScript/C# và thêm regression tests cho server-authoritative `canCancel`, tracking ownership và reorder ownership. Môi trường connector không chạy được `dotnet test`/Expo runtime nên cần xác nhận trên máy development sau khi pull.
 
-**Tiếp theo:** PHASE 8 — Reviews + Notifications + Account.
+**Tiếp theo:** PHASE 9 — Collections + Lookbook + Recommendation.
+
+## PHASE 8 — Reviews + Notifications + Account
+
+Đã triển khai:
+
+- Order Detail cho phép viết review trên từng completed item chưa review;
+- backend review validate exact owner + completed order + product + purchased variant; size/color lấy từ OrderItem server-side;
+- `HasReviewed` được làm variant-aware để không đánh dấu nhầm cùng product khác size/color;
+- Review form 1–5 sao, comment, purchased variant, tối đa 4 ảnh; dùng Expo Image Picker SDK 57 gallery-only và multipart upload;
+- Product Detail hiển thị toàn bộ review approved theo expand, verified purchase, ảnh review, admin reply và Helpful;
+- thêm Notification Center có unread badge ở Account tab, pagination, pull-to-refresh, mark read/read-all/delete và deep-link chỉ từ backend link;
+- nâng Account tab thành dashboard profile/tier/points/orders/spent với entry Orders/Notifications/Points/Vouchers/Addresses/Wishlist;
+- thêm Profile edit name/phone/birthday + avatar upload;
+- thêm Loyalty points history + redeem theo contract bội số 100;
+- thêm voucher list + birthday voucher;
+- thêm Delete Account route riêng, confirm `DELETE`, logout sau thành công;
+- backend delete-account gọi CartService để release reservation trước khi xóa Cart, đồng thời xóa notifications/wishlist/addresses và anonymize review display name;
+- birthday voucher được đưa vào `GET /api/account/vouchers`;
+- upload review/avatar dùng timeout 45s; normal API giữ 15s;
+- `scripts/run-mobile.bat` tự `npm install` nếu `expo-image-picker` còn thiếu sau pull;
+- không triển khai video review hoặc Product Q&A vì đây là optional sau core;
+- không có migration database mới trong PHASE 8.
+
+### UI workflow
+
+PHASE 8 dùng design system trong `docs/UI_UX.md` + Codex `ui-ux-pro-max`: account hub + task screens, FlatList cho list dài, visible form labels, field-local validation, 44px touch target, destructive confirmation và loading/disabled feedback.
+
+### Validation
+
+Đã static-review contract TypeScript/C#, Expo SDK 57 Image Picker types/config, ownership boundaries và reservation invariant. Đã thêm regression tests cho review owner/order/variant, variant-specific HasReviewed, notification ownership và delete-account release reservation. Connector chưa chạy được `dotnet test`/Expo runtime nên cần xác nhận trên máy development sau khi pull.
+
+**Tiếp theo:** PHASE 9 — Collections + Lookbook + Recommendation.
 
 ## PHASE 6 → PHASE 10
 

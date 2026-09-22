@@ -28,10 +28,11 @@ Không triển khai theo trí nhớ của chat cũ nếu code/main đã thay đ�
 - PHASE 5 — Cart thật
 - PHASE 6 — Checkout + Address + Shipping + Payment
 - PHASE 7 — Orders + Tracking
+- PHASE 8 — Reviews + Notifications + Account
 
 Tiếp theo phải làm:
 
-**PHASE 8 — Reviews + Notifications + Account**
+**PHASE 9 — Collections + Lookbook + Recommendation**
 
 Quy tắc Git:
 
@@ -553,6 +554,16 @@ Actions tùy status:
 
 # PHASE 8 — Reviews + Notifications + Account
 
+## Trạng thái triển khai PHASE 8
+
+**Core implementation hoàn tất ngày 2026-09-22; runtime local cần xác nhận sau khi pull.**
+
+Đã có Review theo completed order/item + image upload, Product Detail review full/helpful/verified/admin reply, Notification Center + unread badge, Account dashboard/Profile/Avatar, Points/Redeem, Vouchers/Birthday và Delete Account an toàn reservation.
+
+Video review và Product Q&A không triển khai vì là optional sau core. Review mới ở trạng thái pending được phản ánh qua `HasReviewed` ở Order Detail; chỉ review approved mới xuất hiện công khai trên Product Detail sau moderation/refresh.
+
+Không có migration database mới. PHASE 8 thêm dependency Expo `expo-image-picker ~57.0.19`; launcher sẽ tự chạy `npm install` khi dependency này còn thiếu.
+
 ## Mục tiêu
 
 Hoàn thiện hậu mua hàng và khu vực tài khoản: đánh giá sản phẩm, notification center, hồ sơ, avatar, điểm thành viên và voucher.
@@ -706,18 +717,18 @@ Chỉ làm sau khi Reviews/Notifications/Account core đã đạt acceptance; kh
 
 ## Checklist nghiệm thu PHASE 8
 
-- [ ] Review chỉ từ order/item hợp lệ.
-- [ ] Upload ảnh review hoạt động.
-- [ ] Review mới xuất hiện sau refresh.
-- [ ] Helpful hoạt động.
-- [ ] Notification unread badge đúng.
-- [ ] Mark read/read-all/delete đúng.
-- [ ] Account profile đọc/sửa đúng.
-- [ ] Avatar update đúng.
-- [ ] Loyalty points/history đúng.
-- [ ] Redeem points/voucher đúng API.
-- [ ] Logout/delete account clear protected state.
-- [ ] Toàn PHASE 8 = một commit.
+- [x] Review chỉ từ order/item hợp lệ.
+- [x] Upload ảnh review hoạt động.
+- [x] Review mới xuất hiện sau refresh.
+- [x] Helpful hoạt động.
+- [x] Notification unread badge đúng.
+- [x] Mark read/read-all/delete đúng.
+- [x] Account profile đọc/sửa đúng.
+- [x] Avatar update đúng.
+- [x] Loyalty points/history đúng.
+- [x] Redeem points/voucher đúng API.
+- [x] Logout/delete account clear protected state.
+- [x] Toàn PHASE 8 = một commit.
 
 ---
 
@@ -1166,8 +1177,8 @@ Khi mở chat mới:
 4. đọc file này;
 5. xác nhận `main` hiện tại;
 6. nếu task có UI/UX, **bắt buộc** đọc `docs/UI_UX.md` + `skill/.codex/skills/ui-ux-pro-max/SKILL.md` và generate design system trước;
-7. xác nhận PHASE 7 runtime trên máy development nếu chưa được user xác nhận, đặc biệt tracking owner-only, cancel và reorder;
-8. bắt đầu **PHASE 8 — Reviews + Notifications + Account** từ OrderItem.HasReviewed, review APIs, notification APIs và account/profile APIs hiện có;
-9. giữ nguyên invariant partial checkout/reservation/payment/orders security của PHASE 6–7;
-10. hoàn tất toàn PHASE 8 trước khi commit;
-11. tạo **một commit tiếng Việt duy nhất** cho PHASE 8.
+7. xác nhận PHASE 8 runtime trên máy development nếu chưa được user xác nhận, đặc biệt image picker/upload, review, notification badge, redeem/voucher và delete-account release reservation;
+8. bắt đầu **PHASE 9 — Collections + Lookbook + Recommendation** từ các API/data collection/lookbook/recommendation hiện có;
+9. giữ nguyên invariant partial checkout/reservation/payment/orders/review/account security của PHASE 6–8;
+10. hoàn tất toàn PHASE 9 trước khi commit;
+11. tạo **một commit tiếng Việt duy nhất** cho PHASE 9.

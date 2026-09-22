@@ -5,6 +5,7 @@ import { useColorScheme } from 'react-native';
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
 import { AuthProvider } from '@/context/AuthContext';
 import { CheckoutProvider } from '@/context/CheckoutContext';
+import { NotificationsProvider } from '@/context/NotificationsContext';
 import { ShoppingProvider } from '@/context/ShoppingContext';
 import { installWebWarningFilter } from '@/utils/web-warning-filter';
 
@@ -16,10 +17,12 @@ export default function RootLayout() {
 
   return (
     <AuthProvider>
-      <ShoppingProvider>
-        <CheckoutProvider>
-          <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-            <Stack screenOptions={{ headerShown: false }}>
+      <NotificationsProvider>
+        <ShoppingProvider>
+          <CheckoutProvider>
+            <ThemeProvider
+              value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+              <Stack screenOptions={{ headerShown: false }}>
               <Stack.Screen name="(tabs)" />
               <Stack.Screen name="product/[slug]" />
               <Stack.Screen name="wishlist" />
@@ -31,11 +34,18 @@ export default function RootLayout() {
               <Stack.Screen name="orders/index" />
               <Stack.Screen name="orders/[id]" />
               <Stack.Screen name="orders/[id]/tracking" />
-            </Stack>
-            <AnimatedSplashOverlay />
-          </ThemeProvider>
-        </CheckoutProvider>
-      </ShoppingProvider>
+              <Stack.Screen name="review/create" />
+              <Stack.Screen name="notifications" />
+              <Stack.Screen name="account/profile" />
+              <Stack.Screen name="account/points" />
+              <Stack.Screen name="account/vouchers" />
+              <Stack.Screen name="account/delete" />
+              </Stack>
+              <AnimatedSplashOverlay />
+            </ThemeProvider>
+          </CheckoutProvider>
+        </ShoppingProvider>
+      </NotificationsProvider>
     </AuthProvider>
   );
 }
