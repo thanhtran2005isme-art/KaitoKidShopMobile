@@ -48,6 +48,8 @@ public class OrderDTO
     public string? CouponCode { get; set; }
     public string PaymentMethod { get; set; } = string.Empty;
     public string Status { get; set; } = string.Empty;
+    /// <summary>Server-authoritative: user hiện tại có được hủy đơn ở trạng thái này hay không.</summary>
+    public bool CanCancel { get; set; }
     public string? Note { get; set; }
     public DateTime CreatedAt { get; set; }
     public List<OrderDetailDTO> Items { get; set; } = [];

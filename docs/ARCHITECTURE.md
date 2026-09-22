@@ -41,6 +41,8 @@ Important paths:
 - `src/app` — Expo Router screens/routes
 - `src/services/api-client.ts` — API.Customer HTTP client
 - `src/services/auth.service.ts` — API.Auth client
+- `src/services/orders.api.ts` — Orders/Tracking/Cancel/Reorder client
+- `src/app/orders` — order list/detail/tracking routes
 - `app.config.js` — runtime Expo configuration and LAN API auto-detection
 - `package.json` — mobile dependencies/scripts
 
@@ -173,3 +175,16 @@ For order creation, API.Customer is authoritative for:
 `CreateOrderDTO.CartItemIds` enables partial checkout. Selected items are converted into the order and removed from Cart; unselected items remain reserved in Cart.
 
 Payment account/QR data comes from `CauHinhCuaHang`. Mobile does not embed bank credentials or a VietQR gateway URL.
+
+
+## Orders/Tracking security boundary
+
+PHASE 7 keeps order history private to the authenticated customer:
+
+- `GET /api/orders` and `GET /api/orders/{id}` filter by JWT user ID;
+- `PUT /api/orders/{id}/cancel` checks ownership and server-side cancellation rules;
+- `GET /api/shipping/track/{orderCode}` requires authorization and filters by both order code + JWT user ID;
+- `POST /api/cart/reorder/{orderId}` checks order ownership before adding any item;
+- `OrderDTO.CanCancel` is computed by API.Customer; Mobile does not duplicate cancellation eligibility rules.
+
+Mobile order pages keep data screen-local rather than adding a global Orders context. Reorder refreshes `ShoppingContext` because Cart/badge is global shopping state.

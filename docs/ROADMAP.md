@@ -12,7 +12,7 @@ Roadmap này là thứ tự triển khai chính. Không nhảy phase khi phần 
 - [x] PHASE 4 — Wishlist + Add to Cart
 - [x] PHASE 5 — Cart thật
 - [x] PHASE 6 — Checkout + Address + Shipping + Payment
-- [ ] PHASE 7 — Orders + Tracking
+- [x] PHASE 7 — Orders + Tracking
 - [ ] PHASE 8 — Reviews + Notifications + Account
 - [ ] PHASE 9 — Collections + Lookbook + Recommendation
 - [ ] PHASE 10 — Polish UI + performance + testing
@@ -188,6 +188,33 @@ Các màn PHASE 6 được thiết kế sau khi đọc `skill/.codex/skills/ui-u
 Đã static-review contract TypeScript/C#, reservation/partial-checkout, source-of-truth shipping/payment và compatibility với Web. Đã thêm regression tests cho selected partial checkout, invalid selected IDs và fallback all-cart của Web; môi trường connector không chạy được `dotnet test`/Expo runtime nên vẫn cần xác nhận trên máy development sau khi pull.
 
 **Tiếp theo:** PHASE 7 — Orders + Tracking.
+
+## PHASE 7 — Orders + Tracking
+
+Đã triển khai:
+
+- thêm Mobile routes `/orders`, `/orders/[id]`, `/orders/[id]/tracking`;
+- Orders list dùng `FlatList`, filter Tất cả / Chờ xử lý / Đang giao / Hoàn tất / Đã hủy, pull-to-refresh và empty/error state;
+- status mapping được tập trung tại `utils/order-status.ts`; `pending + confirmed` cùng thuộc filter Chờ xử lý để không làm mất đơn;
+- Order Detail hiển thị items, recipient, payment, shipping, total, note và trạng thái review hiện có;
+- backend trả `OrderDTO.CanCancel` từ đúng rule server-side; Mobile không tự suy quyền hủy;
+- Cancel có confirmation + loading, backend vẫn là source of truth cuối cùng;
+- Reorder dùng `POST /api/cart/reorder/{orderId}`, hiển thị added/skipped, refresh `ShoppingContext` và cho mở Cart để kiểm tra variant/tồn kho;
+- Tracking timeline chỉ render history backend, có location/description/time + ETA tham khảo;
+- `GET /api/shipping/track/{orderCode}` đã đổi thành owner-only: yêu cầu JWT và lọc theo `UserId`;
+- Account tab có entry “Đơn hàng của tôi” cho user đã đăng nhập;
+- Order Success có CTA mở đơn vừa đặt;
+- không có migration database mới trong PHASE 7.
+
+### UI workflow
+
+Orders/Tracking dùng durable design system trong `docs/UI_UX.md` + skill `ui-ux-pro-max`: touch target ≥44 px, status text + semantic color, destructive confirmation, một primary CTA và không giả tracking event.
+
+### Validation
+
+Đã static-review TypeScript/C# và thêm regression tests cho server-authoritative `canCancel`, tracking ownership và reorder ownership. Môi trường connector không chạy được `dotnet test`/Expo runtime nên cần xác nhận trên máy development sau khi pull.
+
+**Tiếp theo:** PHASE 8 — Reviews + Notifications + Account.
 
 ## PHASE 6 → PHASE 10
 

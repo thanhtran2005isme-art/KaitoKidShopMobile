@@ -27,10 +27,11 @@ Không triển khai theo trí nhớ của chat cũ nếu code/main đã thay đ�
 - PHASE 4 — Wishlist + Add to Cart
 - PHASE 5 — Cart thật
 - PHASE 6 — Checkout + Address + Shipping + Payment
+- PHASE 7 — Orders + Tracking
 
 Tiếp theo phải làm:
 
-**PHASE 7 — Orders + Tracking**
+**PHASE 8 — Reviews + Notifications + Account**
 
 Quy tắc Git:
 
@@ -428,6 +429,14 @@ ATM/VietQR:
 
 # PHASE 7 — Orders + Tracking
 
+## Trạng thái triển khai PHASE 7
+
+**Code implementation hoàn tất ngày 2026-09-22; runtime local cần xác nhận sau khi pull.**
+
+Đã có Orders list/filter, Order Detail, owner-only Tracking timeline, server-authoritative `CanCancel`, Cancel confirmation, Reorder + cart refresh, Account entry và Order Success link. Không có migration database mới.
+
+Regression tests bao phủ `CanCancel`, tracking ownership và reorder ownership.
+
 ## Mục tiêu
 
 Người dùng xem lịch sử mua hàng, chi tiết đơn, trạng thái thanh toán/vận chuyển, hủy đơn hợp lệ và mua lại.
@@ -530,15 +539,15 @@ Actions tùy status:
 
 ## Checklist nghiệm thu PHASE 7
 
-- [ ] List order đúng user.
-- [ ] Filter status không làm mất dữ liệu.
-- [ ] Order detail đúng tổng tiền/item.
-- [ ] Cancel chỉ hiện khi hợp lệ.
-- [ ] Tracking timeline đúng API.
-- [ ] Reorder cập nhật Cart/badge.
-- [ ] Không expose order của user khác.
-- [ ] Loading/error/empty đầy đủ.
-- [ ] Toàn PHASE 7 = một commit.
+- [x] List order đúng user.
+- [x] Filter status không làm mất dữ liệu.
+- [x] Order detail đúng tổng tiền/item.
+- [x] Cancel chỉ hiện khi hợp lệ.
+- [x] Tracking timeline đúng API.
+- [x] Reorder cập nhật Cart/badge.
+- [x] Không expose order của user khác.
+- [x] Loading/error/empty đầy đủ.
+- [x] Toàn PHASE 7 = một commit.
 
 ---
 
@@ -1157,8 +1166,8 @@ Khi mở chat mới:
 4. đọc file này;
 5. xác nhận `main` hiện tại;
 6. nếu task có UI/UX, **bắt buộc** đọc `docs/UI_UX.md` + `skill/.codex/skills/ui-ux-pro-max/SKILL.md` và generate design system trước;
-7. xác nhận PHASE 6 runtime trên máy development nếu chưa được user xác nhận;
-8. bắt đầu **PHASE 7 — Orders + Tracking** từ Orders API, tracking API và `POST /api/cart/reorder/{orderId}`;
-9. giữ nguyên invariant partial checkout/reservation/payment của PHASE 6;
-10. hoàn tất toàn PHASE 7 trước khi commit;
-11. tạo **một commit tiếng Việt duy nhất** cho PHASE 7.
+7. xác nhận PHASE 7 runtime trên máy development nếu chưa được user xác nhận, đặc biệt tracking owner-only, cancel và reorder;
+8. bắt đầu **PHASE 8 — Reviews + Notifications + Account** từ OrderItem.HasReviewed, review APIs, notification APIs và account/profile APIs hiện có;
+9. giữ nguyên invariant partial checkout/reservation/payment/orders security của PHASE 6–7;
+10. hoàn tất toàn PHASE 8 trước khi commit;
+11. tạo **một commit tiếng Việt duy nhất** cho PHASE 8.
