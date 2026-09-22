@@ -11,13 +11,14 @@ This file is intentionally concise. It describes the current state needed to con
 - Project name used in docs/UI: KaitoKidShop
 - Brand: **KaitoKid = thời trang trẻ em 0–12 tuổi**
 - Brand rules: `docs/BRAND.md`
-- Current roadmap: PHASE 1–5 hoàn tất, tiếp theo PHASE 6 — Checkout + Address + Shipping + Payment
+- Current roadmap: PHASE 1–6 hoàn tất, tiếp theo PHASE 7 — Orders + Tracking
 - PHASE 5–10 đã có acceptance criteria, API dependencies, UI/state scope và ranh giới chi tiết trong `docs/PHASES_5_10.md`.
 - Roadmap source: `docs/ROADMAP.md`
 - Detailed remaining PHASE 5–10 spec: `docs/PHASES_5_10.md`
 - Structure: full-stack monorepo
 - Git convention: mọi commit do AI/GPT tạo phải có phần mô tả bằng **tiếng Việt**; có thể giữ tiền tố Conventional Commits như `feat:`, `fix:`, `docs:`.
 - Commit granularity: mặc định **một task/fix/PHASE = một commit duy nhất**; không commit từng file/từng bước. Với PR, ưu tiên squash merge để `main` chỉ có một commit cho công việc đó.
+- UI workflow: mọi thay đổi giao diện phải đọc/dùng `skill/.codex/skills/ui-ux-pro-max/SKILL.md`, generate design system trước và dùng guideline `react-native` cho Mobile.
 
 ## Current structure
 
@@ -126,7 +127,9 @@ As of 2026-09-22:
 - The mobile home screen loads categories and product data from API.Customer.
 - PHASE 2 Home UI đã được nâng cấp: header, cart badge có token, hero auto-slide + dots, promo strip, root categories, discovery tiles, product cards và skeleton loading.
 - PHASE 3 Product Detail đã hoàn chỉnh phần xem/chọn: gallery, màu, size, size guide, số lượng, tồn kho, specs, review read-only, share và related products.
-- PHASE 4 đã nối Wishlist + Add to Cart thật. Mobile dùng `ShoppingContext` để đồng bộ wishlist và cart badge toàn app.\n- PHASE 5 đã hoàn thiện Cart thật: danh sách item, select all/bulk actions, quantity, remove, move-to-wishlist, subtotal selected, reservation countdown, combo discount và cross-sell.
+- PHASE 4 đã nối Wishlist + Add to Cart thật. Mobile dùng `ShoppingContext` để đồng bộ wishlist và cart badge toàn app.
+- PHASE 5 đã hoàn thiện Cart thật: danh sách item, select all/bulk actions, quantity, remove, move-to-wishlist, subtotal selected, reservation countdown, combo discount và cross-sell.
+- PHASE 6 đã hoàn thiện Checkout Mobile: partial checkout theo selected CartItemIds, Address CRUD/default, shipping quote backend, coupon + combo selected, COD, ATM/bank transfer, payment polling/cancel và order success.
 - Có màn `/wishlist`; ProductCard/Product Detail đều toggle wishlist qua API.Customer.
 - Product Detail gửi Add to Cart đúng size/màu/số lượng; cart badge Home/tab cập nhật ngay sau khi thêm.
 - API Product Detail trả `variantInventory` từ `TonKhoBienThe` nếu có; nếu chưa có dữ liệu biến thể thì mobile fallback về tồn kho khả dụng cấp sản phẩm.
@@ -139,7 +142,8 @@ As of 2026-09-22:
 ## Known non-blocking item
 
 - PHASE 2 đã static-review nhưng chưa chạy được `npm/tsc` trong môi trường công cụ do không có DNS/network tới GitHub. Cần xác nhận runtime trên máy local sau khi pull.
-- Wishlist/Add-to-cart và Cart screen đầy đủ đã được nối qua PHASE 4–5. Checkout/Address/Shipping/Payment thuộc PHASE 6.
+- PHASE 6 có regression tests cho partial checkout + Web legacy fallback, nhưng chưa chạy được `dotnet test`/Expo runtime trong connector; cần xác nhận trên máy development.
+- Wishlist/Add-to-cart, Cart và Checkout/Address/Shipping/Payment đã được nối qua PHASE 4–6. Orders + Tracking thuộc PHASE 7.
 - Seed hiện chưa có ảnh phụ hoặc `TonKhoBienThe` mẫu; Add to Cart dùng product-level reservation fallback qua `SanPham.SoLuongDaGiu`.
 - Sau khi pull PHASE 4 cần chạy migration reservation và restart API.Customer trước khi test Add to Cart.
 - A NuGet warning about a known vulnerability in `Microsoft.OpenApi 2.0.0` has been observed during API.Auth build. It did not block startup, but dependency remediation should be handled separately rather than mixed into unrelated changes.
@@ -153,9 +157,10 @@ As of 2026-09-22:
 5. Read `docs/PHASES_5_10.md` trước khi làm bất kỳ PHASE 5–10 nào.
 6. Read `docs/ARCHITECTURE.md`.
 7. Read task-relevant decisions/troubleshooting.
-8. Inspect the relevant current files.
-9. Check recent Git history/PRs when the reason for existing code matters.
-10. Khi tạo commit mới, viết commit message bằng tiếng Việt theo quy tắc trong `AGENTS.md`.
-11. Gom toàn bộ thay đổi của cùng một task/fix/PHASE vào một commit; không tạo chuỗi commit nhỏ theo từng file.
+8. Nếu task có thay đổi UI/UX, đọc `skill/.codex/skills/ui-ux-pro-max/SKILL.md` và generate design system trước khi code.
+9. Inspect the relevant current files.
+10. Check recent Git history/PRs when the reason for existing code matters.
+11. Khi tạo commit mới, viết commit message bằng tiếng Việt theo quy tắc trong `AGENTS.md`.
+12. Gom toàn bộ thay đổi của cùng một task/fix/PHASE vào một commit; không tạo chuỗi commit nhỏ theo từng file.
 
 For exact historical changes, use Git rather than relying on this file.

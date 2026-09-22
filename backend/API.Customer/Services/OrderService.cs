@@ -4,6 +4,7 @@ using API.Customer.Models;
 using API.Customer.Services.Email;
 using API.Customer.Services.Shipping;
 using Microsoft.EntityFrameworkCore;
+using System.Text.Json;
 
 namespace API.Customer.Services;
 
@@ -17,34 +18,195 @@ public class OrderService(
 {
     public async Task<OrderDTO> CreateOrderAsync(int userId, CreateOrderDTO dto)
     {
-        var cartItems = await db.CartItems
+        var requestedIds = dto.CartItemIds?.Distinct().ToList();
+        if (dto.CartItemIds is not null && requestedIds is { Count: 0 })
+            throw new InvalidOperationException("Bạn chưa chọn sản phẩm để thanh toán.");
+
+        var cartQuery = db.CartItems
             .Include(c => c.Product)
-            .Where(c => c.UserId == userId)
-            .ToListAsync();
+            .Where(c => c.UserId == userId);
+
+        if (requestedIds is { Count: > 0 })
+            cartQuery = cartQuery.Where(c => requestedIds.Contains(c.Id));
+
+        var cartItems = await cartQuery.ToListAsync();
+
+        if (requestedIds is { Count: > 0 } && cartItems.Count != requestedIds.Count)
+            throw new InvalidOperationException("Một số sản phẩm đã không còn trong giỏ. Vui lòng tải lại giỏ hàng.");
 
         if (cartItems.Count == 0)
             throw new InvalidOperationException("Giỏ hàng trống");
 
-        var subtotal = cartItems.Sum(c => c.Product.Price * c.Quantity);
-        decimal discount = 0;
+        var now = DateTime.UtcNow;
+        if (cartItems.Any(c => c.ReservedUntil.HasValue && c.ReservedUntil.Value <= now))
+            throw new InvalidOperationException("Thời gian giữ hàng đã hết. Vui lòng tải lại giỏ hàng để kiểm tra tồn kho.");
 
-        if (!string.IsNullOrEmpty(dto.CouponCode))
+        var paymentMethod = (dto.PaymentMethod ?? "COD").Trim().ToUpperInvariant();
+        if (paymentMethod != "COD" && paymentMethod != "ATM")
+            throw new InvalidOperationException("Phương thức thanh toán không được hỗ trợ.");
+
+        var paymentSettings = await db.StoreSettings
+            .Where(s => s.Group == "payment")
+            .ToListAsync();
+
+        static bool ReadBoolSetting(
+            IReadOnlyCollection<StoreSetting> settings,
+            string code,
+            bool fallback)
         {
-            var couponResult = await couponService.ValidateAsync(new CouponValidateDTO
-            {
-                Code = dto.CouponCode,
-                OrderAmount = subtotal
-            });
-            if (couponResult.IsValid)
-                discount = couponResult.DiscountAmount;
+            var raw = settings.FirstOrDefault(s => s.Code == code)?.Value;
+            return bool.TryParse(raw, out var parsed) ? parsed : fallback;
         }
 
-        // Combo discount: 10% nếu giỏ có ≥2 SP khác nhau cùng category
+        var legacyBankConfigured =
+            !string.IsNullOrWhiteSpace(paymentSettings.FirstOrDefault(s => s.Code == "bankName")?.Value) &&
+            !string.IsNullOrWhiteSpace(paymentSettings.FirstOrDefault(s => s.Code == "bankAccount")?.Value) &&
+            !string.IsNullOrWhiteSpace(paymentSettings.FirstOrDefault(s => s.Code == "bankOwner")?.Value);
+
+        var bankListConfigured = false;
+        var bankListJson = paymentSettings.FirstOrDefault(s => s.Code == "bankAccounts")?.Value;
+        if (!string.IsNullOrWhiteSpace(bankListJson))
+        {
+            try
+            {
+                var accounts = JsonSerializer.Deserialize<List<PaymentBankAccountDTO>>(
+                    bankListJson,
+                    new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                bankListConfigured = accounts?.Any(a =>
+                    !string.IsNullOrWhiteSpace(a.BankName) &&
+                    !string.IsNullOrWhiteSpace(a.AccountNumber) &&
+                    !string.IsNullOrWhiteSpace(a.AccountHolder)) == true;
+            }
+            catch
+            {
+                bankListConfigured = false;
+            }
+        }
+
+        var bankConfigured = legacyBankConfigured || bankListConfigured;
+
+        if (paymentMethod == "COD" &&
+            !ReadBoolSetting(paymentSettings, "enableCOD", true))
+            throw new InvalidOperationException("Thanh toán COD hiện đang tạm tắt.");
+
+        if (paymentMethod == "ATM" &&
+            (!ReadBoolSetting(paymentSettings, "enableBankTransfer", bankConfigured) || !bankConfigured))
+            throw new InvalidOperationException("Chuyển khoản ngân hàng hiện chưa được cấu hình.");
+
+        var account = await db.Users
+            .AsNoTracking()
+            .FirstOrDefaultAsync(u => u.Id == userId)
+            ?? throw new InvalidOperationException("Tài khoản không còn tồn tại.");
+
+        var customerName = dto.CustomerName?.Trim() ?? string.Empty;
+        var customerPhone = dto.CustomerPhone?.Trim() ?? string.Empty;
+        var customerEmail = string.IsNullOrWhiteSpace(dto.CustomerEmail)
+            ? account.Email.Trim()
+            : dto.CustomerEmail.Trim();
+
+        var shippingProvince = dto.ShippingProvince?.Trim() ?? string.Empty;
+        var shippingDistrict = dto.ShippingDistrict?.Trim() ?? string.Empty;
+        var shippingWard = dto.ShippingWard?.Trim() ?? string.Empty;
+        var shippingStreet = dto.ShippingStreet?.Trim() ?? string.Empty;
+
+        if (customerName.Length < 2)
+            throw new InvalidOperationException("Tên người nhận không hợp lệ.");
+        if (customerPhone.Count(char.IsDigit) < 9)
+            throw new InvalidOperationException("Số điện thoại người nhận không hợp lệ.");
+        if (string.IsNullOrWhiteSpace(customerEmail))
+            throw new InvalidOperationException("Email tài khoản không hợp lệ.");
+        if (string.IsNullOrWhiteSpace(shippingProvince) ||
+            string.IsNullOrWhiteSpace(shippingDistrict) ||
+            string.IsNullOrWhiteSpace(shippingWard) ||
+            string.IsNullOrWhiteSpace(shippingStreet))
+            throw new InvalidOperationException("Địa chỉ giao hàng chưa đầy đủ.");
+
+        var customerAddress = string.Join(", ",
+            new[] { shippingStreet, shippingWard, shippingDistrict, shippingProvince }
+                .Where(value => !string.IsNullOrWhiteSpace(value)));
+
+        var variantProductIds = cartItems.Select(c => c.ProductId).Distinct().ToList();
+        var variants = await db.VariantStocks
+            .Where(v => variantProductIds.Contains(v.ProductId))
+            .ToListAsync();
+
+        foreach (var item in cartItems)
+        {
+            if (item.Product.Status != "active")
+                throw new InvalidOperationException(
+                    $"Sản phẩm {item.Product.Name} hiện không còn được bán.");
+
+            if (item.Quantity < 1 || item.Product.Stock < item.Quantity)
+                throw new InvalidOperationException($"Sản phẩm {item.Product.Name} không còn đủ tồn kho.");
+
+            var productVariants = variants.Where(v => v.ProductId == item.ProductId).ToList();
+            if (productVariants.Count > 0)
+            {
+                var variant = productVariants.FirstOrDefault(v =>
+                    v.Size == item.Size && v.Color == item.Color);
+
+                if (variant is null || variant.Stock < item.Quantity)
+                    throw new InvalidOperationException(
+                        $"Biến thể {item.Size} - {item.Color} của {item.Product.Name} không còn đủ tồn kho.");
+            }
+        }
+
+        var subtotal = cartItems.Sum(c => c.Product.Price * c.Quantity);
+        decimal couponDiscount = 0;
+        string? validCouponCode = null;
+
+        if (!string.IsNullOrWhiteSpace(dto.CouponCode))
+        {
+            var normalizedCoupon = dto.CouponCode.Trim().ToUpperInvariant();
+            var couponResult = await couponService.ValidateAsync(new CouponValidateDTO
+            {
+                Code = normalizedCoupon,
+                OrderAmount = subtotal
+            });
+
+            if (!couponResult.IsValid)
+                throw new InvalidOperationException(couponResult.Message ?? "Mã giảm giá không còn hợp lệ.");
+
+            couponDiscount = couponResult.DiscountAmount;
+            validCouponCode = normalizedCoupon;
+        }
+
         var combo = await comboService.EvaluateForItemsAsync(cartItems);
         var comboDiscount = combo.Eligible ? combo.Discount : 0m;
+        var totalDiscount = couponDiscount + comboDiscount;
 
-        var totalDiscount = discount + comboDiscount;
-        var shippingFee = dto.ShippingFee < 0 ? 0 : dto.ShippingFee;
+        var shippingProvider = string.IsNullOrWhiteSpace(dto.ShippingProvider)
+            ? "mock"
+            : dto.ShippingProvider.Trim().ToLowerInvariant();
+        var shippingServiceCode = string.IsNullOrWhiteSpace(dto.ShippingServiceCode)
+            ? "standard"
+            : dto.ShippingServiceCode.Trim();
+
+        var quote = await shippingService.QuoteAsync(new ShippingQuoteRequestDTO
+        {
+            Provider = shippingProvider,
+            ToProvince = shippingProvince,
+            ToDistrict = shippingDistrict,
+            ToWard = shippingWard,
+            ToAddress = shippingStreet,
+            WeightGram = Math.Max(300, cartItems.Sum(c => c.Quantity * 300)),
+            OrderValue = subtotal,
+        });
+
+        var selectedShipping = quote.Options.FirstOrDefault(o =>
+            o.Provider.Equals(shippingProvider, StringComparison.OrdinalIgnoreCase) &&
+            o.ServiceCode.Equals(shippingServiceCode, StringComparison.OrdinalIgnoreCase));
+
+        if (!quote.Success || selectedShipping is null)
+            throw new InvalidOperationException(
+                "Gói vận chuyển đã thay đổi. Vui lòng tính lại phí và chọn lại phương thức giao hàng.");
+
+        // Phí ship/ETA luôn lấy từ quote backend, không tin giá trị client gửi.
+        var shippingFee = selectedShipping.Fee;
+        var leadTimeHours = selectedShipping.LeadTimeHours;
+        shippingProvider = selectedShipping.Provider;
+        shippingServiceCode = selectedShipping.ServiceCode;
+
         var total = subtotal - totalDiscount + shippingFee;
         if (total < 0) total = 0;
 
@@ -54,25 +216,23 @@ public class OrderService(
         {
             OrderCode = orderCode,
             UserId = userId,
-            CustomerName = dto.CustomerName,
-            CustomerPhone = dto.CustomerPhone,
-            CustomerEmail = dto.CustomerEmail,
-            CustomerAddress = dto.CustomerAddress,
+            CustomerName = customerName,
+            CustomerPhone = customerPhone,
+            CustomerEmail = customerEmail,
+            CustomerAddress = customerAddress,
             Subtotal = subtotal,
             ShippingFee = shippingFee,
             Discount = totalDiscount,
             Total = total,
-            CouponCode = dto.CouponCode,
-            PaymentMethod = dto.PaymentMethod,
-            Note = dto.Note,
-            ShippingProvider = string.IsNullOrWhiteSpace(dto.ShippingProvider) ? "mock" : dto.ShippingProvider,
-            // Đơn ATM/VietQR: 15 phút để khách chuyển khoản, hết giờ tự hủy.
-            // Đơn COD: PaymentExpiresAt = null (không cần thanh toán trước).
-            PaymentExpiresAt = string.Equals(dto.PaymentMethod, "ATM", StringComparison.OrdinalIgnoreCase)
+            CouponCode = validCouponCode,
+            PaymentMethod = paymentMethod,
+            Note = string.IsNullOrWhiteSpace(dto.Note) ? null : dto.Note.Trim(),
+            ShippingProvider = shippingProvider,
+            PaymentExpiresAt = paymentMethod == "ATM"
                 ? DateTime.UtcNow.AddMinutes(15)
                 : null,
-            ShippingServiceCode = dto.ShippingServiceCode,
-            LeadTimeHours = dto.LeadTimeHours,
+            ShippingServiceCode = shippingServiceCode,
+            LeadTimeHours = leadTimeHours,
             Items = cartItems.Select(c => new OrderItem
             {
                 ProductId = c.ProductId,
@@ -87,16 +247,6 @@ public class OrderService(
 
         db.Orders.Add(order);
 
-        // Trừ stock thật + giải phóng phần Reserved trên variant (đã được giữ lúc add to cart)
-        var variantKeys = cartItems
-            .Select(c => new { c.ProductId, c.Size, c.Color })
-            .Distinct()
-            .ToList();
-        var productIdsForVariant = variantKeys.Select(k => k.ProductId).Distinct().ToList();
-        var variants = await db.VariantStocks
-            .Where(v => productIdsForVariant.Contains(v.ProductId))
-            .ToListAsync();
-
         foreach (var item in cartItems)
         {
             item.Product.Stock -= item.Quantity;
@@ -106,34 +256,35 @@ public class OrderService(
             if (item.Product.Stock <= 0)
                 item.Product.Status = "out-of-stock";
 
-            // Variant: trừ Stock thật, trả Reserved (đã giữ trước đó)
-            var v = variants.FirstOrDefault(x =>
-                x.ProductId == item.ProductId && x.Size == item.Size && x.Color == item.Color);
-            if (v != null)
+            var variant = variants.FirstOrDefault(x =>
+                x.ProductId == item.ProductId &&
+                x.Size == item.Size &&
+                x.Color == item.Color);
+
+            if (variant != null)
             {
-                v.Stock = Math.Max(0, v.Stock - item.Quantity);
-                v.Reserved = Math.Max(0, v.Reserved - item.Quantity);
-                v.SoldCount += item.Quantity;
-                v.UpdatedAt = DateTime.UtcNow;
+                variant.Stock = Math.Max(0, variant.Stock - item.Quantity);
+                variant.Reserved = Math.Max(0, variant.Reserved - item.Quantity);
+                variant.SoldCount += item.Quantity;
+                variant.UpdatedAt = DateTime.UtcNow;
             }
         }
 
+        // Partial checkout: chỉ xóa item đã chọn. Item không chọn vẫn giữ nguyên reservation.
         db.CartItems.RemoveRange(cartItems);
 
-        if (!string.IsNullOrEmpty(dto.CouponCode))
+        if (validCouponCode is not null)
         {
-            var coupon = await db.Coupons.FirstOrDefaultAsync(c => c.Code == dto.CouponCode);
+            var coupon = await db.Coupons.FirstOrDefaultAsync(c => c.Code == validCouponCode);
             if (coupon is not null) coupon.UsedCount++;
         }
 
         await db.SaveChangesAsync();
 
-        // Lưu lịch sử "đã đặt hàng"
         await shippingService.AppendHistoryAsync(order.Id, "order_placed",
             $"Đơn hàng {order.OrderCode} đã được tạo", "Hệ thống KaitoKid");
 
-        // COD → tạo vận đơn ngay; ATM/online → đợi xác nhận thanh toán
-        if (string.Equals(order.PaymentMethod, "COD", StringComparison.OrdinalIgnoreCase))
+        if (paymentMethod == "COD")
         {
             try
             {
@@ -144,11 +295,10 @@ public class OrderService(
             }
             catch
             {
-                // Không chặn luồng tạo đơn nếu shipping fail
+                // Không chặn luồng tạo đơn nếu shipping fail.
             }
         }
 
-        // Email xác nhận đơn — fire and forget, không chặn flow
         var frontendUrl = (config["Frontend:BaseUrl"] ?? "http://localhost:5173").TrimEnd('/');
         var trackingUrl = $"{frontendUrl}/orders";
         _ = emailService.SendAsync(order.CustomerEmail,
@@ -269,6 +419,8 @@ public class OrderService(
         ShippingProvider = o.ShippingProvider,
         ShippingServiceCode = o.ShippingServiceCode,
         LeadTimeHours = o.LeadTimeHours,
+        PaymentExpiresAt = o.PaymentExpiresAt,
+        PaidAt = o.PaidAt,
         Items = o.Items.Select(i => new OrderDetailDTO
         {
             ProductId = i.ProductId,

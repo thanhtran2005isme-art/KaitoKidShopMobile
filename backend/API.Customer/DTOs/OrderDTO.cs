@@ -2,19 +2,35 @@
 
 public class CreateOrderDTO
 {
+    /// <summary>
+    /// Cart item IDs cần checkout. null = tương thích ngược: checkout toàn bộ giỏ.
+    /// List rỗng là request không hợp lệ.
+    /// </summary>
+    public List<int>? CartItemIds { get; set; }
+
     public string CustomerName { get; set; } = string.Empty;
     public string CustomerPhone { get; set; } = string.Empty;
     public string CustomerEmail { get; set; } = string.Empty;
+    // Giữ field này để tương thích request cũ; backend PHASE 6 dựng địa chỉ
+    // canonical từ ShippingProvince/District/Ward/Street.
     public string CustomerAddress { get; set; } = string.Empty;
     public string PaymentMethod { get; set; } = "COD";
     public string? CouponCode { get; set; }
     public string? Note { get; set; }
 
     // Shipping
-    public string? ShippingProvider { get; set; }       // mock | ghtk | ghn ...
-    public string? ShippingServiceCode { get; set; }    // standard | express | ...
+    public string? ShippingProvider { get; set; }
+    public string? ShippingServiceCode { get; set; }
+    // Client có thể echo fee/ETA để review, nhưng OrderService không tin hai giá trị
+    // này: backend luôn quote lại theo provider/service + địa chỉ có cấu trúc.
     public decimal ShippingFee { get; set; }
     public int? LeadTimeHours { get; set; }
+
+    // Bắt buộc cho order mới từ Mobile/Web PHASE 6 để backend quote shipping.
+    public string? ShippingProvince { get; set; }
+    public string? ShippingDistrict { get; set; }
+    public string? ShippingWard { get; set; }
+    public string? ShippingStreet { get; set; }
 }
 
 public class OrderDTO
@@ -43,6 +59,10 @@ public class OrderDTO
     public string? ShippingProvider { get; set; }
     public string? ShippingServiceCode { get; set; }
     public int? LeadTimeHours { get; set; }
+
+    // Payment echo back
+    public DateTime? PaymentExpiresAt { get; set; }
+    public DateTime? PaidAt { get; set; }
 }
 
 public class OrderDetailDTO

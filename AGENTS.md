@@ -9,11 +9,12 @@ Before making non-trivial changes, read:
 1. `AGENTS.md` (this file)
 2. `docs/AI_HANDOFF.md` — current project state
 3. `docs/BRAND.md` — KaitoKid brand/data rules
-4. `docs/ROADMAP.md` — current implementation phase
-5. `docs/PHASES_5_10.md` — detailed implementation spec for remaining PHASE 5–10
-6. `docs/ARCHITECTURE.md` — stable system architecture
-7. The task-relevant sections of `docs/DECISIONS.md` and `docs/TROUBLESHOOTING.md`
-8. Relevant source files and recent Git history for the area being changed
+4. `docs/UI_UX.md` + `skill/.codex/skills/ui-ux-pro-max/SKILL.md` — required for UI/UX work
+5. `docs/ROADMAP.md` — current implementation phase
+6. `docs/PHASES_5_10.md` — detailed implementation spec for remaining PHASE 5–10
+7. `docs/ARCHITECTURE.md` — stable system architecture
+8. The task-relevant sections of `docs/DECISIONS.md` and `docs/TROUBLESHOOTING.md`
+9. Relevant source files and recent Git history for the area being changed
 
 Do not assume an old chat transcript is the source of truth. Git and the repository documentation are the durable project memory.
 
@@ -27,6 +28,23 @@ Do not assume an old chat transcript is the source of truth. Git and the reposit
 - Project documentation: `docs`.
 
 Before changing Expo APIs, check the Expo SDK 57 documentation.
+
+## Mandatory UI/UX workflow
+
+Khi một task/PHASE có **sửa, thêm hoặc thiết kế giao diện**, AI/coding agent phải dùng skill UI của chính repository trước khi viết UI:
+
+`skill/.codex/skills/ui-ux-pro-max/SKILL.md`
+
+Quy trình bắt buộc:
+
+1. đọc `SKILL.md`;
+2. generate/search **design system trước** theo hướng dẫn của skill;
+3. đọc guideline stack phù hợp — Mobile dùng `react-native`;
+4. giữ `docs/BRAND.md` và `apps/mobile/src/constants/brand.ts` làm source of truth cho thương hiệu/token hiện có;
+5. mới bắt đầu sửa component/screen;
+6. static-review lại accessibility, touch target, keyboard/form, loading/error/empty state và responsive behavior trước khi commit.
+
+Không bỏ qua `.codex` rồi tự thiết kế UI theo cảm tính. Nếu script của skill không chạy được trong môi trường công cụ, phải đọc dữ liệu/script của skill và áp dụng cùng logic/guideline, đồng thời ghi rõ giới hạn validation.
 
 ## Workflow
 
@@ -89,6 +107,7 @@ Do not use long-lived branches as project memory. Branches are for work in progr
 - Keep `docs/AI_HANDOFF.md` concise and focused on the current state.
 - Put stable system structure in `docs/ARCHITECTURE.md`.
 - Keep brand positioning and catalog rules in `docs/BRAND.md`.
+- Keep durable UI/UX rules and the Codex skill workflow in `docs/UI_UX.md`.
 - Keep phase status and next work in `docs/ROADMAP.md`.
 - Keep detailed remaining PHASE 5–10 implementation scope/checklists in `docs/PHASES_5_10.md`.
 - Record important technical choices in `docs/DECISIONS.md`.

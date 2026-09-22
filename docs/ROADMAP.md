@@ -11,7 +11,7 @@ Roadmap này là thứ tự triển khai chính. Không nhảy phase khi phần 
 - [x] PHASE 3 — Product Detail hoàn chỉnh
 - [x] PHASE 4 — Wishlist + Add to Cart
 - [x] PHASE 5 — Cart thật
-- [ ] PHASE 6 — Checkout + Address + Shipping + Payment
+- [x] PHASE 6 — Checkout + Address + Shipping + Payment
 - [ ] PHASE 7 — Orders + Tracking
 - [ ] PHASE 8 — Reviews + Notifications + Account
 - [ ] PHASE 9 — Collections + Lookbook + Recommendation
@@ -160,6 +160,34 @@ Migration này idempotent và chỉ bảo đảm các cột reservation cần th
 Đã static-review contract TypeScript/C# và luồng reservation. Runtime cuối cần xác nhận trên máy development sau khi pull.
 
 **Tiếp theo:** PHASE 6 — Checkout + Address + Shipping + Payment.
+
+## PHASE 6 — Checkout + Address + Shipping + Payment
+
+Đã triển khai:
+
+- Cart chuyển selected `CartItemIds` sang `CheckoutContext`; không truyền toàn bộ checkout state qua query params;
+- backend `CreateOrderDTO.CartItemIds` hỗ trợ partial checkout và validate ID thuộc đúng user;
+- subtotal, coupon và combo discount đều tính trên đúng selected items;
+- chỉ selected items bị trừ stock/release reserve/xóa khỏi Cart; item không chọn tiếp tục giữ nguyên Cart + reservation;
+- `OrderService` luôn quote lại shipping server-side từ địa chỉ có cấu trúc và provider/service đã chọn; không tin `shippingFee` client;
+- Web checkout cũng gửi province/district/ward/street để giữ tương thích với contract shipping mới;
+- Mobile có `CheckoutProvider`, màn Checkout, quản lý Address CRUD/default, shipping options, coupon, payment method, review modal và Order Success;
+- COD tạo đơn và vận đơn theo backend hiện có;
+- ATM/bank transfer dùng `/api/payment/config` + `/api/payment/instructions/{orderCode}`, countdown/poll status/cancel; simulate-paid chỉ hiện khi backend cho phép dev;
+- QR chỉ render khi backend/store setting thật sự cung cấp `qrImage`; Mobile không hard-code gateway VietQR;
+- payment status/instructions yêu cầu auth và chỉ trả đơn thuộc user hiện tại;
+- loading/error/retry và double-submit guard đã được thêm cho flow chính;
+- không có migration database mới trong PHASE 6.
+
+### UI workflow
+
+Các màn PHASE 6 được thiết kế sau khi đọc `skill/.codex/skills/ui-ux-pro-max/SKILL.md` và chạy logic design-system + guideline `react-native`. Quy tắc này đã được đưa vào `AGENTS.md` để các phiên sau bắt buộc tiếp tục áp dụng.
+
+### Validation
+
+Đã static-review contract TypeScript/C#, reservation/partial-checkout, source-of-truth shipping/payment và compatibility với Web. Đã thêm regression tests cho selected partial checkout, invalid selected IDs và fallback all-cart của Web; môi trường connector không chạy được `dotnet test`/Expo runtime nên vẫn cần xác nhận trên máy development sau khi pull.
+
+**Tiếp theo:** PHASE 7 — Orders + Tracking.
 
 ## PHASE 6 → PHASE 10
 

@@ -26,10 +26,11 @@ Không triển khai theo trí nhớ của chat cũ nếu code/main đã thay đ�
 - PHASE 3 — Product Detail
 - PHASE 4 — Wishlist + Add to Cart
 - PHASE 5 — Cart thật
+- PHASE 6 — Checkout + Address + Shipping + Payment
 
 Tiếp theo phải làm:
 
-**PHASE 6 — Checkout + Address + Shipping + Payment**
+**PHASE 7 — Orders + Tracking**
 
 Quy tắc Git:
 
@@ -37,6 +38,13 @@ Quy tắc Git:
 - commit message bằng tiếng Việt;
 - không commit từng file;
 - ưu tiên squash merge để `main` chỉ nhận một commit cho mỗi PHASE.
+
+Quy tắc UI/UX bắt buộc:
+
+- mọi thay đổi giao diện phải đọc `docs/UI_UX.md` và `skill/.codex/skills/ui-ux-pro-max/SKILL.md`;
+- generate/search design system trước khi code;
+- Mobile phải đọc guideline `react-native`;
+- giữ brand token KaitoKid hiện tại làm source of truth.
 
 ---
 
@@ -206,6 +214,15 @@ Các phần trên thuộc PHASE 6–7.
 ---
 
 # PHASE 6 — Checkout + Address + Shipping + Payment
+
+## Trạng thái triển khai PHASE 6
+
+**Code implementation hoàn tất ngày 2026-09-22; runtime local cần xác nhận sau khi pull.**
+
+Đã thực hiện partial checkout selected IDs, Address CRUD/default, shipping server re-quote, selected coupon/combo, COD, ATM/bank transfer, payment polling/cancel, optional configured QR, review/create-order guard và Order Success. Không có migration database mới.
+
+UI của PHASE 6 đã tuân workflow `.codex` và quy tắc này đã được lưu bền vững trong `AGENTS.md` + `docs/DECISIONS.md`.
+
 
 ## Mục tiêu
 
@@ -1139,8 +1156,9 @@ Khi mở chat mới:
 3. đọc `docs/ROADMAP.md`;
 4. đọc file này;
 5. xác nhận `main` hiện tại;
-6. xác nhận PHASE 5 runtime trên máy development nếu chưa được user xác nhận;
-7. bắt đầu **PHASE 6 — Checkout + Address + Shipping + Payment** từ selected cart IDs đã được chuẩn bị ở PHASE 5;
-8. mở rộng order contract để partial checkout chỉ xử lý `CartItemIds` đã chọn và giữ nguyên item không chọn;
-9. hoàn tất toàn PHASE 6 trước khi commit;
-10. tạo **một commit tiếng Việt duy nhất** cho PHASE 6.
+6. nếu task có UI/UX, **bắt buộc** đọc `docs/UI_UX.md` + `skill/.codex/skills/ui-ux-pro-max/SKILL.md` và generate design system trước;
+7. xác nhận PHASE 6 runtime trên máy development nếu chưa được user xác nhận;
+8. bắt đầu **PHASE 7 — Orders + Tracking** từ Orders API, tracking API và `POST /api/cart/reorder/{orderId}`;
+9. giữ nguyên invariant partial checkout/reservation/payment của PHASE 6;
+10. hoàn tất toàn PHASE 7 trước khi commit;
+11. tạo **một commit tiếng Việt duy nhất** cho PHASE 7.
