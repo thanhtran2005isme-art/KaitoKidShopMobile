@@ -282,13 +282,7 @@ export default function CartScreen() {
   const handleCheckout = () => {
     if (selectedArray.length === 0) return;
     prepareCheckout(selectedArray);
-    setFeedback({
-      type: 'success',
-      text:
-        'Đã chuẩn bị ' +
-        selectedQuantity +
-        ' sản phẩm đã chọn cho bước thanh toán.',
-    });
+    router.push('/checkout');
   };
 
   if (!token) {

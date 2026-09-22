@@ -98,6 +98,23 @@ public class CartController(ICartService cartService, IComboDiscountService comb
         return Ok(result);
     }
 
+    /// <summary>Combo discount chỉ cho các cart item đang được chọn để checkout.</summary>
+    [HttpPost("combo-discount/selected")]
+    public async Task<ActionResult<ComboDiscountResultDTO>> ComboDiscountSelected([FromBody] BulkCartActionDTO dto)
+    {
+        if (dto.ItemIds is null || dto.ItemIds.Count == 0)
+            return BadRequest(new { message = "Danh sách sản phẩm checkout rỗng" });
+
+        try
+        {
+            return Ok(await comboService.EvaluateSelectedAsync(UserId, dto.ItemIds));
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
     /// <summary>"Mua lại" — nạp toàn bộ item từ 1 đơn cũ vào giỏ.</summary>
     [HttpPost("reorder/{orderId:int}")]
     public async Task<ActionResult<ReorderResultDTO>> Reorder(int orderId)

@@ -175,6 +175,7 @@ export default function Checkout() {
     if (!addressForm.phone.trim()) return 'Vui lòng nhập số điện thoại';
     if (!addressForm.street.trim()) return 'Vui lòng nhập địa chỉ';
     if (!addressForm.city || !addressForm.district) return 'Vui lòng chọn tỉnh/quận';
+    if (!addressForm.ward.trim()) return 'Vui lòng chọn phường/xã';
     if (!selectedShipping) return 'Vui lòng chọn đơn vị vận chuyển';
     return null;
   };
@@ -209,6 +210,10 @@ export default function Checkout() {
         shippingServiceCode: selectedShipping?.serviceCode,
         shippingFee: selectedShipping?.fee ?? shippingFee,
         leadTimeHours: selectedShipping?.leadTimeHours,
+        shippingProvince: addressForm.city,
+        shippingDistrict: addressForm.district,
+        shippingWard: addressForm.ward,
+        shippingStreet: addressForm.street,
       });
       const data = response.data as { id?: number; orderCode?: string; total?: number };
 

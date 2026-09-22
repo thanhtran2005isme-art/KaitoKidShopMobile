@@ -13,6 +13,7 @@ namespace API.Customer.Services;
 public interface IComboDiscountService
 {
     Task<ComboDiscountResultDTO> EvaluateAsync(int userId);
+    Task<ComboDiscountResultDTO> EvaluateSelectedAsync(int userId, IEnumerable<int> cartItemIds);
     Task<ComboDiscountResultDTO> EvaluateForItemsAsync(IEnumerable<CartItem> items);
 }
 
@@ -26,6 +27,23 @@ public class ComboDiscountService(CustomerDbContext db) : IComboDiscountService
             .Where(c => c.UserId == userId)
             .Include(c => c.Product)
             .ToListAsync();
+        return await EvaluateForItemsAsync(items);
+    }
+
+    public async Task<ComboDiscountResultDTO> EvaluateSelectedAsync(int userId, IEnumerable<int> cartItemIds)
+    {
+        var ids = cartItemIds.Distinct().ToList();
+        if (ids.Count == 0)
+            return new ComboDiscountResultDTO { Eligible = false };
+
+        var items = await db.CartItems
+            .Where(c => c.UserId == userId && ids.Contains(c.Id))
+            .Include(c => c.Product)
+            .ToListAsync();
+
+        if (items.Count != ids.Count)
+            throw new InvalidOperationException("Danh sách sản phẩm checkout không hợp lệ hoặc đã thay đổi.");
+
         return await EvaluateForItemsAsync(items);
     }
 

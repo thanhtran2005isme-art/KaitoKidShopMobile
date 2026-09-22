@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
+using System.Text.Json;
 
 namespace API.Customer.Controllers;
 
@@ -37,11 +38,73 @@ public class PaymentController(
     /// allowSimulatePaid = true ⇒ FE được phép hiển thị nút "Tôi đã chuyển khoản" (gọi simulate-paid).
     /// </summary>
     [HttpGet("config")]
-    public IActionResult GetConfig()
+    public async Task<ActionResult<PaymentConfigDTO>> GetConfig()
     {
         var allowSimulate = env.IsDevelopment()
             || string.Equals(config["Payment:AllowSimulatePaid"], "true", StringComparison.OrdinalIgnoreCase);
-        return Ok(new { allowSimulatePaid = allowSimulate });
+
+        var settings = await db.StoreSettings
+            .Where(s => s.Group == "payment")
+            .ToListAsync();
+
+        var enableCod = ReadBoolSetting(settings, "enableCOD", true);
+        var bankAccounts = ReadBankAccounts(settings);
+        var enableBank = ReadBoolSetting(settings, "enableBankTransfer", bankAccounts.Count > 0)
+            && bankAccounts.Count > 0;
+
+        var methods = new List<string>();
+        if (enableCod) methods.Add("COD");
+        if (enableBank) methods.Add("ATM");
+
+        return Ok(new PaymentConfigDTO
+        {
+            AllowSimulatePaid = allowSimulate,
+            SupportedMethods = methods,
+            BankTransferConfigured = enableBank,
+            VietQrConfigured = bankAccounts.Any(a => !string.IsNullOrWhiteSpace(a.QrImage)),
+        });
+    }
+
+    /// <summary>
+    /// Hướng dẫn chuyển khoản cho chính chủ đơn ATM.
+    /// Mobile chỉ render dữ liệu backend trả về, không hard-code tài khoản/gateway.
+    /// </summary>
+    [HttpGet("instructions/{orderCode}")]
+    [Authorize]
+    public async Task<ActionResult<PaymentInstructionsDTO>> GetInstructions(string orderCode)
+    {
+        var uid = UserId;
+        if (uid is null) return Unauthorized();
+
+        var order = await db.Orders
+            .FirstOrDefaultAsync(o => o.OrderCode == orderCode && o.UserId == uid);
+
+        if (order is null) return NotFound(new { message = "Không tìm thấy đơn hàng" });
+        if (!string.Equals(order.PaymentMethod, "ATM", StringComparison.OrdinalIgnoreCase))
+            return BadRequest(new { message = "Đơn hàng không dùng chuyển khoản ngân hàng" });
+
+        var settings = await db.StoreSettings
+            .Where(s => s.Group == "payment")
+            .ToListAsync();
+        var bank = ReadBankAccounts(settings).FirstOrDefault();
+        if (bank is null)
+            return BadRequest(new { message = "Shop chưa cấu hình tài khoản nhận chuyển khoản" });
+
+        var secondsLeft = order.PaymentExpiresAt.HasValue
+            ? Math.Max(0, (int)(order.PaymentExpiresAt.Value - DateTime.UtcNow).TotalSeconds)
+            : 0;
+        var transferContent = $"DH{order.OrderCode}";
+
+        return Ok(new PaymentInstructionsDTO
+        {
+            OrderCode = order.OrderCode,
+            Total = order.Total,
+            PaymentExpiresAt = order.PaymentExpiresAt,
+            SecondsLeft = secondsLeft,
+            TransferContent = transferContent,
+            BankAccount = bank,
+            QrUrl = bank.QrImage,
+        });
     }
 
     /// <summary>
@@ -50,9 +113,13 @@ public class PaymentController(
     /// Khi secondsLeft = 0 và status = pending → đơn đã/sẽ bị auto-cancel.
     /// </summary>
     [HttpGet("status/{orderCode}")]
+    [Authorize]
     public async Task<IActionResult> GetStatus(string orderCode)
     {
-        var order = await db.Orders.FirstOrDefaultAsync(o => o.OrderCode == orderCode);
+        var uid = UserId;
+        if (uid is null) return Unauthorized();
+
+        var order = await db.Orders.FirstOrDefaultAsync(o => o.OrderCode == orderCode && o.UserId == uid);
         if (order is null) return NotFound(new { message = "Không tìm thấy đơn hàng" });
 
         var now = DateTime.UtcNow;
@@ -230,4 +297,60 @@ public class PaymentController(
 
         return Ok(new { message = "Đã xác nhận thanh toán (mô phỏng webhook)", order.OrderCode, order.PaidAt });
     }
+    private static bool ReadBoolSetting(IReadOnlyCollection<API.Customer.Models.StoreSetting> settings, string code, bool fallback)
+    {
+        var value = settings.FirstOrDefault(s => s.Code == code)?.Value;
+        return bool.TryParse(value, out var parsed) ? parsed : fallback;
+    }
+
+    private static List<PaymentBankAccountDTO> ReadBankAccounts(IReadOnlyCollection<API.Customer.Models.StoreSetting> settings)
+    {
+        var json = settings.FirstOrDefault(s => s.Code == "bankAccounts")?.Value;
+        if (!string.IsNullOrWhiteSpace(json))
+        {
+            try
+            {
+                var parsed = JsonSerializer.Deserialize<List<PaymentBankAccountDTO>>(
+                    json,
+                    new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                if (parsed is { Count: > 0 })
+                    return parsed.Where(IsUsableBankAccount).ToList();
+            }
+            catch
+            {
+                // Fallback xuống các key payment cũ.
+            }
+        }
+
+        var bankName = settings.FirstOrDefault(s => s.Code == "bankName")?.Value?.Trim();
+        var accountNumber = settings.FirstOrDefault(s => s.Code == "bankAccount")?.Value?.Trim();
+        var accountHolder = settings.FirstOrDefault(s => s.Code == "bankOwner")?.Value?.Trim();
+        var branch = settings.FirstOrDefault(s => s.Code == "bankBranch")?.Value?.Trim();
+        var qrImage = settings.FirstOrDefault(s => s.Code == "bankQrImage")?.Value?.Trim();
+
+        if (string.IsNullOrWhiteSpace(bankName) ||
+            string.IsNullOrWhiteSpace(accountNumber) ||
+            string.IsNullOrWhiteSpace(accountHolder))
+            return [];
+
+        return
+        [
+            new PaymentBankAccountDTO
+            {
+                Id = 1,
+                BankName = bankName,
+                AccountNumber = accountNumber,
+                AccountHolder = accountHolder,
+                Branch = branch,
+                QrImage = qrImage,
+            }
+        ];
+    }
+
+    private static bool IsUsableBankAccount(PaymentBankAccountDTO account)
+        => !string.IsNullOrWhiteSpace(account.BankName)
+           && !string.IsNullOrWhiteSpace(account.AccountNumber)
+           && !string.IsNullOrWhiteSpace(account.AccountHolder);
+
+
 }

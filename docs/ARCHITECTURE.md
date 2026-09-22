@@ -138,5 +138,38 @@ run.bat
 - Current operational state: `docs/AI_HANDOFF.md`
 - Stable architecture: this file
 - Technical rationale: `docs/DECISIONS.md`
+- Durable UI/UX rules: `docs/UI_UX.md`
 - Repeatable fixes: `docs/TROUBLESHOOTING.md`
 - Older chronology: `docs/history/`
+
+
+## Mobile state layering
+
+Protected shopping/checkout state is layered under auth:
+
+```text
+AuthProvider
+  └─ ShoppingProvider
+       └─ CheckoutProvider
+            └─ Expo Router screens
+```
+
+- `ShoppingContext` owns wishlist/cart data and prepared checkout cart-item IDs.
+- `CheckoutContext` owns checkout-scoped address, shipping option, coupon/combo, payment method, note and pending order.
+- Full checkout state is not serialized into route query parameters. Order code may be used as a navigation identifier for payment/success recovery.
+
+## Checkout source-of-truth boundary
+
+For order creation, API.Customer is authoritative for:
+
+- cart item ownership;
+- product prices and selected subtotal;
+- coupon validity;
+- combo discount;
+- stock/reservation;
+- shipping quote;
+- enabled payment methods.
+
+`CreateOrderDTO.CartItemIds` enables partial checkout. Selected items are converted into the order and removed from Cart; unselected items remain reserved in Cart.
+
+Payment account/QR data comes from `CauHinhCuaHang`. Mobile does not embed bank credentials or a VietQR gateway URL.

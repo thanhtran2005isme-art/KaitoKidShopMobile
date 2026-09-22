@@ -155,3 +155,34 @@ This file records durable decisions and their rationale. It is not a chronologic
 **Quy ước tên:** Commit vẫn phải tuân D008 — phần mô tả bằng tiếng Việt. Ví dụ: `feat: hoàn thành phase 5 giỏ hàng mobile`.
 
 **Hệ quả:** Các phiên AI/GPT sau phải tránh cách làm “mỗi file một commit”. Git history trên `main` nên phản ánh các đơn vị công việc có ý nghĩa ở cấp task/fix/PHASE.
+
+
+## D014 — Bắt buộc dùng skill `.codex` trước khi sửa UI
+
+**Ngày:** 2026-09-22
+
+**Quyết định:** Mọi task/PHASE có sửa hoặc thêm UI/UX phải đọc `docs/UI_UX.md` và dùng `skill/.codex/skills/ui-ux-pro-max/SKILL.md` trước khi viết giao diện.
+
+**Quy trình:** Generate/search design system trước, sau đó đọc guideline stack tương ứng; Mobile dùng `react-native`. Brand token hiện có trong `docs/BRAND.md` và `apps/mobile/src/constants/brand.ts` vẫn là source of truth của KaitoKid.
+
+**Lý do:** Repository đã có skill thiết kế riêng; dùng quy trình này giúp UI giữa các phase nhất quán, có accessibility/touch/keyboard/loading/error review và tránh thiết kế cảm tính giữa các phiên AI khác nhau.
+
+**Hệ quả:** `AGENTS.md` và `docs/UI_UX.md` ghi quy tắc này như workflow bắt buộc. Nếu môi trường không chạy được script của skill, agent phải đọc script/data và áp dụng cùng logic/guideline, không được bỏ qua skill.
+
+
+## D015 — Partial checkout và tổng tiền phải được xác thực server-side
+
+**Ngày:** 2026-09-22
+
+**Quyết định:** Checkout Mobile gửi `CartItemIds` đã chọn. Backend chỉ tạo order từ các ID thuộc đúng user và chỉ xóa/trừ stock/release reserve các item đó.
+
+**Quy tắc source of truth:**
+
+- subtotal lấy từ Product/Cart phía server;
+- coupon được validate lại khi tạo order;
+- combo discount tính lại trên selected items;
+- shipping fee/ETA được quote lại server-side từ địa chỉ + provider/service, không tin fee client;
+- payment method phải đang được bật trong cấu hình cửa hàng;
+- tài khoản/QR chuyển khoản do backend/store setting trả; Mobile không hard-code gateway hoặc tài khoản.
+
+**Hệ quả:** Item không chọn vẫn còn nguyên trong Cart và tiếp tục giữ reservation. Web checkout gửi thêm structured address để dùng cùng contract shipping an toàn.
