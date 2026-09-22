@@ -303,6 +303,52 @@ public class CartService(CustomerDbContext db) : ICartService
         }).ToList();
     }
 
+    public async Task<List<ProductDTO>> GetCrossSellProductsAsync(int userId, int limit = 4)
+    {
+        var cartItems = await db.CartItems
+            .Where(c => c.UserId == userId)
+            .Include(c => c.Product)
+            .ToListAsync();
+        if (cartItems.Count == 0) return [];
+
+        var firstCategory = cartItems[0].Product.Category;
+        var inCart = cartItems.Select(c => c.ProductId).ToHashSet();
+
+        var related = await db.Products
+            .Where(p =>
+                p.Status == "active" &&
+                p.Category == firstCategory &&
+                !inCart.Contains(p.Id))
+            .OrderByDescending(p => p.SoldCount)
+            .Take(limit)
+            .ToListAsync();
+
+        return related.Select(p => new ProductDTO
+        {
+            Id = p.Id,
+            Name = p.Name,
+            Category = p.Category,
+            Subcategory = p.Subcategory,
+            Gender = p.Gender,
+            Price = p.Price,
+            OldPrice = p.OldPrice,
+            Stock = p.Stock,
+            AvailableStock = p.Available,
+            Status = p.Status,
+            Image = p.Image,
+            ShortDescription = p.ShortDescription,
+            Sku = p.Sku,
+            Slug = p.Slug,
+            IsNew = p.IsNew,
+            IsSale = p.IsSale,
+            IsBestSeller = p.IsBestSeller,
+            Rating = p.Rating,
+            SoldCount = p.SoldCount,
+            Colors = DeserializeList(p.Colors),
+            Sizes = DeserializeList(p.Sizes),
+        }).ToList();
+    }
+
     public async Task<ReorderResultDTO> ReorderAsync(int userId, int orderId)
     {
         var order = await db.Orders
