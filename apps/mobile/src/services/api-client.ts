@@ -52,9 +52,13 @@ async function getErrorMessage(response: Response) {
   }
 }
 
-export async function apiRequest<T>(path: string, init?: RequestInit): Promise<T> {
+export async function apiRequest<T>(
+  path: string,
+  init?: RequestInit,
+  timeoutMs = 15000,
+): Promise<T> {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 15000);
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
     const response = await fetch(`${API_BASE_URL}${path.startsWith('/') ? path : `/${path}`}`, {

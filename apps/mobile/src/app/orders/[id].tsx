@@ -369,13 +369,32 @@ export default function OrderDetailScreen() {
                       item.quantity}
                   </Text>
                   {order.status === 'completed' ? (
-                    <Text
-                      style={[
-                        styles.reviewMeta,
-                        item.hasReviewed && styles.reviewMetaDone,
-                      ]}>
-                      {item.hasReviewed ? 'Đã đánh giá' : 'Chưa đánh giá'}
-                    </Text>
+                    item.hasReviewed ? (
+                      <Text style={[styles.reviewMeta, styles.reviewMetaDone]}>
+                        ✓ Đã đánh giá
+                      </Text>
+                    ) : (
+                      <Pressable
+                        accessibilityLabel={'Viết đánh giá cho ' + item.productName}
+                        accessibilityRole="button"
+                        onPress={() =>
+                          router.push({
+                            pathname: '/review/create',
+                            params: {
+                              orderId: String(order.id),
+                              productId: String(item.productId),
+                              size: item.size,
+                              color: item.color,
+                            },
+                          })
+                        }
+                        style={({ pressed }) => [
+                          styles.reviewButton,
+                          pressed && styles.pressed,
+                        ]}>
+                        <Text style={styles.reviewButtonText}>Viết đánh giá</Text>
+                      </Pressable>
+                    )
                   ) : null}
                 </View>
                 <Text style={styles.itemPrice}>
@@ -678,6 +697,23 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   reviewMetaDone: { color: BRAND_COLORS.success },
+  reviewButton: {
+    alignSelf: 'flex-start',
+    minHeight: 44,
+    marginTop: 5,
+    borderRadius: 11,
+    borderWidth: 1,
+    borderColor: '#DDD6FE',
+    backgroundColor: BRAND_COLORS.primarySoft,
+    paddingHorizontal: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  reviewButtonText: {
+    color: BRAND_COLORS.primaryDark,
+    fontSize: 8,
+    fontWeight: '900',
+  },
   itemPrice: {
     color: BRAND_COLORS.ink,
     fontSize: 9,

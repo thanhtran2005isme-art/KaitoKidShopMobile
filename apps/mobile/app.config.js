@@ -48,6 +48,17 @@ module.exports = () => {
 
   return {
     ...baseConfig,
+    plugins: [
+      ...(baseConfig.plugins || []),
+      [
+        'expo-image-picker',
+        {
+          photosPermission: 'Cho phép KaitoKid truy cập ảnh để cập nhật avatar và gửi ảnh đánh giá.',
+          cameraPermission: false,
+          microphonePermission: false,
+        },
+      ],
+    ],
     extra: {
       ...(baseConfig.extra || {}),
       apiUrl,

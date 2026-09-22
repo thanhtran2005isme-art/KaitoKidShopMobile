@@ -1,6 +1,7 @@
 import { Tabs } from 'expo-router';
 import { StyleSheet, Text } from 'react-native';
 
+import { useNotifications } from '@/context/NotificationsContext';
 import { useShopping } from '@/context/ShoppingContext';
 
 function TabIcon({ label, color }: { label: string; color: string }) {
@@ -9,6 +10,7 @@ function TabIcon({ label, color }: { label: string; color: string }) {
 
 export default function TabsLayout() {
   const { cartCount } = useShopping();
+  const { unreadCount } = useNotifications();
 
   return (
     <Tabs
@@ -36,7 +38,15 @@ export default function TabsLayout() {
           tabBarBadgeStyle: styles.badge,
         }}
       />
-      <Tabs.Screen name="account" options={{ title: 'Tài khoản', tabBarIcon: ({ color }) => <TabIcon color={color} label="○" /> }} />
+      <Tabs.Screen
+        name="account"
+        options={{
+          title: 'Tài khoản',
+          tabBarIcon: ({ color }) => <TabIcon color={color} label="○" />,
+          tabBarBadge: unreadCount > 0 ? (unreadCount > 99 ? '99+' : unreadCount) : undefined,
+          tabBarBadgeStyle: styles.badge,
+        }}
+      />
     </Tabs>
   );
 }

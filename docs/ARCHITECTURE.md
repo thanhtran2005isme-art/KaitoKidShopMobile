@@ -151,11 +151,13 @@ Protected shopping/checkout state is layered under auth:
 
 ```text
 AuthProvider
-  └─ ShoppingProvider
-       └─ CheckoutProvider
-            └─ Expo Router screens
+  └─ NotificationsProvider
+       └─ ShoppingProvider
+            └─ CheckoutProvider
+                 └─ Expo Router screens
 ```
 
+- `NotificationsContext` owns only global unread-notification count/badge state.
 - `ShoppingContext` owns wishlist/cart data and prepared checkout cart-item IDs.
 - `CheckoutContext` owns checkout-scoped address, shipping option, coupon/combo, payment method, note and pending order.
 - Full checkout state is not serialized into route query parameters. Order code may be used as a navigation identifier for payment/success recovery.
@@ -188,3 +190,16 @@ PHASE 7 keeps order history private to the authenticated customer:
 - `OrderDTO.CanCancel` is computed by API.Customer; Mobile does not duplicate cancellation eligibility rules.
 
 Mobile order pages keep data screen-local rather than adding a global Orders context. Reorder refreshes `ShoppingContext` because Cart/badge is global shopping state.
+
+
+## Reviews/Notifications/Account boundary
+
+PHASE 8 keeps post-purchase/account rules server-authoritative:
+
+- Review create requires an authenticated user, an owned `completed` order, the requested product and a purchased size/color variant from that exact order.
+- `OrderDTO.HasReviewed` is variant-aware (`order + product + size + color`) while preserving wildcard compatibility for legacy reviews without variant metadata.
+- Newly submitted reviews remain `pending`; Product Detail continues to expose only approved reviews, while Order Detail treats the submitted variant as already reviewed.
+- Review/avatar media is selected with Expo Image Picker and uploaded as multipart to API.Customer; upload requests use a longer 45-second timeout without changing normal API timeouts.
+- Notification read/delete endpoints remain owner-scoped. Mobile uses backend `link` only when it is an explicit internal path.
+- Account delete must call `CartService.ClearCartAsync` before removing Cart rows so product/variant reservations are released. Notifications, wishlist and addresses are removed; review display names are anonymized; order history remains per the existing backend retention contract.
+- Profile, points and vouchers are screen-local data. Only unread notification count is global because the Account tab badge needs cross-screen state.

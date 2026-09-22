@@ -12,7 +12,7 @@ This file is intentionally concise. It describes the current state needed to con
 - Brand: **KaitoKid = thời trang trẻ em 0–12 tuổi**
 - Brand rules: `docs/BRAND.md`
 - UI/UX durable rules: `docs/UI_UX.md`; source skill: `skill/.codex/skills/ui-ux-pro-max/SKILL.md`
-- Current roadmap: PHASE 1–7 hoàn tất, tiếp theo PHASE 8 — Reviews + Notifications + Account
+- Current roadmap: PHASE 1–8 hoàn tất, tiếp theo PHASE 9 — Collections + Lookbook + Recommendation
 - PHASE 5–10 đã có acceptance criteria, API dependencies, UI/state scope và ranh giới chi tiết trong `docs/PHASES_5_10.md`.
 - Roadmap source: `docs/ROADMAP.md`
 - Detailed remaining PHASE 5–10 spec: `docs/PHASES_5_10.md`
@@ -132,6 +132,7 @@ As of 2026-09-22:
 - PHASE 5 đã hoàn thiện Cart thật: danh sách item, select all/bulk actions, quantity, remove, move-to-wishlist, subtotal selected, reservation countdown, combo discount và cross-sell.
 - PHASE 6 đã hoàn thiện Checkout Mobile: partial checkout theo selected CartItemIds, Address CRUD/default, shipping quote backend, coupon + combo selected, COD, ATM/bank transfer, payment polling/cancel và order success.
 - PHASE 7 đã hoàn thiện Orders + Tracking Mobile: list/filter, order detail, server-authoritative cancel, owner-only tracking timeline, reorder + cart refresh và Account entry.
+- PHASE 8 đã hoàn thiện Reviews + Notifications + Account Mobile: review từ completed order/variant hợp lệ, ảnh review, Helpful/verified/admin reply, notification unread/pagination/read/delete, profile/avatar, loyalty points/redeem/voucher/birthday và delete-account an toàn reservation.
 - Có màn `/wishlist`; ProductCard/Product Detail đều toggle wishlist qua API.Customer.
 - Product Detail gửi Add to Cart đúng size/màu/số lượng; cart badge Home/tab cập nhật ngay sau khi thêm.
 - API Product Detail trả `variantInventory` từ `TonKhoBienThe` nếu có; nếu chưa có dữ liệu biến thể thì mobile fallback về tồn kho khả dụng cấp sản phẩm.
@@ -146,7 +147,8 @@ As of 2026-09-22:
 - PHASE 2 đã static-review nhưng chưa chạy được `npm/tsc` trong môi trường công cụ do không có DNS/network tới GitHub. Cần xác nhận runtime trên máy local sau khi pull.
 - PHASE 6 có regression tests cho partial checkout + Web legacy fallback, nhưng chưa chạy được `dotnet test`/Expo runtime trong connector; cần xác nhận trên máy development.
 - PHASE 7 có regression tests cho `canCancel`, tracking ownership và reorder ownership; chưa chạy được `dotnet test`/Expo runtime trong connector.
-- Wishlist/Add-to-cart, Cart, Checkout và Orders/Tracking đã được nối qua PHASE 4–7. Reviews/Notifications/Account mở rộng thuộc PHASE 8.
+- PHASE 8 có regression tests cho review ownership/variant, HasReviewed theo biến thể, notification ownership và delete-account release reservation; chưa chạy được `dotnet test`/Expo runtime trong connector.
+- Wishlist/Add-to-cart, Cart, Checkout, Orders/Tracking và Reviews/Notifications/Account đã được nối qua PHASE 4–8. Collections/Lookbook/Recommendation thuộc PHASE 9.
 - Seed hiện chưa có ảnh phụ hoặc `TonKhoBienThe` mẫu; Add to Cart dùng product-level reservation fallback qua `SanPham.SoLuongDaGiu`.
 - Sau khi pull PHASE 4 cần chạy migration reservation và restart API.Customer trước khi test Add to Cart.
 - A NuGet warning about a known vulnerability in `Microsoft.OpenApi 2.0.0` has been observed during API.Auth build. It did not block startup, but dependency remediation should be handled separately rather than mixed into unrelated changes.

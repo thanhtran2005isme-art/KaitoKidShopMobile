@@ -22,26 +22,19 @@ if errorlevel 1 (
 
 pushd "%MOBILE%"
 
-if not exist "node_modules\.bin\expo.cmd" (
+set "NEED_INSTALL=0"
+if not exist "node_modules\.bin\expo.cmd" set "NEED_INSTALL=1"
+if not exist "node_modules\expo-image-picker\package.json" set "NEED_INSTALL=1"
+
+if "%NEED_INSTALL%"=="1" (
   echo [SETUP] Mobile dependencies thieu hoac chua day du.
   echo [SETUP] Dang chay npm install...
   call npm install
   if errorlevel 1 goto :install_error
 )
 
-if not exist "node_modules\.bin\expo.cmd" (
-  echo.
-  echo [LOI] npm install xong nhung van khong tim thay Expo CLI:
-  echo       %MOBILE%\node_modules\.bin\expo.cmd
-  echo.
-  echo Thu chay thu cong:
-  echo   cd /d "%MOBILE%"
-  echo   npm install
-  pause
-  popd
-  endlocal
-  exit /b 1
-)
+if not exist "node_modules\.bin\expo.cmd" goto :dependency_error
+if not exist "node_modules\expo-image-picker\package.json" goto :dependency_error
 
 where adb >nul 2>&1
 if not errorlevel 1 (
@@ -66,6 +59,20 @@ if errorlevel 1 goto :expo_error
 popd
 endlocal
 exit /b 0
+
+:dependency_error
+echo.
+echo ==================================================
+echo [LOI] npm install xong nhung mobile dependency van chua day du.
+echo Thu chay thu cong:
+echo   cd /d "%MOBILE%"
+echo   npm install
+echo ==================================================
+echo.
+popd
+pause
+endlocal
+exit /b 1
 
 :expo_error
 set "EXPO_EXIT=%ERRORLEVEL%"

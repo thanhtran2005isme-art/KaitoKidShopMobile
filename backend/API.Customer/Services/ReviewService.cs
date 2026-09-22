@@ -20,43 +20,89 @@ public class ReviewService(CustomerDbContext db) : IReviewService
 
     public async Task<ReviewDTO> CreateAsync(int userId, string customerName, CreateReviewDTO dto)
     {
-        // Verified purchase: chỉ cho phép review nếu khách đã có đơn hàng completed chứa sản phẩm này
-        var hasPurchased = await db.Orders
-            .Where(o => o.UserId == userId && o.Status == "completed")
-            .Join(db.OrderItems, o => o.Id, i => i.OrderId, (o, i) => i)
-            .AnyAsync(i => i.ProductId == dto.ProductId);
+        if (dto.OrderId <= 0)
+            throw new InvalidOperationException("Đánh giá phải được tạo từ một đơn hàng đã hoàn tất.");
 
-        if (!hasPurchased)
-            throw new InvalidOperationException("Bạn chỉ có thể đánh giá sản phẩm sau khi đã mua và nhận hàng thành công.");
+        if (dto.Rating is < 1 or > 5)
+            throw new InvalidOperationException("Số sao đánh giá phải từ 1 đến 5.");
 
-        // Không cho review trùng cho cùng đơn hàng + sản phẩm
-        if (dto.OrderId > 0)
+        var comment = dto.Comment?.Trim() ?? string.Empty;
+        if (comment.Length < 3)
+            throw new InvalidOperationException("Vui lòng chia sẻ ít nhất 3 ký tự về trải nghiệm sản phẩm.");
+        if (comment.Length > 2000)
+            throw new InvalidOperationException("Nội dung đánh giá tối đa 2000 ký tự.");
+
+        var order = await db.Orders
+            .AsNoTracking()
+            .Include(o => o.Items)
+            .FirstOrDefaultAsync(o =>
+                o.Id == dto.OrderId &&
+                o.UserId == userId &&
+                o.Status == "completed");
+
+        if (order is null)
+            throw new InvalidOperationException("Đơn hàng không tồn tại, không thuộc tài khoản này hoặc chưa hoàn tất.");
+
+        var productItems = order.Items
+            .Where(i => i.ProductId == dto.ProductId)
+            .ToList();
+
+        if (productItems.Count == 0)
+            throw new InvalidOperationException("Sản phẩm này không thuộc đơn hàng đã chọn.");
+
+        OrderItem? purchasedItem = null;
+        var requestedSize = dto.Size?.Trim();
+        var requestedColor = dto.Color?.Trim();
+
+        if (!string.IsNullOrWhiteSpace(requestedSize) ||
+            !string.IsNullOrWhiteSpace(requestedColor))
         {
-            var dup = await db.Reviews.AnyAsync(r =>
-                r.UserId == userId && r.ProductId == dto.ProductId && r.OrderId == dto.OrderId);
-            if (dup)
-                throw new InvalidOperationException("Bạn đã đánh giá sản phẩm này trong đơn hàng này rồi.");
+            purchasedItem = productItems.FirstOrDefault(i =>
+                (string.IsNullOrWhiteSpace(requestedSize) || i.Size == requestedSize) &&
+                (string.IsNullOrWhiteSpace(requestedColor) || i.Color == requestedColor));
         }
+
+        purchasedItem ??= productItems.Count == 1 ? productItems[0] : null;
+
+        if (purchasedItem is null)
+            throw new InvalidOperationException("Không xác định được đúng biến thể đã mua để đánh giá.");
+
+        var duplicate = await db.Reviews.AnyAsync(r =>
+            r.UserId == userId &&
+            r.ProductId == dto.ProductId &&
+            r.OrderId == dto.OrderId &&
+            (string.IsNullOrEmpty(r.Size) || r.Size == purchasedItem.Size) &&
+            (string.IsNullOrEmpty(r.Color) || r.Color == purchasedItem.Color));
+
+        if (duplicate)
+            throw new InvalidOperationException("Bạn đã đánh giá biến thể sản phẩm này trong đơn hàng rồi.");
+
+        var images = (dto.Images ?? [])
+            .Where(url => !string.IsNullOrWhiteSpace(url))
+            .Select(url => url.Trim())
+            .Distinct()
+            .Take(4)
+            .ToList();
 
         var review = new Review
         {
             ProductId = dto.ProductId,
             UserId = userId,
-            CustomerName = customerName,
+            CustomerName = string.IsNullOrWhiteSpace(customerName) ? "Khách hàng" : customerName.Trim(),
             OrderId = dto.OrderId,
-            Rating = Math.Clamp(dto.Rating, 1, 5),
-            Comment = dto.Comment,
+            Rating = dto.Rating,
+            Comment = comment,
             Status = "pending",
-            Images = dto.Images is { Count: > 0 } ? JsonSerializer.Serialize(dto.Images) : null,
-            VideoUrl = dto.VideoUrl,
-            Size = dto.Size,
-            Color = dto.Color,
+            Images = images.Count > 0 ? JsonSerializer.Serialize(images) : null,
+            VideoUrl = string.IsNullOrWhiteSpace(dto.VideoUrl) ? null : dto.VideoUrl.Trim(),
+            Size = purchasedItem.Size,
+            Color = purchasedItem.Color,
         };
 
         db.Reviews.Add(review);
         await db.SaveChangesAsync();
 
-        // Cập nhật rating trung bình (chỉ tính review đã approved)
+        // Rating sản phẩm chỉ dựa trên review đã được duyệt.
         var avg = await db.Reviews
             .Where(r => r.ProductId == dto.ProductId && r.Status == "approved")
             .AverageAsync(r => (double?)r.Rating) ?? 0;

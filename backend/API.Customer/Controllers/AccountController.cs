@@ -2,6 +2,7 @@ using System.Security.Claims;
 using API.Customer.Data;
 using API.Customer.DTOs;
 using API.Customer.Models;
+using API.Customer.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -11,7 +12,10 @@ namespace API.Customer.Controllers;
 [ApiController]
 [Route("api/[controller]")]
 [Authorize]
-public class AccountController(CustomerDbContext db, IWebHostEnvironment env) : ControllerBase
+public class AccountController(
+    CustomerDbContext db,
+    IWebHostEnvironment env,
+    ICartService cartService) : ControllerBase
 {
     private int UserId => int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
 
@@ -99,10 +103,45 @@ public class AccountController(CustomerDbContext db, IWebHostEnvironment env) : 
         var user = await db.Users.FindAsync(UserId);
         if (user is null) return NotFound();
 
-        if (dto.Name is not null) user.Name = dto.Name;
-        if (dto.Phone is not null) user.Phone = dto.Phone;
-        if (dto.Avatar is not null) user.Avatar = dto.Avatar;
-        if (dto.Birthday is not null) user.Birthday = dto.Birthday;
+        if (dto.Name is not null)
+        {
+            var name = dto.Name.Trim();
+            if (name.Length < 2)
+                return BadRequest(new { message = "Họ tên phải có ít nhất 2 ký tự." });
+            user.Name = name;
+        }
+
+        if (dto.Phone is not null)
+        {
+            var phone = dto.Phone.Trim();
+            if (phone.Length == 0)
+            {
+                user.Phone = null;
+            }
+            else
+            {
+                var digits = new string(phone.Where(char.IsDigit).ToArray());
+                if (digits.Length is < 9 or > 12)
+                    return BadRequest(new { message = "Số điện thoại cần có từ 9 đến 12 chữ số." });
+                user.Phone = phone;
+            }
+        }
+
+        if (dto.Avatar is not null)
+        {
+            var avatar = dto.Avatar.Trim();
+            if (!string.IsNullOrEmpty(avatar) &&
+                !avatar.StartsWith("/uploads/avatars/", StringComparison.OrdinalIgnoreCase))
+                return BadRequest(new { message = "Ảnh đại diện phải được tải lên qua endpoint avatar." });
+            user.Avatar = string.IsNullOrEmpty(avatar) ? null : avatar;
+        }
+
+        if (dto.Birthday is not null)
+        {
+            if (dto.Birthday.Value.Date > DateTime.UtcNow.Date)
+                return BadRequest(new { message = "Ngày sinh không thể nằm trong tương lai." });
+            user.Birthday = dto.Birthday.Value.Date;
+        }
 
         await db.SaveChangesAsync();
         return await GetProfile();
@@ -195,10 +234,15 @@ public class AccountController(CustomerDbContext db, IWebHostEnvironment env) : 
         var user = await db.Users.FindAsync(UserId);
         if (user is null) return NotFound();
 
-        // Lấy mã coupon đã sinh từ redeem (PT{userId}-...) còn hạn
-        var prefix = $"PT{user.Id}-";
+        // Voucher cá nhân gồm đổi điểm (PT...) và sinh nhật (BD...).
+        var redeemPrefix = $"PT{user.Id}-";
+        var birthdayPrefix = $"BD{user.Id}-";
         var personalCoupons = await db.Coupons
-            .Where(c => c.Code.StartsWith(prefix) && c.IsActive && c.EndDate >= DateTime.UtcNow && c.UsedCount < c.UsageLimit)
+            .Where(c =>
+                (c.Code.StartsWith(redeemPrefix) || c.Code.StartsWith(birthdayPrefix)) &&
+                c.IsActive &&
+                c.EndDate >= DateTime.UtcNow &&
+                c.UsedCount < c.UsageLimit)
             .OrderByDescending(c => c.StartDate)
             .ToListAsync();
 
@@ -211,7 +255,9 @@ public class AccountController(CustomerDbContext db, IWebHostEnvironment env) : 
             startDate = c.StartDate,
             endDate = c.EndDate,
             isActive = c.IsActive,
-            description = $"Voucher cá nhân — giảm {c.Value:N0}đ cho đơn từ {c.MinOrderAmount:N0}đ",
+            description = c.Type == "percent"
+                ? $"Voucher sinh nhật — giảm {c.Value:N0}% cho đơn từ {c.MinOrderAmount:N0}đ"
+                : $"Voucher cá nhân — giảm {c.Value:N0}đ cho đơn từ {c.MinOrderAmount:N0}đ",
         }));
     }
 
@@ -317,20 +363,25 @@ public class AccountController(CustomerDbContext db, IWebHostEnvironment env) : 
             .ToListAsync();
         foreach (var c in coupons) c.IsActive = false;
 
-        // 4) Xóa wishlist + cart + address của user
+        // 4) Giải phóng reservation trước khi xóa Cart, rồi xóa dữ liệu cá nhân phụ.
+        // Không xóa thẳng CartItems vì sẽ làm kẹt SanPham/TonKhoBienThe.Reserved.
+        await cartService.ClearCartAsync(user.Id);
+
         var wishlist = await db.WishlistItems.Where(w => w.UserId == user.Id).ToListAsync();
         db.WishlistItems.RemoveRange(wishlist);
-        var cartItems = await db.CartItems.Where(c => c.UserId == user.Id).ToListAsync();
-        db.CartItems.RemoveRange(cartItems);
+
         var addresses = await db.Addresses.Where(a => a.UserId == user.Id).ToListAsync();
         db.Addresses.RemoveRange(addresses);
+
+        var notifications = await db.Notifications.Where(n => n.UserId == user.Id).ToListAsync();
+        db.Notifications.RemoveRange(notifications);
 
         // 5) Ẩn danh review (giữ rating/comment cho seller, đổi tên hiển thị)
         var reviews = await db.Reviews.Where(r => r.UserId == user.Id).ToListAsync();
         foreach (var r in reviews) r.CustomerName = "Người dùng ẩn danh";
 
         await db.SaveChangesAsync();
-        return Ok(new { message = "Đã hủy tài khoản. Mọi dữ liệu cá nhân đã được ẩn danh." });
+        return Ok(new { message = "Đã hủy tài khoản và xử lý dữ liệu cá nhân theo chính sách lưu trữ đơn hàng." });
     }
     private static (string nextTier, decimal threshold) ResolveNextTier(string current) => current switch
     {
