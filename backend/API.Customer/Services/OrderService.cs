@@ -360,11 +360,8 @@ public class OrderService(
 
         if (order is null) return false;
 
-        // Cho phép hủy khi đơn còn trong giai đoạn chờ xử lý hoặc shipper CHƯA lấy hàng.
-        // Một khi đã "picked" (shipper đã lấy hàng từ shop) thì không cho hủy nữa.
-        var canCancel = order.Status is "pending" or "confirmed"
-                        && order.ShippingStatus is null or "ready_to_pick" or "picking";
-        if (!canCancel) return false;
+        // Quyền hủy là rule server-side dùng chung cho command + DTO.
+        if (!CanCancelOrder(order)) return false;
 
         order.Status = "cancelled";
         order.ShippingStatus = "cancelled";
@@ -394,6 +391,10 @@ public class OrderService(
             coupon.UsedCount--;
     }
 
+    private static bool CanCancelOrder(Order order)
+        => (order.Status is "pending" or "confirmed")
+           && (order.ShippingStatus is null or "ready_to_pick" or "picking");
+
     private static OrderDTO MapToDTO(Order o) => MapToDTO(o, null);
 
     private static OrderDTO MapToDTO(Order o, HashSet<string>? reviewedKeys) => new()
@@ -411,6 +412,7 @@ public class OrderService(
         CouponCode = o.CouponCode,
         PaymentMethod = o.PaymentMethod,
         Status = o.Status,
+        CanCancel = CanCancelOrder(o),
         Note = o.Note,
         CreatedAt = o.CreatedAt,
         TrackingCode = o.TrackingCode,

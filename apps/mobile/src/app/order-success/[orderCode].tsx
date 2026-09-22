@@ -106,7 +106,7 @@ export default function OrderSuccessScreen() {
               Mã đơn đã được lưu trên hệ thống
             </Text>
             <Text style={styles.infoText}>
-              Chi tiết đơn hàng đầy đủ sẽ nằm trong khu vực Đơn hàng ở PHASE 7.
+              Bạn có thể mở khu vực Đơn hàng để xem chi tiết, trạng thái và hành trình vận chuyển.
             </Text>
           </View>
         )}
@@ -129,21 +129,41 @@ export default function OrderSuccessScreen() {
           <View style={styles.nextItem}>
             <Text style={styles.nextNumber}>3</Text>
             <Text style={styles.nextText}>
-              Theo dõi lịch sử và trạng thái vận chuyển sẽ được hoàn thiện ở
-              PHASE 7.
+              Theo dõi lịch sử xử lý và vận chuyển trong mục Đơn hàng của tôi.
             </Text>
           </View>
         </View>
 
         <View style={styles.actions}>
           <Pressable
-            accessibilityLabel="Tiếp tục mua sắm"
-            onPress={continueShopping}
+            accessibilityLabel="Xem đơn hàng vừa đặt"
+            onPress={() => {
+              const id = order?.id;
+              resetCheckout();
+              if (id) {
+                router.replace({
+                  pathname: '/orders/[id]',
+                  params: { id: String(id) },
+                });
+              } else {
+                router.replace('/orders');
+              }
+            }}
             style={({ pressed }) => [
               styles.primaryButton,
               pressed && styles.pressed,
             ]}>
-            <Text style={styles.primaryButtonText}>Tiếp tục mua sắm</Text>
+            <Text style={styles.primaryButtonText}>Xem đơn hàng</Text>
+          </Pressable>
+
+          <Pressable
+            accessibilityLabel="Tiếp tục mua sắm"
+            onPress={continueShopping}
+            style={({ pressed }) => [
+              styles.secondaryButton,
+              pressed && styles.pressed,
+            ]}>
+            <Text style={styles.secondaryButtonText}>Tiếp tục mua sắm</Text>
           </Pressable>
 
           <Pressable

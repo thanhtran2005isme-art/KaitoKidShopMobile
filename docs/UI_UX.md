@@ -94,6 +94,26 @@ Quy tắc kỹ thuật/UX đã chốt:
 - Order Success nhấn mạnh order code và next action;
 - Web không gửi `CartItemIds` vẫn giữ all-cart checkout để backward-compatible.
 
+## PHASE 7 Orders + Tracking design system
+
+Orders/Tracking là khu vực quản lý sau mua, ưu tiên khả năng quét nhanh trạng thái và hành động an toàn.
+
+Quy tắc:
+
+- Orders list dùng `FlatList` với key ổn định, pull-to-refresh, loading/error/empty state;
+- filter bắt buộc: Tất cả / Chờ xử lý / Đang giao / Hoàn tất / Đã hủy;
+- `pending + confirmed` cùng nằm trong filter “Chờ xử lý” để không làm mất đơn đã xác nhận;
+- status mapper tập trung ở một utility; badge luôn có **text + semantic color**, không dùng màu đơn độc;
+- card đơn hàng ưu tiên order code, ngày, item preview, total và status;
+- Order Detail dùng backend `canCancel`; Mobile không tự suy quyền hủy;
+- action hủy luôn có confirmation dialog và loading state;
+- Reorder phải báo số item added/skipped, refresh cart badge rồi đưa user tới Cart để kiểm tra variant/tồn kho;
+- Tracking timeline chỉ render event backend trả về; không tự chèn event “đã giao/đang giao” nếu API chưa ghi nhận;
+- ETA chỉ được tính từ `createdAt + leadTimeHours` và phải trình bày là dự kiến;
+- Tracking API là owner-only; UI lỗi 404/401 không được suy đoán nội dung đơn khác;
+- không dùng animation trang trí; motion chỉ dành cho loading/feedback cần thiết;
+- mỗi màn chỉ có một primary action rõ ràng khi có thể.
+
 ## Source of truth
 
 - Brand/data language: `docs/BRAND.md`

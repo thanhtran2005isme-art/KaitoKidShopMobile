@@ -28,6 +28,9 @@ export default function RootLayout() {
               <Stack.Screen name="checkout/address" />
               <Stack.Screen name="checkout/payment" />
               <Stack.Screen name="order-success/[orderCode]" />
+              <Stack.Screen name="orders/index" />
+              <Stack.Screen name="orders/[id]" />
+              <Stack.Screen name="orders/[id]/tracking" />
             </Stack>
             <AnimatedSplashOverlay />
           </ThemeProvider>

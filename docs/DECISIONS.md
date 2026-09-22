@@ -186,3 +186,14 @@ This file records durable decisions and their rationale. It is not a chronologic
 - tài khoản/QR chuyển khoản do backend/store setting trả; Mobile không hard-code gateway hoặc tài khoản.
 
 **Hệ quả:** Item không chọn vẫn còn nguyên trong Cart và tiếp tục giữ reservation. Web checkout gửi thêm structured address để dùng cùng contract shipping an toàn.
+
+
+## D016 — Order tracking phải owner-only và quyền hủy do backend quyết định
+
+**Ngày:** 2026-09-22
+
+**Quyết định:** `GET /api/shipping/track/{orderCode}` phải yêu cầu JWT và chỉ trả tracking khi `Order.UserId` khớp user hiện tại. `OrderDTO` trả `CanCancel` được tính từ cùng rule server-side mà `CancelOrderAsync` sử dụng.
+
+**Lý do:** Order code không phải secret đủ mạnh để dùng làm authorization. Nếu tracking public theo orderCode thì người biết/đoán mã có thể xem lịch sử đơn khác. Đồng thời nếu Mobile tự suy quyền hủy từ status, rule frontend có thể lệch backend.
+
+**Hệ quả:** Mobile luôn gửi Bearer token khi gọi tracking, chỉ render nút hủy khi `canCancel=true`, và vẫn xử lý backend reject như source of truth cuối cùng. Web `shippingApi.track` tiếp tục tương thích vì customer `apiClient` đã tự gắn JWT.

@@ -1,6 +1,8 @@
 using API.Customer.Data;
 using API.Customer.DTOs;
+using System.Security.Claims;
 using API.Customer.Services.Shipping;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -12,6 +14,8 @@ public class ShippingController(
     IShippingService shipping,
     CustomerDbContext db) : ControllerBase
 {
+    private int UserId => int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+
     /// <summary>Danh sách nhà vận chuyển đang bật trong hệ thống</summary>
     [HttpGet("providers")]
     public async Task<ActionResult<List<ShippingProviderDTO>>> GetProviders()
@@ -22,13 +26,14 @@ public class ShippingController(
     public async Task<ActionResult<ShippingQuoteResponseDTO>> Quote([FromBody] ShippingQuoteRequestDTO req)
         => Ok(await shipping.QuoteAsync(req));
 
-    /// <summary>Tracking đơn hàng theo orderCode (public)</summary>
+    /// <summary>Tracking đơn hàng theo orderCode — chỉ chính chủ đơn hàng.</summary>
     [HttpGet("track/{orderCode}")]
+    [Authorize]
     public async Task<ActionResult<ShippingTrackingDTO>> Track(string orderCode)
     {
         var order = await db.Orders
             .Include(o => o.ShippingHistories)
-            .FirstOrDefaultAsync(o => o.OrderCode == orderCode);
+            .FirstOrDefaultAsync(o => o.OrderCode == orderCode && o.UserId == UserId);
 
         if (order is null) return NotFound(new { message = "Không tìm thấy đơn hàng" });
 
