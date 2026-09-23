@@ -14,7 +14,7 @@ Roadmap này là thứ tự triển khai chính. Không nhảy phase khi phần 
 - [x] PHASE 6 — Checkout + Address + Shipping + Payment
 - [x] PHASE 7 — Orders + Tracking
 - [x] PHASE 8 — Reviews + Notifications + Account
-- [ ] PHASE 9 — Collections + Lookbook + Recommendation
+- [x] PHASE 9 — Collections + Lookbook + Recommendation
 - [ ] PHASE 10 — Polish UI + performance + testing
 
 ## PHASE 1 — Chốt branding + dữ liệu
@@ -214,7 +214,7 @@ Orders/Tracking dùng durable design system trong `docs/UI_UX.md` + skill `ui-ux
 
 Đã static-review TypeScript/C# và thêm regression tests cho server-authoritative `canCancel`, tracking ownership và reorder ownership. Môi trường connector không chạy được `dotnet test`/Expo runtime nên cần xác nhận trên máy development sau khi pull.
 
-**Tiếp theo:** PHASE 9 — Collections + Lookbook + Recommendation.
+**Tiếp theo:** PHASE 8 — Reviews + Notifications + Account.
 
 ## PHASE 8 — Reviews + Notifications + Account
 
@@ -247,6 +247,35 @@ PHASE 8 dùng design system trong `docs/UI_UX.md` + Codex `ui-ux-pro-max`: accou
 Đã static-review contract TypeScript/C#, Expo SDK 57 Image Picker types/config, ownership boundaries và reservation invariant. Đã thêm regression tests cho review owner/order/variant, variant-specific HasReviewed, notification ownership và delete-account release reservation. Connector chưa chạy được `dotnet test`/Expo runtime nên cần xác nhận trên máy development sau khi pull.
 
 **Tiếp theo:** PHASE 9 — Collections + Lookbook + Recommendation.
+
+
+## PHASE 9 — Collections + Lookbook + Recommendation
+
+Đã triển khai ở mức code ngày 2026-09-24:
+
+- thêm Mobile routes `/collections`, `/collections/[id]`, `/lookbooks`, `/lookbooks/[id]`;
+- Collection list/detail dùng metadata backend, ProductCard hiện có và sorting;
+- thêm `ProductFilterDTO.CollectionId` để `GET /api/products` lọc sản phẩm Collection ngay trên server; Mobile không tải toàn bộ catalog rồi filter client;
+- Lookbook list dùng `GET /api/lookbooks/filters` + season/style filter thật;
+- Lookbook Detail đặt hotspot từ `ToaDoX/ToaDoY` theo phần trăm 0–100 và tính lại theo kích thước ảnh render, giữ touch target 44px trên Android/Expo Web;
+- hotspot mở mini product card và điều hướng đúng Product Detail;
+- thêm `GET /api/recommendations/for-me?limit=` với optional authenticated signal;
+- user có Wishlist/completed Order được gợi ý rule-based theo category, ưu tiên best seller/sold/rating/new và loại sản phẩm đã mua khỏi candidate;
+- guest hoặc user chưa có signal nhận fallback Best Sellers + New Arrivals/general active; Mobile hiển thị “Khám phá thêm”, không gọi là personalized;
+- Home thêm `Bộ sưu tập nổi bật`, `Shop the look` và recommendation; section tự ẩn nếu không có data;
+- thêm migration idempotent `backend/Database/migrations/20260924_phase9_discovery_seed.sql` để bổ sung Season/Style và hotspot mẫu cho 2 Lookbook seed hiện có; fresh schema được cập nhật tương ứng;
+- thêm regression tests cho Collection filter server-side và recommendation personalized/fallback;
+- không thêm bảng database mới.
+
+### UI workflow
+
+PHASE 9 dùng `docs/UI_UX.md` + Codex `ui-ux-pro-max`: discovery card rõ hierarchy, `expo-image`, `Pressable`, touch target ≥44px, responsive max-width cho Expo Web, FlatList cho list/grid, loading/error/empty và hotspot tính theo layout thực tế.
+
+### Validation
+
+Đã static-review contract C#/TypeScript, percent hotspot, auth/fallback semantics và seed migration. Connector không có runtime local để chạy `dotnet test`/Expo; cần chạy migration + xác nhận Android/Expo Web trên máy development sau khi pull.
+
+**Tiếp theo:** PHASE 10 — Polish UI + performance + testing.
 
 ## PHASE 6 → PHASE 10
 

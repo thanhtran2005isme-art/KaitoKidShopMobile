@@ -58,6 +58,7 @@ public class ProductVariantInventoryDTO
 
 public class ProductFilterDTO
 {
+    public int? CollectionId { get; set; }
     public string? Category { get; set; }
     public string? Gender { get; set; }
     public string? Search { get; set; }

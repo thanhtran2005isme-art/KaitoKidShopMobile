@@ -1,6 +1,6 @@
 # AI Handoff — Current State
 
-Last updated: 2026-09-22
+Last updated: 2026-09-24
 
 This file is intentionally concise. It describes the current state needed to continue work quickly. Historical detail belongs in `docs/history/`, and exact code history belongs in Git.
 
@@ -12,7 +12,7 @@ This file is intentionally concise. It describes the current state needed to con
 - Brand: **KaitoKid = thời trang trẻ em 0–12 tuổi**
 - Brand rules: `docs/BRAND.md`
 - UI/UX durable rules: `docs/UI_UX.md`; source skill: `skill/.codex/skills/ui-ux-pro-max/SKILL.md`
-- Current roadmap: PHASE 1–8 hoàn tất, tiếp theo PHASE 9 — Collections + Lookbook + Recommendation
+- Current roadmap: PHASE 1–9 hoàn tất ở mức code, tiếp theo PHASE 10 — Polish UI + performance + testing
 - PHASE 5–10 đã có acceptance criteria, API dependencies, UI/state scope và ranh giới chi tiết trong `docs/PHASES_5_10.md`.
 - Roadmap source: `docs/ROADMAP.md`
 - Detailed remaining PHASE 5–10 spec: `docs/PHASES_5_10.md`
@@ -74,6 +74,7 @@ KaitoKidShop/
 - Dữ liệu seed đã chuẩn hóa sang trẻ em.
 - Database local hiện tại cần chạy `backend/Database/migrations/20260922_phase1_kids_branding.sql` sau khi pull PHASE 1.
 - PHASE 4 thêm migration idempotent `backend/Database/migrations/20260922_phase4_cart_reservation.sql` để bảo đảm các cột reservation của giỏ hàng tồn tại.
+- PHASE 9 thêm migration idempotent `backend/Database/migrations/20260924_phase9_discovery_seed.sql` để bổ sung Season/Style + hotspot mẫu cho Lookbook; không thêm bảng mới.
 
 ## Local database credentials
 
@@ -133,6 +134,7 @@ As of 2026-09-22:
 - PHASE 6 đã hoàn thiện Checkout Mobile: partial checkout theo selected CartItemIds, Address CRUD/default, shipping quote backend, coupon + combo selected, COD, ATM/bank transfer, payment polling/cancel và order success.
 - PHASE 7 đã hoàn thiện Orders + Tracking Mobile: list/filter, order detail, server-authoritative cancel, owner-only tracking timeline, reorder + cart refresh và Account entry.
 - PHASE 8 đã hoàn thiện Reviews + Notifications + Account Mobile: review từ completed order/variant hợp lệ, ảnh review, Helpful/verified/admin reply, notification unread/pagination/read/delete, profile/avatar, loyalty points/redeem/voucher/birthday và delete-account an toàn reservation.
+- PHASE 9 đã hoàn thiện code Collections + Lookbook + Recommendation: Collection query server-side qua `ProductFilterDTO.CollectionId`, Mobile list/detail + sorting, Lookbook filter/detail với hotspot phần trăm responsive, recommendation rule-based theo Wishlist/Order và fallback guest, cùng các section discovery trên Home.
 - Có màn `/wishlist`; ProductCard/Product Detail đều toggle wishlist qua API.Customer.
 - Product Detail gửi Add to Cart đúng size/màu/số lượng; cart badge Home/tab cập nhật ngay sau khi thêm.
 - API Product Detail trả `variantInventory` từ `TonKhoBienThe` nếu có; nếu chưa có dữ liệu biến thể thì mobile fallback về tồn kho khả dụng cấp sản phẩm.
@@ -141,6 +143,7 @@ As of 2026-09-22:
 - Expo Web renders the mobile app successfully at `127.0.0.1:8081`.
 - API.Customer serves shared media from `apps/web/public` so existing banner URLs such as `/slide_1.jpg` resolve on port 5265.
 - Seed product image paths under `/products/` currently have no source files in the repository; API.Customer returns a branded placeholder instead of 404 until real product media is added.
+- Seed Lookbook paths `/lookbook/school-1.jpg` và `/lookbook/weekend-1.jpg` cũng chưa có file media; PHASE 9 thêm branded fallback ở API.Customer để không trả 404 cho discovery trong lúc chờ media thật.
 
 ## Known non-blocking item
 
@@ -148,7 +151,8 @@ As of 2026-09-22:
 - PHASE 6 có regression tests cho partial checkout + Web legacy fallback, nhưng chưa chạy được `dotnet test`/Expo runtime trong connector; cần xác nhận trên máy development.
 - PHASE 7 có regression tests cho `canCancel`, tracking ownership và reorder ownership; chưa chạy được `dotnet test`/Expo runtime trong connector.
 - PHASE 8 có regression tests cho review ownership/variant, HasReviewed theo biến thể, notification ownership và delete-account release reservation; chưa chạy được `dotnet test`/Expo runtime trong connector.
-- Wishlist/Add-to-cart, Cart, Checkout, Orders/Tracking và Reviews/Notifications/Account đã được nối qua PHASE 4–8. Collections/Lookbook/Recommendation thuộc PHASE 9.
+- PHASE 9 có regression tests cho Collection filter server-side và recommendation personalized/fallback; connector chưa chạy được `dotnet test`/Expo runtime nên cần xác nhận trên máy development sau khi pull.
+- Wishlist/Add-to-cart, Cart, Checkout, Orders/Tracking, Reviews/Notifications/Account và Discovery PHASE 9 đã được nối ở mức code. PHASE 10 còn polish/performance/test matrix toàn hệ thống.
 - Seed hiện chưa có ảnh phụ hoặc `TonKhoBienThe` mẫu; Add to Cart dùng product-level reservation fallback qua `SanPham.SoLuongDaGiu`.
 - Sau khi pull PHASE 4 cần chạy migration reservation và restart API.Customer trước khi test Add to Cart.
 - A NuGet warning about a known vulnerability in `Microsoft.OpenApi 2.0.0` has been observed during API.Auth build. It did not block startup, but dependency remediation should be handled separately rather than mixed into unrelated changes.
@@ -159,7 +163,7 @@ As of 2026-09-22:
 2. Read this file.
 3. Read `docs/BRAND.md`.
 4. Read `docs/ROADMAP.md`.
-5. Read `docs/PHASES_5_10.md` trước khi làm bất kỳ PHASE 5–10 nào.
+5. Read `docs/PHASES_5_10.md` trước khi làm PHASE 10 hoặc sửa các flow PHASE 5–9.
 6. Read `docs/ARCHITECTURE.md`.
 7. Read task-relevant decisions/troubleshooting.
 8. Nếu task có thay đổi UI/UX, đọc `docs/UI_UX.md` + `skill/.codex/skills/ui-ux-pro-max/SKILL.md` và generate design system trước khi code.
@@ -167,5 +171,6 @@ As of 2026-09-22:
 10. Check recent Git history/PRs when the reason for existing code matters.
 11. Khi tạo commit mới, viết commit message bằng tiếng Việt theo quy tắc trong `AGENTS.md`.
 12. Gom toàn bộ thay đổi của cùng một task/fix/PHASE vào một commit; không tạo chuỗi commit nhỏ theo từng file.
+13. Trước PHASE 10, xác nhận runtime PHASE 9 trên máy development: migration discovery, Collection list/detail, Lookbook filter/hotspot, recommendation guest/login và Home sections.
 
 For exact historical changes, use Git rather than relying on this file.

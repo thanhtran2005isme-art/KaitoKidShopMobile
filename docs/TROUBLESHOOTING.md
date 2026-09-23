@@ -189,3 +189,25 @@ Backend PHASE 4 kiểm tra lựa chọn với `DanhSachSize`, `DanhSachMau` và 
 - Nếu sản phẩm có variant inventory, cặp size + màu phải tồn tại thật.
 - Nếu chưa có variant inventory, backend dùng tồn khả dụng cấp sản phẩm nhưng vẫn validate size/màu đã khai báo.
 - Không gửi giá trị tự chế từ UI.
+
+
+## Lookbook PHASE 9 không có filter hoặc hotspot
+
+PHASE 9 bổ sung metadata `Season/Style` và hotspot mẫu cho dữ liệu Lookbook local hiện có.
+
+Sau khi pull PHASE 9 trên database đã tồn tại, chạy:
+
+```bat
+"C:\xampp\mysql\bin\mysql.exe" -u root kaitokid < backend\Database\migrations\20260924_phase9_discovery_seed.sql
+```
+
+Sau đó restart API.Customer.
+
+Migration tra Lookbook theo title và sản phẩm theo SKU, dùng `NOT EXISTS` khi thêm hotspot nên có thể chạy lại an toàn. Nếu Collection vẫn trống, kiểm tra `SanPham.BoSuuTapId`; PHASE 9 không filter Collection ở client mà dùng `GET /api/products?CollectionId=...`.
+
+
+## Ảnh Lookbook PHASE 9 trả 404
+
+Seed hiện dùng `/lookbook/school-1.jpg` và `/lookbook/weekend-1.jpg` nhưng repository chưa có hai file ảnh này.
+
+API.Customer PHASE 9 có fallback SVG branded cho `/lookbook/*`, tương tự product placeholder. Nếu vẫn thấy 404 sau khi pull, restart API.Customer để middleware/route mới có hiệu lực. Khi media thật được thêm vào static-file provider, file thật sẽ được phục vụ trước fallback.

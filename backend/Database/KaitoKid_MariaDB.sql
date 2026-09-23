@@ -1070,9 +1070,20 @@ INSERT INTO Banner (TieuDe, TieuDePhu, HinhAnh, LienKet, LoaiBanner, ViTri, ThuT
     ('Mặc Xinh Chơi Cả Ngày',  'Outfit mới cho mọi cuộc phiêu lưu', '/slide_2.jpg', '/categories/quan-be',        'slider', 'homepage', 2),
     ('Ưu Đãi Cho Bé',          'Deal nổi bật cho tủ đồ mới',        '/slide_3.jpg', '/categories/vay-be-gai',     'slider', 'homepage', 3);
 
-INSERT INTO Lookbook (TieuDe, TieuDePhu, MoTa, HinhAnh, LienKet, ThuTu) VALUES
-    ('Ngày Đến Trường',     'Back to School', 'Gợi ý outfit gọn gàng, thoải mái cho bé đi học',             '/lookbook/school-1.jpg', '/categories/ao-be', 1),
-    ('Cuối Tuần Phiêu Lưu', 'Weekend Fun',    'Phối đồ năng động để bé tự do vui chơi cùng gia đình',       '/lookbook/weekend-1.jpg', '/categories/quan-be', 2);
+INSERT INTO Lookbook (TieuDe, TieuDePhu, MoTa, HinhAnh, LienKet, Season, Style, ThuTu) VALUES
+    ('Ngày Đến Trường',     'Back to School', 'Gợi ý outfit gọn gàng, thoải mái cho bé đi học',       '/lookbook/school-1.jpg',  '/categories/ao-be',  'Tựu trường', 'Gọn gàng', 1),
+    ('Cuối Tuần Phiêu Lưu', 'Weekend Fun',    'Phối đồ năng động để bé tự do vui chơi cùng gia đình', '/lookbook/weekend-1.jpg', '/categories/quan-be', 'Cuối tuần',   'Năng động', 2);
+
+INSERT INTO LookbookHotspot (LookbookId, SanPhamId, ToaDoX, ToaDoY, GhiChu, ThuTu)
+SELECT l.Id, p.Id, x.ToaDoX, x.ToaDoY, x.GhiChu, x.ThuTu
+FROM (
+    SELECT 'Ngày Đến Trường' AS LookbookTitle, 'KK-SM-001' AS Sku, 38.00 AS ToaDoX, 28.00 AS ToaDoY, 'Áo sơ mi mềm cho outfit đi học' AS GhiChu, 1 AS ThuTu
+    UNION ALL SELECT 'Ngày Đến Trường', 'KK-QK-001', 52.00, 68.00, 'Quần kaki gọn gàng, dễ vận động', 2
+    UNION ALL SELECT 'Cuối Tuần Phiêu Lưu', 'KK-AK-001', 42.00, 30.00, 'Hoodie ấm nhẹ cho chuyến đi cuối tuần', 1
+    UNION ALL SELECT 'Cuối Tuần Phiêu Lưu', 'KK-QJ-002', 55.00, 70.00, 'Quần jean co giãn để bé thoải mái chạy nhảy', 2
+) x
+JOIN Lookbook l ON l.TieuDe = x.LookbookTitle
+JOIN SanPham p ON p.MaSanPham = x.Sku;
 
 INSERT INTO MenuDieuHuong (TenMenu, LienKet, ViTri, ThuTu) VALUES
     ('Bé gái',       '/categories/vay-be-gai',  'header', 1),

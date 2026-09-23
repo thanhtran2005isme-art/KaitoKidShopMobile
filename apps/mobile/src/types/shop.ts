@@ -107,6 +107,53 @@ export type HomepageBlock = {
 
 export type HomepageBlocks = Record<string, HomepageBlock[]>;
 
+export type Collection = {
+  id: number;
+  name: string;
+  slug?: string | null;
+  description?: string | null;
+  image?: string | null;
+  sortOrder: number;
+};
+
+export type LookbookHotspot = {
+  id: number;
+  productId: number;
+  productName: string;
+  productImage?: string | null;
+  productPrice: number;
+  productOldPrice?: number | null;
+  x: number;
+  y: number;
+  note?: string | null;
+  sortOrder: number;
+};
+
+export type Lookbook = {
+  id: number;
+  title: string;
+  subtitle?: string | null;
+  description?: string | null;
+  image: string;
+  link?: string | null;
+  videoUrl?: string | null;
+  season?: string | null;
+  style?: string | null;
+  sortOrder: number;
+  hotspots: LookbookHotspot[];
+};
+
+export type LookbookFilters = {
+  seasons: string[];
+  styles: string[];
+};
+
+export type RecommendationResult = {
+  isPersonalized: boolean;
+  source: 'wishlist-orders' | 'fallback' | string;
+  items: Product[];
+};
+
 export type PagedResult<T> = {
   items: T[];
   totalCount: number;
@@ -121,5 +168,9 @@ export type HomeData = {
   newArrivals: Product[];
   bestSellers: Product[];
   saleProducts: Product[];
+  featuredCollections: Collection[];
+  featuredLookbooks: Lookbook[];
+  recommendations: Product[];
+  recommendationPersonalized: boolean;
   blocks: HomepageBlocks;
 };

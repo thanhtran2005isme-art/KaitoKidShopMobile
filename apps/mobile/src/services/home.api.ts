@@ -1,4 +1,5 @@
 import { apiRequest } from '@/services/api-client';
+import { discoveryApi } from '@/services/discovery.api';
 import type {
   Banner,
   Category,
@@ -39,19 +40,46 @@ function heroBlockToBanner(block: HomepageBlock): Banner {
 }
 
 export const shopApi = {
-  async getHome(): Promise<HomeData> {
+  async getHome(token?: string | null): Promise<HomeData> {
     // Home là màn hình đầu tiên nên không để một endpoint phụ lỗi làm trắng toàn bộ trang.
     // Mỗi nhóm dữ liệu có fallback riêng; chỉ báo lỗi nếu toàn bộ request đều thất bại.
-    const [bannersResult, categoriesResult, newResult, bestResult, saleResult, blocksResult] = await Promise.all([
+    const [
+      bannersResult,
+      categoriesResult,
+      newResult,
+      bestResult,
+      saleResult,
+      blocksResult,
+      collectionsResult,
+      lookbooksResult,
+      recommendationsResult,
+    ] = await Promise.all([
       safely(apiRequest<Banner[]>('/api/banners?position=homepage'), []),
       safely(apiRequest<Category[]>('/api/categories'), []),
       safely(apiRequest<Product[]>('/api/products/new-arrivals?count=8'), []),
       safely(apiRequest<Product[]>('/api/products/best-sellers?count=8'), []),
       safely(apiRequest<Product[]>('/api/products/sale?count=8'), []),
       safely(apiRequest<HomepageBlocks>('/api/homepage-blocks'), {}),
+      safely(discoveryApi.getCollections(), []),
+      safely(discoveryApi.getLookbooks(), []),
+      safely(discoveryApi.getRecommendations(token, 8), {
+        isPersonalized: false,
+        source: 'fallback',
+        items: [],
+      }),
     ]);
 
-    const results = [bannersResult, categoriesResult, newResult, bestResult, saleResult, blocksResult];
+    const results = [
+      bannersResult,
+      categoriesResult,
+      newResult,
+      bestResult,
+      saleResult,
+      blocksResult,
+      collectionsResult,
+      lookbooksResult,
+      recommendationsResult,
+    ];
     const failed = results.filter((result) => result.error !== null);
 
     if (failed.length === results.length) {
@@ -70,6 +98,10 @@ export const shopApi = {
       newArrivals: newResult.value,
       bestSellers: bestResult.value,
       saleProducts: saleResult.value,
+      featuredCollections: collectionsResult.value.slice(0, 4),
+      featuredLookbooks: lookbooksResult.value.slice(0, 4),
+      recommendations: recommendationsResult.value.items,
+      recommendationPersonalized: recommendationsResult.value.isPersonalized,
       blocks,
     };
   },

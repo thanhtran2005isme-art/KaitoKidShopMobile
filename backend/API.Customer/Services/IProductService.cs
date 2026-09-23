@@ -11,4 +11,5 @@ public interface IProductService
     Task<List<ProductDTO>> GetBestSellersAsync(int count = 8);
     Task<List<ProductDTO>> GetSaleProductsAsync(int count = 8);
     Task<List<ProductDTO>> GetRelatedAsync(int productId, int count = 4);
+    Task<RecommendationDTO> GetRecommendationsAsync(int? userId, int limit = 12);
 }

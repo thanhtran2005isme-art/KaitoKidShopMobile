@@ -36,6 +36,10 @@ export default function RootLayout() {
               <Stack.Screen name="orders/[id]/tracking" />
               <Stack.Screen name="review/create" />
               <Stack.Screen name="notifications" />
+              <Stack.Screen name="collections/index" />
+              <Stack.Screen name="collections/[id]" />
+              <Stack.Screen name="lookbooks/index" />
+              <Stack.Screen name="lookbooks/[id]" />
               <Stack.Screen name="account/profile" />
               <Stack.Screen name="account/points" />
               <Stack.Screen name="account/vouchers" />
