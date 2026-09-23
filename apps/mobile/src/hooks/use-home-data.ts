@@ -3,7 +3,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { shopApi } from '@/services/home.api';
 import type { HomeData } from '@/types/shop';
 
-export function useHomeData() {
+export function useHomeData(token?: string | null) {
   const [data, setData] = useState<HomeData | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -15,14 +15,14 @@ export function useHomeData() {
     setError(null);
 
     try {
-      setData(await shopApi.getHome());
+      setData(await shopApi.getHome(token));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Không thể tải dữ liệu trang chủ.');
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [token]);
 
   useEffect(() => {
     void load();

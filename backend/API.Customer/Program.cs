@@ -182,6 +182,29 @@ app.MapGet("/products/{**imagePath}", () =>
         "image/svg+xml",
         Encoding.UTF8));
 
+
+// Lookbook seed media is not committed yet. Keep PHASE 9 discovery usable without noisy 404s
+// until real lookbook media is provided by the content/admin pipeline.
+app.MapGet("/lookbook/{**imagePath}", () =>
+    Results.Text(
+        """
+        <svg xmlns="http://www.w3.org/2000/svg" width="900" height="1125" viewBox="0 0 900 1125">
+          <defs>
+            <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stop-color="#5B21B6"/>
+              <stop offset="100%" stop-color="#F97316"/>
+            </linearGradient>
+          </defs>
+          <rect width="900" height="1125" fill="url(#bg)"/>
+          <circle cx="450" cy="430" r="165" fill="rgba(255,255,255,0.16)"/>
+          <text x="450" y="420" text-anchor="middle" font-family="Arial, sans-serif" font-size="86" font-weight="800" fill="#ffffff">KaitoKid</text>
+          <text x="450" y="500" text-anchor="middle" font-family="Arial, sans-serif" font-size="34" fill="#f5f3ff">SHOP THE LOOK</text>
+          <text x="450" y="790" text-anchor="middle" font-family="Arial, sans-serif" font-size="30" fill="#ffffff">Ảnh lookbook đang cập nhật</text>
+        </svg>
+        """,
+        "image/svg+xml",
+        Encoding.UTF8));
+
 app.MapHub<API.Customer.Hubs.ChatHub>("/hubs/chat");
 
 // Banner an toàn ở console khi khởi động

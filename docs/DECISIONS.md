@@ -219,3 +219,24 @@ This file records durable decisions and their rationale. It is not a chronologic
 **Lý do:** Xóa Cart trực tiếp làm tồn kho bị giữ ảo sau khi user hủy tài khoản, vi phạm invariant D012.
 
 **Hệ quả:** Delete-account tiếp tục giữ order history theo contract hiện có, xóa notification/wishlist/address, anonymize review display name, vô hiệu voucher cá nhân và Mobile logout để Auth/Notifications/Shopping/Checkout protected state tự clear.
+
+
+## D019 — Discovery PHASE 9 dùng query server-side, hotspot phần trăm và recommendation rule-based
+
+**Ngày:** 2026-09-24
+
+**Quyết định:** Collection product query dùng `ProductFilterDTO.CollectionId` trên `GET /api/products`; Lookbook hotspot giữ tọa độ phần trăm `0..100`; Recommendation MVP dùng endpoint `GET /api/recommendations/for-me` với optional auth và rule-based signal từ Wishlist/completed Orders.
+
+**Lý do:** Collection cần paging/sort server-side thay vì tải toàn catalog xuống client. Hotspot phần trăm giữ vị trí tương đối trên nhiều kích thước màn hình. Recommendation rule-based đủ giải thích được cho MVP, tái sử dụng dữ liệu commerce hiện có và không cần đưa ML phức tạp vào PHASE 9.
+
+**Quy tắc:**
+
+- Mobile không filter Collection từ toàn bộ catalog.
+- Backend là source of truth cho candidate recommendation.
+- User có signal: ưu tiên category từ Wishlist/Order, sau đó best seller/new/general active; sản phẩm đã mua hoàn tất được loại khỏi candidate hiện tại.
+- Guest hoặc user không có signal nhận fallback và response phải có `IsPersonalized = false`.
+- UI guest không được gọi fallback là “cá nhân hóa” hoặc “AI”.
+- Hotspot Mobile phải chuyển `X/Y` phần trăm sang vị trí trên kích thước ảnh render và giữ touch target khoảng 44px.
+- Không tạo global Recommendation/Collection/Lookbook context nếu dữ liệu chỉ dùng ở Home/screen local.
+
+**Hệ quả:** PHASE 9 thêm `RecommendationDTO`, recommendation controller/service rule và `CollectionId` filter nhưng không thêm bảng database. Seed Lookbook local được bổ sung bằng migration idempotent riêng.

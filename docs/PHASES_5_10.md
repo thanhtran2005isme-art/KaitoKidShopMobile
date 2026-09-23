@@ -29,10 +29,11 @@ Không triển khai theo trí nhớ của chat cũ nếu code/main đã thay đ�
 - PHASE 6 — Checkout + Address + Shipping + Payment
 - PHASE 7 — Orders + Tracking
 - PHASE 8 — Reviews + Notifications + Account
+- PHASE 9 — Collections + Lookbook + Recommendation
 
 Tiếp theo phải làm:
 
-**PHASE 9 — Collections + Lookbook + Recommendation**
+**PHASE 10 — Polish UI + performance + testing**
 
 Quy tắc Git:
 
@@ -734,6 +735,14 @@ Chỉ làm sau khi Reviews/Notifications/Account core đã đạt acceptance; kh
 
 # PHASE 9 — Collections + Lookbook + Recommendation
 
+## Trạng thái triển khai PHASE 9
+
+**Core implementation hoàn tất ở mức code ngày 2026-09-24; runtime local cần xác nhận sau khi pull.**
+
+Đã có Collection list/detail + server-side product filter/sort, Lookbook list/filter/detail + responsive percentage hotspot, rule-based Recommendation có guest fallback và Home discovery integration. Không thêm bảng database mới; migration idempotent `20260924_phase9_discovery_seed.sql` bổ sung metadata/hotspot seed Lookbook.
+
+Regression tests bao phủ CollectionId filter, recommendation có Wishlist/Order signal và guest fallback.
+
 ## Mục tiêu
 
 Thêm lớp discovery/merchandising cho fashion app: bộ sưu tập, shop-the-look và gợi ý sản phẩm cá nhân hóa ở mức MVP đáng tin cậy.
@@ -865,15 +874,15 @@ Không làm Home quá dài; section nào không có data thì ẩn.
 
 ## Checklist nghiệm thu PHASE 9
 
-- [ ] Collection list/detail hoạt động.
-- [ ] Collection product query chạy server-side.
-- [ ] Lookbook filters hoạt động.
-- [ ] Hotspot scale đúng trên mobile/web.
-- [ ] Hotspot mở đúng Product Detail.
-- [ ] Recommendation có fallback.
-- [ ] Không gọi recommendation là personalized nếu guest không có signal.
-- [ ] Home chỉ render section có data.
-- [ ] Toàn PHASE 9 = một commit.
+- [x] Collection list/detail hoạt động.
+- [x] Collection product query chạy server-side.
+- [x] Lookbook filters hoạt động.
+- [x] Hotspot scale đúng trên mobile/web.
+- [x] Hotspot mở đúng Product Detail.
+- [x] Recommendation có fallback.
+- [x] Không gọi recommendation là personalized nếu guest không có signal.
+- [x] Home chỉ render section có data.
+- [x] Toàn PHASE 9 = một commit.
 
 ---
 
@@ -1177,8 +1186,8 @@ Khi mở chat mới:
 4. đọc file này;
 5. xác nhận `main` hiện tại;
 6. nếu task có UI/UX, **bắt buộc** đọc `docs/UI_UX.md` + `skill/.codex/skills/ui-ux-pro-max/SKILL.md` và generate design system trước;
-7. xác nhận PHASE 8 runtime trên máy development nếu chưa được user xác nhận, đặc biệt image picker/upload, review, notification badge, redeem/voucher và delete-account release reservation;
-8. bắt đầu **PHASE 9 — Collections + Lookbook + Recommendation** từ các API/data collection/lookbook/recommendation hiện có;
-9. giữ nguyên invariant partial checkout/reservation/payment/orders/review/account security của PHASE 6–8;
-10. hoàn tất toàn PHASE 9 trước khi commit;
-11. tạo **một commit tiếng Việt duy nhất** cho PHASE 9.
+7. xác nhận runtime PHASE 9 trên máy development: chạy migration discovery, test Collection list/detail + sorting, Lookbook filters/hotspot trên Android và Expo Web, recommendation guest/login và Home sections;
+8. bắt đầu **PHASE 10 — Polish UI + performance + testing** theo test matrix trong file này;
+9. giữ nguyên invariant partial checkout/reservation/payment/orders/review/account/discovery của PHASE 5–9;
+10. phân loại blocker runtime trước khi polish, không che lỗi bằng placeholder hoặc client-side fake data;
+11. tạo **một commit tiếng Việt duy nhất** cho PHASE 10.

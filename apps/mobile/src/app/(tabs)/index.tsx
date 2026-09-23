@@ -11,10 +11,12 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { CategoryStrip } from '@/components/home/category-strip';
+import { CollectionSection } from '@/components/home/collection-section';
 import { DiscoveryTiles } from '@/components/home/discovery-tiles';
 import { HeroCarousel } from '@/components/home/hero-carousel';
 import { HomeHeader } from '@/components/home/home-header';
 import { HomeSkeleton } from '@/components/home/home-skeleton';
+import { LookbookSection } from '@/components/home/lookbook-section';
 import { ProductSection } from '@/components/home/product-section';
 import { PromoStrip } from '@/components/home/promo-strip';
 import { BRAND, BRAND_COLORS } from '@/constants/brand';
@@ -24,9 +26,9 @@ import { useHomeData } from '@/hooks/use-home-data';
 import { resolveMediaUrl } from '@/services/api-client';
 
 export default function HomeScreen() {
-  const { user } = useAuth();
+  const { user, token } = useAuth();
   const { cartCount, refreshCartCount, refreshWishlist } = useShopping();
-  const { data, error, loading, refreshing, refresh, reload } = useHomeData();
+  const { data, error, loading, refreshing, refresh, reload } = useHomeData(token);
 
   const handleRefresh = useCallback(async () => {
     await Promise.all([refresh(), refreshCartCount(), refreshWishlist()]);
@@ -88,6 +90,8 @@ export default function HomeScreen() {
 
             <DiscoveryTiles items={data.blocks.categoryTile} />
 
+            <CollectionSection collections={data.featuredCollections} />
+
             <ProductSection
               badge="MỚI"
               badgeTone="primary"
@@ -96,12 +100,26 @@ export default function HomeScreen() {
               title="Hàng mới về"
             />
 
+            <LookbookSection lookbooks={data.featuredLookbooks} />
+
             <ProductSection
               badge="HOT"
               badgeTone="hot"
               products={data.bestSellers}
               subtitle="Những mẫu được phụ huynh yêu thích"
               title="Bán chạy"
+            />
+
+            <ProductSection
+              badge={data.recommendationPersonalized ? 'CHO BẠN' : 'KHÁM PHÁ'}
+              badgeTone="primary"
+              products={data.recommendations}
+              subtitle={
+                data.recommendationPersonalized
+                  ? 'Dựa trên sản phẩm bạn đã lưu và mua'
+                  : 'Sản phẩm nổi bật và mẫu mới từ KaitoKid'
+              }
+              title={data.recommendationPersonalized ? 'Gợi ý cho bạn' : 'Khám phá thêm'}
             />
 
             <ProductSection

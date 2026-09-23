@@ -135,6 +135,24 @@ Quy tắc:
 - action mới phải giữ vùng bấm khoảng 44px trở lên; icon overlay nhỏ phải tăng hitSlop;
 - PHASE 8 dùng `expo-image-picker` SDK 57 gallery-only; không xin camera/microphone và không làm video review vì flow video chưa cần cho core.
 
+## PHASE 9 Collections + Lookbook + Recommendation design system
+
+PHASE 9 dùng mô hình **discovery cards + immersive shop-the-look + explainable recommendations**, giữ KaitoKid là e-commerce trẻ em thực dụng thay vì biến Home thành feed quá dài.
+
+Quy tắc:
+
+- Collection/Lookbook list dùng card ảnh lớn, hierarchy title → mô tả/meta → action; không nhồi nhiều CTA trên một card.
+- Collection product grid tái sử dụng `ProductCard` + `ShoppingContext` để wishlist luôn đồng bộ; sorting là chip 44px và query lại backend.
+- List/grid dài dùng `FlatList`, stable key; Expo Web giới hạn `maxWidth` và thay số cột theo viewport.
+- Ảnh remote dùng `expo-image` + kích thước/aspect ratio rõ để tránh layout shift.
+- Lookbook hotspot lấy `X/Y` phần trăm `0..100`; vị trí pixel tính từ layout ảnh render, clamp để pin 44px không tràn khỏi ảnh.
+- Hotspot có số thứ tự + accessibilityLabel; tap hiển thị mini product card trước khi mở Product Detail để tránh điều hướng nhầm.
+- Season/style filters dùng selected state có text + màu; “Tất cả” luôn có đường quay về.
+- Recommendation personalized chỉ dùng copy “Gợi ý cho bạn” khi backend trả `isPersonalized=true`. Guest/fallback dùng copy trung tính như “Khám phá thêm”.
+- Home chỉ render Collection/Lookbook/Recommendation section khi có data; không để empty block làm Home dài.
+- Không thêm animation trang trí nặng; pressed/loading feedback đủ rõ.
+- Tất cả screen mới có loading/error/empty/retry thích hợp và touch target chính khoảng 44px.
+
 ## Source of truth
 
 - Brand/data language: `docs/BRAND.md`

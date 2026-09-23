@@ -203,3 +203,22 @@ PHASE 8 keeps post-purchase/account rules server-authoritative:
 - Notification read/delete endpoints remain owner-scoped. Mobile uses backend `link` only when it is an explicit internal path.
 - Account delete must call `CartService.ClearCartAsync` before removing Cart rows so product/variant reservations are released. Notifications, wishlist and addresses are removed; review display names are anonymized; order history remains per the existing backend retention contract.
 - Profile, points and vouchers are screen-local data. Only unread notification count is global because the Account tab badge needs cross-screen state.
+
+
+## Collections/Lookbook/Recommendation boundary
+
+PHASE 9 giữ discovery data ở API.Customer và không tạo global context mới:
+
+- Collection metadata vẫn do `/api/collections` quản lý; sản phẩm của Collection được query server-side qua `GET /api/products?CollectionId=...`, dùng chung paging/sort/ProductDTO.
+- Lookbook hotspot lưu `ToaDoX/ToaDoY` theo phần trăm `0..100`. Mobile chuyển phần trăm sang pixel dựa trên kích thước image stage thực tế và clamp touch target trong ảnh; không lưu pixel thiết bị.
+- `GET /api/recommendations/for-me` là endpoint optional-auth. Khi JWT có user signal, backend dùng category từ Wishlist + completed Orders; nếu không có signal thì trả fallback best seller/new/general active.
+- Recommendation response ghi rõ `IsPersonalized`; client không tự suy hoặc quảng bá guest fallback là cá nhân hóa.
+- Completed-purchase product IDs được loại khỏi candidate personalized trong implementation hiện tại.
+- Home tải Collections/Lookbooks/Recommendation theo cùng chiến lược resilient của dữ liệu Home khác: một endpoint discovery lỗi không được làm trắng toàn bộ Home.
+- Collection/Lookbook screens giữ state local; wishlist/cart tiếp tục dùng `ShoppingContext`.
+
+Seed Lookbook cho local development được bổ sung bằng migration idempotent:
+
+`backend/Database/migrations/20260924_phase9_discovery_seed.sql`
+
+Migration chỉ cập nhật metadata/hotspot seed, không tạo bảng mới.

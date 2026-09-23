@@ -12,6 +12,9 @@ public class ProductService(CustomerDbContext db) : IProductService
     {
         var query = db.Products.Where(p => p.Status == "active").AsQueryable();
 
+        if (filter.CollectionId.HasValue)
+            query = query.Where(p => p.CollectionId == filter.CollectionId.Value);
+
         if (!string.IsNullOrEmpty(filter.Category))
             query = query.Where(p => p.Category == filter.Category);
 
@@ -141,6 +144,121 @@ public class ProductService(CustomerDbContext db) : IProductService
             .Take(count)
             .Select(p => MapToDTO(p))
             .ToListAsync();
+    }
+
+
+    public async Task<RecommendationDTO> GetRecommendationsAsync(int? userId, int limit = 12)
+    {
+        limit = Math.Clamp(limit, 1, 24);
+
+        var signalCategories = new List<string>();
+        var purchasedProductIds = new List<int>();
+
+        if (userId.HasValue)
+        {
+            var wishlistCategories = await (
+                from wishlist in db.WishlistItems
+                join product in db.Products on wishlist.ProductId equals product.Id
+                where wishlist.UserId == userId.Value && product.Status == "active"
+                select product.Category)
+                .Distinct()
+                .ToListAsync();
+
+            purchasedProductIds = await (
+                from order in db.Orders
+                join item in db.OrderItems on order.Id equals item.OrderId
+                where order.UserId == userId.Value && order.Status == "completed"
+                select item.ProductId)
+                .Distinct()
+                .ToListAsync();
+
+            var orderCategories = new List<string>();
+            if (purchasedProductIds.Count > 0)
+            {
+                orderCategories = await db.Products
+                    .Where(p => purchasedProductIds.Contains(p.Id))
+                    .Select(p => p.Category)
+                    .Distinct()
+                    .ToListAsync();
+            }
+
+            signalCategories = wishlistCategories
+                .Concat(orderCategories)
+                .Where(category => !string.IsNullOrWhiteSpace(category))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+        }
+
+        var result = new List<ProductDTO>(limit);
+        var selectedIds = new HashSet<int>();
+
+        async Task AddCandidatesAsync(IQueryable<Product> query)
+        {
+            var remaining = limit - result.Count;
+            if (remaining <= 0) return;
+
+            if (selectedIds.Count > 0)
+            {
+                var excludedIds = selectedIds.ToList();
+                query = query.Where(p => !excludedIds.Contains(p.Id));
+            }
+
+            var products = await query.Take(remaining).ToListAsync();
+            foreach (var product in products)
+            {
+                if (!selectedIds.Add(product.Id)) continue;
+                result.Add(MapToDTO(product));
+            }
+        }
+
+        IQueryable<Product> AvailableProducts()
+        {
+            var query = db.Products.Where(p => p.Status == "active");
+            if (purchasedProductIds.Count > 0)
+                query = query.Where(p => !purchasedProductIds.Contains(p.Id));
+            return query;
+        }
+
+        var personalizedCount = 0;
+        if (signalCategories.Count > 0)
+        {
+            await AddCandidatesAsync(
+                AvailableProducts()
+                    .Where(p => signalCategories.Contains(p.Category))
+                    .OrderByDescending(p => p.IsBestSeller)
+                    .ThenByDescending(p => p.SoldCount)
+                    .ThenByDescending(p => p.Rating)
+                    .ThenByDescending(p => p.IsNew)
+                    .ThenByDescending(p => p.Id));
+            personalizedCount = result.Count;
+        }
+
+        await AddCandidatesAsync(
+            AvailableProducts()
+                .Where(p => p.IsBestSeller)
+                .OrderByDescending(p => p.SoldCount)
+                .ThenByDescending(p => p.Rating)
+                .ThenByDescending(p => p.Id));
+
+        await AddCandidatesAsync(
+            AvailableProducts()
+                .Where(p => p.IsNew)
+                .OrderByDescending(p => p.CreatedAt)
+                .ThenByDescending(p => p.Id));
+
+        await AddCandidatesAsync(
+            AvailableProducts()
+                .OrderByDescending(p => p.SoldCount)
+                .ThenByDescending(p => p.Rating)
+                .ThenByDescending(p => p.Id));
+
+        var isPersonalized = personalizedCount > 0;
+        return new RecommendationDTO
+        {
+            IsPersonalized = isPersonalized,
+            Source = isPersonalized ? "wishlist-orders" : "fallback",
+            Items = result
+        };
     }
 
     private static ProductDTO MapToDTO(Product p) => new()
