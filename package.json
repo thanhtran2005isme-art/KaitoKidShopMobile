@@ -8,6 +8,9 @@
     "mobile:lint": "npm --prefix apps/mobile run lint",
     "web": "npm --prefix apps/web run dev",
     "web:build": "npm --prefix apps/web run build",
-    "web:lint": "npm --prefix apps/web run lint"
+    "web:lint": "npm --prefix apps/web run lint",
+    "mobile:typecheck": "npm --prefix apps/mobile exec tsc -- --noEmit",
+    "backend:test": "dotnet test backend/KaitoKidShop.slnx",
+    "phase10:check": "npm run mobile:lint && npm run mobile:typecheck && npm run web:lint && npm run web:build && npm run backend:test"
   }
 }

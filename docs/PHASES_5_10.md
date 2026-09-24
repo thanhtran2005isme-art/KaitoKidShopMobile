@@ -892,6 +892,8 @@ Không làm Home quá dài; section nào không có data thì ẩn.
 
 Biến app từ “đủ chức năng” thành bản ổn định, nhất quán và sẵn sàng demo/release. Không thêm feature lớn mới ở phase này trừ bug blocking.
 
+**Brand guard:** Web Nam/Nữ/Trẻ em là đúng nghiệp vụ KaitoKid Shop Fashion. D020 supersede D009 kids-only; PHASE 10 không được xóa/đổi các khu vực Web này.
+
 ## 1. Design/UI consistency
 
 Rà toàn app:

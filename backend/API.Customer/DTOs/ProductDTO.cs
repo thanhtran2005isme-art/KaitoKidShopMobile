@@ -60,10 +60,16 @@ public class ProductFilterDTO
 {
     public int? CollectionId { get; set; }
     public string? Category { get; set; }
+    public string? Subcategory { get; set; }
     public string? Gender { get; set; }
+    public string? Style { get; set; }
+    public string? AgeGroup { get; set; }
     public string? Search { get; set; }
     public decimal? MinPrice { get; set; }
     public decimal? MaxPrice { get; set; }
+    public double? MinRating { get; set; }
+    public string? Sizes { get; set; }
+    public string? Colors { get; set; }
     public string? SortBy { get; set; } // price-asc, price-desc, newest, bestseller, rating
     public bool? IsNew { get; set; }
     public bool? IsSale { get; set; }

@@ -6,13 +6,15 @@ export function CartEmptyState({ onContinue }: { onContinue: () => void }) {
   return (
     <View style={styles.wrap}>
       <View style={styles.iconWrap}>
-        <Text style={styles.icon}>🛍️</Text>
+        <Text style={styles.icon}>K</Text>
       </View>
       <Text style={styles.title}>Giỏ hàng đang trống</Text>
       <Text style={styles.description}>
         Chọn những món mềm mại, thoải mái và phù hợp với bé để bắt đầu đơn hàng.
       </Text>
       <Pressable
+        accessibilityLabel="Khám phá sản phẩm"
+        accessibilityRole="button"
         onPress={onContinue}
         style={({ pressed }) => [
           styles.button,
@@ -40,7 +42,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  icon: { fontSize: 40 },
+  icon: { color: BRAND_COLORS.primary, fontSize: 34, fontWeight: '900' },
   title: {
     color: BRAND_COLORS.ink,
     fontSize: 22,

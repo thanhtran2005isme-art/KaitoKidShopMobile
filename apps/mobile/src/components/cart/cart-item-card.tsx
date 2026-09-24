@@ -38,6 +38,7 @@ export function CartItemCard({
         accessibilityRole="checkbox"
         accessibilityState={{ checked: selected, disabled: busy }}
         disabled={busy}
+        hitSlop={11}
         onPress={onToggle}
         style={[styles.checkbox, selected && styles.checkboxSelected]}>
         <Text style={styles.checkboxText}>{selected ? '✓' : ''}</Text>
@@ -46,13 +47,15 @@ export function CartItemCard({
       <View style={styles.media}>
         {image ? (
           <Image
+            accessibilityLabel={item.name}
+            cachePolicy="memory-disk"
             contentFit="cover"
             source={{ uri: image }}
             style={styles.image}
             transition={160}
           />
         ) : (
-          <Text style={styles.fallback}>👚</Text>
+          <Text style={styles.fallback}>K</Text>
         )}
       </View>
 
@@ -110,6 +113,8 @@ export function CartItemCard({
             <View style={styles.quantityControl}>
               <Pressable
                 accessibilityLabel="Giảm số lượng"
+                accessibilityRole="button"
+                accessibilityState={{ disabled: !canDecrease }}
                 disabled={!canDecrease}
                 onPress={() => onChangeQuantity(item.quantity - 1)}
                 style={[
@@ -121,6 +126,8 @@ export function CartItemCard({
               <Text style={styles.quantity}>{item.quantity}</Text>
               <Pressable
                 accessibilityLabel="Tăng số lượng"
+                accessibilityRole="button"
+                accessibilityState={{ disabled: !canIncrease }}
                 disabled={!canIncrease}
                 onPress={() => onChangeQuantity(item.quantity + 1)}
                 style={[
@@ -196,7 +203,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   image: { width: '100%', height: '100%' },
-  fallback: { fontSize: 36 },
+  fallback: { color: BRAND_COLORS.primary, fontSize: 30, fontWeight: '900' },
   content: {
     flex: 1,
     minWidth: 0,
@@ -288,8 +295,8 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   quantityButton: {
-    width: 31,
-    height: 31,
+    width: 44,
+    height: 44,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#F9FAFB',

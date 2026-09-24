@@ -1,5 +1,7 @@
 # KaitoKid Mobile Roadmap
 
+> **Brand scope update 2026-09-24:** D020 supersede D009. KaitoKid Shop Fashion phục vụ Nam/Nữ/Trẻ em và nhiều lứa tuổi. Các đoạn PHASE 1 kids-only bên dưới là lịch sử triển khai bộ seed Mobile, không được dùng để xóa nghiệp vụ Web Nam/Nữ/Trẻ em.
+
 Roadmap này là thứ tự triển khai chính. Không nhảy phase khi phần phụ thuộc cốt lõi của phase trước chưa ổn định.
 
 **Spec chi tiết cho toàn bộ phần còn lại PHASE 5 → PHASE 10:** `docs/PHASES_5_10.md`. File đó là checklist triển khai/acceptance chính cho các phase chưa hoàn thành.
