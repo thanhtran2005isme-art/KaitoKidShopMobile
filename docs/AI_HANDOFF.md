@@ -7,6 +7,7 @@ This file is intentionally concise. It describes the current state needed to con
 ## Repository
 
 - GitHub: `thanhtran2005isme-art/KaitoKidShopMobile`
+- Local repo path (máy Windows hiện tại): `C:\Users\Admin\Videos\KaitoKidShop`
 - Default branch: `main`
 - Project name used in docs/UI: KaitoKidShop
 - Brand: **KaitoKid = thời trang trẻ em 0–12 tuổi**
