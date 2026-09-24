@@ -5,7 +5,7 @@ export default function KidsProducts() {
     <ProductListPage
       title="Thời trang trẻ em"
       subtitle="Đáng yêu, thoải mái, an toàn cho bé"
-      fixedFilters={{ gender: 'Tre em' }}
+      fixedFilters={{ ageGroup: 'TreEm' }}
     />
   );
 }

@@ -97,13 +97,17 @@ export function ProductCard({
         <View style={styles.imageWrap}>
           {image ? (
             <Image
+              accessibilityLabel={product.name}
+              cachePolicy="memory-disk"
               contentFit="cover"
               source={{ uri: image }}
               style={styles.image}
               transition={180}
             />
           ) : (
-            <Text style={styles.imageFallback}>👚</Text>
+            <View style={styles.imageFallbackWrap}>
+              <Text style={styles.imageFallback}>K</Text>
+            </View>
           )}
 
           <View style={styles.badges}>
@@ -201,8 +205,9 @@ export function ProductCard({
           wished ? 'Bỏ khỏi danh sách yêu thích' : 'Thêm vào danh sách yêu thích'
         }
         accessibilityRole="button"
+        accessibilityState={{ disabled: wishlistBusy, selected: wished }}
         disabled={wishlistBusy}
-        hitSlop={8}
+        hitSlop={4}
         onPress={() => void handleWishlist()}
         style={({ pressed }) => [
           styles.wishlistButton,
@@ -249,14 +254,25 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   image: { width: '100%', height: '100%' },
-  imageFallback: { fontSize: 44 },
+  imageFallbackWrap: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: BRAND_COLORS.primarySoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  imageFallback: {
+    color: BRAND_COLORS.primary,
+    fontSize: 38,
+    fontWeight: '900',
+  },
   wishlistButton: {
     position: 'absolute',
     top: 14,
     right: 14,
     zIndex: 3,
-    width: 34,
-    height: 34,
+    width: 44,
+    height: 44,
     borderRadius: 13,
     backgroundColor: 'rgba(255,255,255,0.94)',
     alignItems: 'center',
@@ -268,9 +284,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FEF2F2',
     borderColor: '#FECACA',
   },
-  wishlistPressed: {
-    transform: [{ scale: 0.94 }],
-  },
+  wishlistPressed: { opacity: 0.72 },
   wishlistBusy: { opacity: 0.58 },
   wishlistIcon: {
     color: BRAND_COLORS.ink,

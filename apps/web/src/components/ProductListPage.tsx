@@ -49,7 +49,7 @@ const PRICE_BUCKETS = [
   { label: 'Trên 2tr', min: 2_000_000, max: 999_999_999 },
 ];
 
-const SIZES = ['S', 'M', 'L', 'XL', 'XXL'];
+const SIZES = ['90', '100', '110', '120', '130', '140', '150', 'S', 'M', 'L', 'XL', 'XXL', 'Freesize'];
 const COLORS = ['Đen', 'Trắng', 'Xám', 'Be', 'Nâu', 'Đỏ', 'Hồng', 'Xanh navy', 'Xanh lá', 'Vàng'];
 
 const PAGE_SIZE_OPTIONS = [12, 24, 48, 96] as const;

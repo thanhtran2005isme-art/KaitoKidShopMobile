@@ -1,89 +1,45 @@
 # KaitoKid Brand Guide
 
-## Định vị
+## Định vị hiện tại
 
-**KaitoKid là thương hiệu thời trang trẻ em 0–12 tuổi.**
+**KaitoKid Shop Fashion là cửa hàng thời trang và phụ kiện cho nhiều lứa tuổi và giới tính.**
 
-Không sử dụng KaitoKid như một shop thời trang nam/nữ người lớn trong dữ liệu, giao diện hoặc nội dung marketing.
+Phạm vi kinh doanh gồm nam, nữ, bé trai, bé gái, unisex, người lớn và trẻ em. Web hiện có các khu vực **NỮ / NAM / TRẺ EM** là chủ đích nghiệp vụ và không được tự động xóa hoặc đổi thành kids-only.
 
-## Khách hàng
+## Quy ước dữ liệu
 
-Người mua chính:
+Hai chiều dữ liệu phải được phân biệt:
 
-- cha mẹ/người chăm sóc trẻ;
-- người thân mua quà cho trẻ;
-- trẻ em là người mặc và trải nghiệm sản phẩm.
+- `GioiTinh = Nam | Nu | Unisex`: giới tính/phân nhóm mặc.
+- `NhomTuoi = NguoiLon | TreEm`: nhóm tuổi.
 
-## Lời hứa thương hiệu
-
-**Mềm mại · Thoải mái · Dễ vận động**
-
-Ưu tiên khi mô tả sản phẩm:
-
-1. chất liệu dễ chịu;
-2. khả năng vận động;
-3. độ tuổi/chiều cao phù hợp;
-4. cách sử dụng: đi học, đi chơi, sinh nhật, cuối tuần;
-5. dễ giặt/chăm sóc khi thông tin có sẵn.
-
-Không dùng mô tả mang tính người lớn như “quyến rũ”, “body”, “công sở nữ”, “dáng người châu Á” cho sản phẩm trẻ em.
-
-## Cấu trúc danh mục hiện tại
-
-- Áo bé
-  - Áo thun bé
-  - Áo sơ mi bé
-  - Áo khoác bé
-  - Áo polo bé
-- Quần bé
-  - Quần jean bé
-  - Quần kaki bé
-  - Quần short bé
-- Váy bé gái
-- Đầm bé gái
-- Phụ kiện bé
-
-Các slug là tiếng Việt không dấu, ví dụ `ao-be`, `quan-be`, `vay-be-gai`.
+Ví dụ `GioiTinh=Nam + NhomTuoi=TreEm` là bé trai; `GioiTinh=Nu + NhomTuoi=NguoiLon` là nữ người lớn. Không dùng `Tre em` như một giá trị `GioiTinh`.
 
 ## Size
 
-Dữ liệu mẫu sử dụng size theo chiều cao:
+- Trẻ em: `90, 100, 110, 120, 130, 140, 150`.
+- Người lớn: `S, M, L, XL, XXL` khi sản phẩm hỗ trợ.
+- Phụ kiện: có thể dùng `Freesize`.
 
-`90, 100, 110, 120, 130, 140, 150`
+UI phải đọc size thật từ dữ liệu sản phẩm/biến thể, không giả định toàn catalog dùng một hệ size.
 
-Phụ kiện có thể dùng `Freesize`.
+## Mobile PHASE 1–9
 
-UI về sau nên hiển thị rõ đây là size/chiều cao cho trẻ em và có link hướng dẫn chọn size.
+PHASE 1 trước đây đã chuẩn hóa **bộ seed Mobile hiện có** thành catalog trẻ em 0–12 tuổi để hoàn thiện nhanh luồng mua hàng Mobile. Đây là trạng thái dữ liệu mẫu của các phase đã triển khai, **không phải định vị toàn bộ KaitoKid Shop Fashion**.
 
-## Giới tính và nhóm tuổi trong database
+Vì vậy:
 
-- `NhomTuoi = TreEm`
-- `GioiTinh = Nam` → bé trai
-- `GioiTinh = Nu` → bé gái
-- `GioiTinh = Unisex` → dùng chung
+- không dùng PHASE 1 làm lý do xóa nội dung nam/nữ người lớn khỏi Web;
+- không chạy migration kids-branding lên catalog đầy đủ nếu việc đó sẽ ghi đè dữ liệu người lớn mà chưa audit;
+- khi mở rộng Mobile parity với Web, phải hỗ trợ Nam/Nữ/Trẻ em theo dữ liệu thật.
 
-Giữ các giá trị kỹ thuật này để tương thích backend hiện tại; UI phải hiển thị ngôn ngữ “Bé trai”, “Bé gái”, “Unisex”.
+## Nội dung và merchandising
 
-## Bộ sưu tập mẫu
+Copy, banner, collection, lookbook và recommendation phải theo đúng audience của sản phẩm đang hiển thị. Không áp copy dành cho trẻ em lên sản phẩm người lớn và ngược lại.
 
-- Ngày Đến Trường
-- Chơi Cả Ngày
-- Tiệc Nhỏ Của Bé
-- Cuối Tuần Phiêu Lưu
+## Màu UI Mobile hiện tại
 
-## Quy tắc cho AI/GPT
-
-Khi thêm dữ liệu hoặc UI mới:
-
-- không quay lại dữ liệu thời trang người lớn;
-- giữ tone thân thiện, rõ ràng với phụ huynh;
-- ưu tiên thông tin thực dụng thay vì marketing quá mức;
-- nếu thêm category/product mới, đảm bảo tên, slug, mô tả, size và `NhomTuoi` đồng nhất với định vị trên.
-
-
-## Màu UI hiện tại
-
-Home mobile dùng bảng màu tập trung tại `apps/mobile/src/constants/brand.ts`:
+Mobile dùng `BRAND_COLORS` tại `apps/mobile/src/constants/brand.ts`:
 
 - Primary: `#7C3AED`
 - Primary dark: `#5B21B6`
@@ -92,4 +48,9 @@ Home mobile dùng bảng màu tập trung tại `apps/mobile/src/constants/brand
 - Surface: `#FFFFFF`
 - Ink: `#111827`
 
-Khi thêm component Home/Product mới, ưu tiên dùng `BRAND_COLORS` thay vì hard-code lại màu thương hiệu.
+## Quy tắc cho AI/GPT
+
+- Web Nam/Nữ/Trẻ em là nghiệp vụ hợp lệ.
+- Không suy từ tên “KaitoKid” rằng toàn bộ shop chỉ bán đồ trẻ em.
+- Khi filter trẻ em, ưu tiên `NhomTuoi=TreEm`, không giả `GioiTinh=Tre em`.
+- Giữ Git + docs + source hiện tại làm source of truth.

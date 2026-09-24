@@ -1,5 +1,5 @@
 @echo off
-setlocal EnableExtensions
+setlocal EnableExtensions EnableDelayedExpansion
 chcp 65001 >nul
 title KaitoKid - Expo Mobile
 
@@ -36,17 +36,32 @@ if "%NEED_INSTALL%"=="1" (
 if not exist "node_modules\.bin\expo.cmd" goto :dependency_error
 if not exist "node_modules\expo-image-picker\package.json" goto :dependency_error
 
+set "EXPO_PUBLIC_AUTH_API_URL="
+set "EXPO_PUBLIC_API_URL="
+set "EXPO_PACKAGER_PROXY_URL=http://127.0.0.1:8081"
+
 where adb >nul 2>&1
 if not errorlevel 1 (
   adb start-server >nul 2>&1
-  adb reverse tcp:8081 tcp:8081 >nul 2>&1
-  adb reverse tcp:5053 tcp:5053 >nul 2>&1
-  adb reverse tcp:5265 tcp:5265 >nul 2>&1
-)
+  set "ADB_DEVICE_COUNT=0"
 
-set "EXPO_PUBLIC_AUTH_API_URL=http://127.0.0.1:5053"
-set "EXPO_PUBLIC_CUSTOMER_API_URL=http://127.0.0.1:5265"
-set "EXPO_PACKAGER_PROXY_URL=http://127.0.0.1:8081"
+  for /f "skip=1 tokens=1,2" %%A in ('adb devices') do (
+    if "%%B"=="device" set /a ADB_DEVICE_COUNT+=1
+  )
+
+  if "!ADB_DEVICE_COUNT!"=="1" (
+    adb reverse tcp:8081 tcp:8081 >nul 2>&1
+    adb reverse tcp:5053 tcp:5053 >nul 2>&1
+    adb reverse tcp:5265 tcp:5265 >nul 2>&1
+    if not errorlevel 1 (
+      set "EXPO_PUBLIC_AUTH_API_URL=http://127.0.0.1:5053"
+      set "EXPO_PUBLIC_API_URL=http://127.0.0.1:5265"
+      echo [ADB] Da bat reverse 8081/5053/5265 cho 1 thiet bi.
+    )
+  ) else (
+    echo [ADB] Khong co dung 1 thiet bi authorized. Expo se dung LAN auto-detect/emulator fallback.
+  )
+)
 
 echo.
 echo [EXPO] Project: %MOBILE%

@@ -10,13 +10,14 @@ This file is intentionally concise. It describes the current state needed to con
 - Local repo path (máy Windows hiện tại): `C:\Users\Admin\Videos\KaitoKidShop`
 - Default branch: `main`
 - Project name used in docs/UI: KaitoKidShop
-- Brand: **KaitoKid = thời trang trẻ em 0–12 tuổi**
+- Brand: **KaitoKid Shop Fashion = thời trang + phụ kiện cho Nam/Nữ/Trẻ em, nhiều lứa tuổi; D020 supersede D009 kids-only**
 - Brand rules: `docs/BRAND.md`
 - UI/UX durable rules: `docs/UI_UX.md`; source skill: `skill/.codex/skills/ui-ux-pro-max/SKILL.md`
-- Current roadmap: PHASE 1–9 hoàn tất ở mức code, tiếp theo PHASE 10 — Polish UI + performance + testing
+- Current roadmap: PHASE 1–9 hoàn tất ở mức code; PHASE 10 đang triển khai và chỉ hoàn tất sau runtime test matrix
 - PHASE 5–10 đã có acceptance criteria, API dependencies, UI/state scope và ranh giới chi tiết trong `docs/PHASES_5_10.md`.
 - Roadmap source: `docs/ROADMAP.md`
 - Detailed remaining PHASE 5–10 spec: `docs/PHASES_5_10.md`
+- PHASE 10 static/build gate: `npm run phase10:check` hoặc `scripts\phase10-check.bat`; vẫn cần manual Android/Expo Web E2E trước khi đánh dấu hoàn tất.
 - Structure: full-stack monorepo
 - Git convention: mọi commit do AI/GPT tạo phải có phần mô tả bằng **tiếng Việt**; có thể giữ tiền tố Conventional Commits như `feat:`, `fix:`, `docs:`.
 - Commit granularity: mặc định **một task/fix/PHASE = một commit duy nhất**; không commit từng file/từng bước. Với PR, ưu tiên squash merge để `main` chỉ có một commit cho công việc đó.
@@ -47,7 +48,7 @@ KaitoKidShop/
 - `http://127.0.0.1:8081` is Expo Web for the mobile app, not the separate Vite web app.
 - Customer API environment variable: `EXPO_PUBLIC_API_URL`
 - Auth API environment variable: `EXPO_PUBLIC_AUTH_API_URL`
-- `apps/mobile/app.config.js` can auto-detect a LAN IPv4 for API.Customer when no explicit customer API URL is provided.
+- `apps/mobile/app.config.js` auto-detects a LAN IPv4 cho cả API.Customer và API.Auth khi không có URL explicit; Android emulator ưu tiên `10.0.2.2`, còn launcher chỉ ép `127.0.0.1` khi có đúng 1 ADB device để reverse port an toàn.
 
 ### Web
 

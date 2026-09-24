@@ -240,3 +240,21 @@ This file records durable decisions and their rationale. It is not a chronologic
 - Không tạo global Recommendation/Collection/Lookbook context nếu dữ liệu chỉ dùng ở Home/screen local.
 
 **Hệ quả:** PHASE 9 thêm `RecommendationDTO`, recommendation controller/service rule và `CollectionId` filter nhưng không thêm bảng database. Seed Lookbook local được bổ sung bằng migration idempotent riêng.
+
+
+## D020 — KaitoKid Shop Fashion phục vụ mọi lứa tuổi và giới tính; D009 bị thay thế
+
+**Ngày:** 2026-09-24
+
+**Quyết định:** KaitoKid Shop Fashion bán quần áo và phụ kiện cho nam, nữ, bé trai, bé gái, người lớn, trẻ em và unisex. Quyết định này **supersede D009** về phạm vi thương hiệu kids-only.
+
+**Lý do:** Chủ dự án xác nhận Web hiện tại với các khu vực NỮ / NAM / TRẺ EM là đúng nghiệp vụ. Việc PHASE 1 chuẩn hóa bộ seed Mobile thành trẻ em chỉ là phạm vi dữ liệu mẫu của giai đoạn Mobile, không phải định vị toàn shop.
+
+**Quy ước dữ liệu:**
+
+- `GioiTinh = Nam/Nu/Unisex` mô tả giới tính/phân nhóm mặc.
+- `NhomTuoi = NguoiLon/TreEm` mô tả nhóm tuổi.
+- Trang trẻ em phải filter theo `NhomTuoi=TreEm`; không dùng `gender=Tre em`.
+- Size trẻ em và người lớn cùng tồn tại; UI đọc danh sách size thật từ sản phẩm.
+
+**Hệ quả:** Không xóa hoặc đổi các route/menu Web Nam/Nữ/Trẻ em chỉ vì D009 cũ. D009 được giữ để bảo toàn lịch sử nhưng không còn là quyết định hiện hành.
