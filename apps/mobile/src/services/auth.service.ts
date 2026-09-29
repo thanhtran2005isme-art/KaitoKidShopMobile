@@ -98,7 +98,9 @@ async function request<T>(url: string, options: RequestInit): Promise<T> {
 
     if (error instanceof TypeError) {
       throw new Error(
-        `Không thể kết nối tới API.Auth ${API_URL}. Nếu dùng điện thoại thật, hãy kiểm tra LAN/Wi-Fi hoặc USB ADB reverse cổng 5053.`,
+        Platform.OS === 'web'
+          ? `Không thể gọi API.Auth ${API_URL}. Hãy kiểm tra API.Auth đang chạy và CORS cho origin của Expo Web (thường là http://localhost:8081).`
+          : `Không thể kết nối tới API.Auth ${API_URL}. Nếu dùng điện thoại thật, hãy kiểm tra LAN/Wi-Fi hoặc USB ADB reverse cổng 5053.`,
       );
     }
 
