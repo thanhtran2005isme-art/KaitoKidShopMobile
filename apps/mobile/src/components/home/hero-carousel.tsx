@@ -13,6 +13,7 @@ import {
   View,
 } from 'react-native';
 
+import { AppIcon } from '@/components/ui/app-icon';
 import { BRAND_COLORS } from '@/constants/brand';
 import { resolveMediaUrl } from '@/services/api-client';
 import type { Banner } from '@/types/shop';
@@ -63,15 +64,28 @@ export function HeroCarousel({ banners }: { banners: Banner[] }) {
       return;
     }
 
-    const productMatch = target.match(/^\/?(?:product|products)\/([^/?#]+)/i);
+    const [pathPart, queryPart = ''] = target.split('?');
+    const query = new URLSearchParams(queryPart);
+
+    const productMatch = pathPart.match(/^\/?(?:product|products)\/([^/?#]+)/i);
     if (productMatch?.[1]) {
       router.push({ pathname: '/product/[slug]', params: { slug: decodeRoutePart(productMatch[1]) } });
       return;
     }
 
-    const categoryMatch = target.match(/^\/?(?:category|categories)\/([^/?#]+)/i);
-    if (categoryMatch?.[1]) {
-      router.push({ pathname: '/categories', params: { category: decodeRoutePart(categoryMatch[1]) } });
+    const categoryMatch = pathPart.match(/^\/?(?:category|categories)\/([^/?#]+)/i);
+    const isCategories = /^\/?(?:category|categories)\/?$/i.test(pathPart);
+    if (categoryMatch?.[1] || isCategories) {
+      const gender = query.get('gender') || undefined;
+      const ageGroup = query.get('ageGroup') || undefined;
+      router.push({
+        pathname: '/categories',
+        params: {
+          ...(categoryMatch?.[1] ? { category: decodeRoutePart(categoryMatch[1]) } : {}),
+          ...(gender ? { gender } : {}),
+          ...(ageGroup ? { ageGroup } : {}),
+        },
+      });
       return;
     }
 
@@ -131,7 +145,7 @@ export function HeroCarousel({ banners }: { banners: Banner[] }) {
               <View style={styles.copy}>
                 {item.subtitle ? <Text style={styles.subtitle}>{item.subtitle}</Text> : null}
                 <Text numberOfLines={2} style={styles.title}>
-                  {item.title || 'Bộ sưu tập mới cho bé'}
+                  {item.title || 'Bộ sưu tập mới'}
                 </Text>
                 {item.description ? (
                   <Text numberOfLines={2} style={styles.description}>
@@ -140,7 +154,7 @@ export function HeroCarousel({ banners }: { banners: Banner[] }) {
                 ) : null}
                 <View style={styles.cta}>
                   <Text style={styles.ctaText}>{item.primaryButton || 'Khám phá ngay'}</Text>
-                  <Text style={styles.ctaArrow}>→</Text>
+                  <AppIcon color={BRAND_COLORS.primary} name="arrowRight" size={15} />
                 </View>
               </View>
 
@@ -236,11 +250,6 @@ const styles = StyleSheet.create({
   ctaText: {
     color: BRAND_COLORS.ink,
     fontSize: 12,
-    fontWeight: '900',
-  },
-  ctaArrow: {
-    color: BRAND_COLORS.primary,
-    fontSize: 14,
     fontWeight: '900',
   },
   counter: {

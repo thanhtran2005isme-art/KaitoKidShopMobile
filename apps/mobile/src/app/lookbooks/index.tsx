@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { AppIcon } from '@/components/ui/app-icon';
 import { BRAND_COLORS } from '@/constants/brand';
 import { resolveMediaUrl } from '@/services/api-client';
 import { discoveryApi } from '@/services/discovery.api';
@@ -77,7 +78,7 @@ export default function LookbooksScreen() {
           accessibilityRole="button"
           onPress={() => router.back()}
           style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}>
-          <Text style={styles.backText}>‹</Text>
+          <AppIcon color={BRAND_COLORS.ink} name="arrowLeft" size={22} />
         </Pressable>
         <View style={styles.heading}>
           <Text style={styles.eyebrow}>SHOP THE LOOK</Text>

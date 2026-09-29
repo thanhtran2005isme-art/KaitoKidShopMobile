@@ -892,6 +892,8 @@ Không làm Home quá dài; section nào không có data thì ẩn.
 
 Biến app từ “đủ chức năng” thành bản ổn định, nhất quán và sẵn sàng demo/release. Không thêm feature lớn mới ở phase này trừ bug blocking.
 
+**Brand guard:** Web Nam/Nữ/Trẻ em là đúng nghiệp vụ KaitoKid Shop Fashion. D020 supersede D009 kids-only; PHASE 10 không được xóa/đổi các khu vực Web này.
+
 ## 1. Design/UI consistency
 
 Rà toàn app:
@@ -1008,17 +1010,17 @@ Server phải là source of truth cho:
 
 ## 6. Media/data readiness
 
-Hiện repo vẫn có product image placeholder.
+PHASE 10 đã bổ sung migration `20260929_phase10_multiaudience_media.sql` để seed chuẩn dùng HTTPS photo URL trong CSDL và thêm sample Nam/Nữ người lớn. API vẫn giữ fallback cho record legacy.
 
-Trước release/demo chính thức:
+Trước release chính thức:
 
-- bổ sung ảnh sản phẩm thật hoặc pipeline upload từ Admin;
-- gallery ảnh phụ;
-- variant inventory mẫu/thật;
-- category/collection/lookbook media;
+- thay demo photo URL bằng media do shop sở hữu hoặc pipeline upload từ Admin/storage;
+- bổ sung gallery ảnh phụ;
+- bổ sung variant inventory mẫu/thật;
+- hoàn thiện category/collection/lookbook media production;
 - image fallback vẫn phải hoạt động.
 
-Không coi placeholder là media production.
+Không coi fallback hoặc demo photo URL là media production.
 
 ## 7. Test matrix bắt buộc
 

@@ -13,6 +13,8 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { GuestAccountExperience } from '@/components/auth/guest-account-experience';
+import { AppIcon } from '@/components/ui/app-icon';
 import { BRAND_COLORS } from '@/constants/brand';
 import { useAuth } from '@/context/AuthContext';
 import { useNotifications } from '@/context/NotificationsContext';
@@ -97,37 +99,10 @@ export default function AccountScreen() {
 
   if (!token) {
     return (
-      <SafeAreaView style={styles.safeArea}>
-        <View style={styles.guestContainer}>
-          <View style={styles.avatarFallback}>
-            <Text style={styles.avatarFallbackText}>K</Text>
-          </View>
-          <Text style={styles.guestTitle}>Tài khoản KaitoKid</Text>
-          <Text style={styles.guestDescription}>
-            Đăng nhập để quản lý đơn hàng, đánh giá, thông báo, điểm thành viên và voucher.
-          </Text>
-          <Pressable
-            accessibilityLabel="Đăng nhập tài khoản KaitoKid"
-            accessibilityRole="button"
-            onPress={() => router.push('/auth/login')}
-            style={({ pressed }) => [
-              styles.primaryButton,
-              pressed && styles.pressed,
-            ]}>
-            <Text style={styles.primaryButtonText}>Đăng nhập</Text>
-          </Pressable>
-          <Pressable
-            accessibilityLabel="Tạo tài khoản KaitoKid mới"
-            accessibilityRole="button"
-            onPress={() => router.push('/auth/register')}
-            style={({ pressed }) => [
-              styles.secondaryButton,
-              pressed && styles.pressed,
-            ]}>
-            <Text style={styles.secondaryButtonText}>Tạo tài khoản mới</Text>
-          </Pressable>
-        </View>
-      </SafeAreaView>
+      <GuestAccountExperience
+        onLogin={() => router.push('/auth/login')}
+        onRegister={() => router.push('/auth/register')}
+      />
     );
   }
 
@@ -292,7 +267,7 @@ export default function AccountScreen() {
           />
           <MenuItem
             title="Danh sách yêu thích"
-            description="Xem lại những sản phẩm đã lưu cho bé."
+            description="Xem lại những sản phẩm bạn đã lưu."
             onPress={() => router.push('/wishlist')}
           />
         </View>
@@ -378,7 +353,7 @@ function MenuItem({
         </View>
         <Text style={styles.menuDescription}>{description}</Text>
       </View>
-      <Text style={styles.menuArrow}>›</Text>
+      <AppIcon color={BRAND_COLORS.primary} name="chevronRight" size={22} />
     </Pressable>
   );
 }
@@ -590,11 +565,6 @@ const styles = StyleSheet.create({
     color: BRAND_COLORS.muted,
     fontSize: 8,
     lineHeight: 13,
-  },
-  menuArrow: {
-    color: BRAND_COLORS.primary,
-    fontSize: 25,
-    lineHeight: 28,
   },
   badge: {
     minWidth: 22,

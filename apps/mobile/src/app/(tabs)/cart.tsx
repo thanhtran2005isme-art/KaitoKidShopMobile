@@ -15,6 +15,7 @@ import { CartCrossSell } from '@/components/cart/cart-cross-sell';
 import { CartEmptyState } from '@/components/cart/cart-empty-state';
 import { CartItemCard } from '@/components/cart/cart-item-card';
 import { CartSummary } from '@/components/cart/cart-summary';
+import { AppIcon } from '@/components/ui/app-icon';
 import { BRAND_COLORS } from '@/constants/brand';
 import { useAuth } from '@/context/AuthContext';
 import { useShopping } from '@/context/ShoppingContext';
@@ -290,7 +291,7 @@ export default function CartScreen() {
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.guest}>
           <View style={styles.guestIconWrap}>
-            <Text style={styles.guestIcon}>🛍️</Text>
+            <AppIcon color={BRAND_COLORS.primary} name="bag" size={40} />
           </View>
           <Text style={styles.guestTitle}>Giỏ hàng của bạn</Text>
           <Text style={styles.guestDescription}>
@@ -369,7 +370,7 @@ export default function CartScreen() {
               styles.refreshButton,
               pressed && styles.pressed,
             ]}>
-            <Text style={styles.refreshText}>↻</Text>
+            <AppIcon color={BRAND_COLORS.primary} name="refresh" size={23} />
           </Pressable>
         </View>
 
@@ -437,7 +438,7 @@ export default function CartScreen() {
                   styles.bulkButton,
                   selectedIds.size === 0 && styles.bulkDisabled,
                 ]}>
-                <Text style={styles.bulkText}>♡ Chuyển sang yêu thích</Text>
+                <View style={styles.bulkContent}><AppIcon color={BRAND_COLORS.primaryDark} name="heart" size={17} /><Text style={styles.bulkText}>Chuyển sang yêu thích</Text></View>
               </Pressable>
               <Pressable
                 disabled={selectedIds.size === 0}
@@ -533,11 +534,6 @@ const styles = StyleSheet.create({
     backgroundColor: BRAND_COLORS.surface,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  refreshText: {
-    color: BRAND_COLORS.primary,
-    fontSize: 24,
-    fontWeight: '900',
   },
   feedback: {
     borderRadius: 14,
@@ -639,6 +635,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 13,
   },
+  bulkContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
   bulkText: {
     color: BRAND_COLORS.primaryDark,
     fontSize: 9,
@@ -667,7 +669,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  guestIcon: { fontSize: 42 },
   guestTitle: {
     color: BRAND_COLORS.ink,
     fontSize: 26,

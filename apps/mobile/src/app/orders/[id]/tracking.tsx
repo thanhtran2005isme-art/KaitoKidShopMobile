@@ -12,6 +12,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { OrderStatusBadge } from '@/components/orders/order-status-badge';
+import { AppIcon } from '@/components/ui/app-icon';
 import { BRAND_COLORS } from '@/constants/brand';
 import { useAuth } from '@/context/AuthContext';
 import { ordersApi } from '@/services/orders.api';
@@ -179,7 +180,7 @@ export default function OrderTrackingScreen() {
               styles.backButton,
               pressed && styles.pressed,
             ]}>
-            <Text style={styles.backText}>‹</Text>
+            <AppIcon color={BRAND_COLORS.ink} name="arrowLeft" size={22} />
           </Pressable>
           <View style={styles.headerCopy}>
             <Text style={styles.eyebrow}>THEO DÕI VẬN CHUYỂN</Text>

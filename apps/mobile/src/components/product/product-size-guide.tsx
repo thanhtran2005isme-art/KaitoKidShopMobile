@@ -1,6 +1,7 @@
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { AppIcon } from '@/components/ui/app-icon';
 import { BRAND_COLORS } from '@/constants/brand';
 import { KID_SIZE_GUIDE } from '@/utils/product-detail';
 
@@ -29,7 +30,7 @@ export function ProductSizeGuide({ visible, availableSizes, onClose }: ProductSi
             <Text style={styles.title}>Chọn size cho bé</Text>
           </View>
           <Pressable accessibilityLabel="Đóng" onPress={onClose} style={styles.close}>
-            <Text style={styles.closeText}>×</Text>
+            <AppIcon color={BRAND_COLORS.ink} name="close" size={21} />
           </Pressable>
         </View>
 

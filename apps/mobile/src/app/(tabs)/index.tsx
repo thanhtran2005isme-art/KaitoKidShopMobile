@@ -96,7 +96,7 @@ export default function HomeScreen() {
               badge="MỚI"
               badgeTone="primary"
               products={data.newArrivals}
-              subtitle="Mẫu mới cho bé 0–12 tuổi"
+              subtitle="Thiết kế mới cho mọi phong cách"
               title="Hàng mới về"
             />
 
@@ -106,7 +106,7 @@ export default function HomeScreen() {
               badge="HOT"
               badgeTone="hot"
               products={data.bestSellers}
-              subtitle="Những mẫu được phụ huynh yêu thích"
+              subtitle="Sản phẩm được khách hàng yêu thích"
               title="Bán chạy"
             />
 
@@ -126,7 +126,7 @@ export default function HomeScreen() {
               badge="SALE"
               badgeTone="sale"
               products={data.saleProducts}
-              subtitle="Ưu đãi nổi bật cho tủ đồ của bé"
+              subtitle="Ưu đãi nổi bật hôm nay"
               title="Đang giảm giá"
             />
 
@@ -165,7 +165,7 @@ export default function HomeScreen() {
                 <Text style={styles.brandMarkText}>K</Text>
               </View>
               <View style={styles.brandFooterCopy}>
-                <Text style={styles.brandFooterTitle}>Lớn lên thật vui cùng {BRAND.name}</Text>
+                <Text style={styles.brandFooterTitle}>Phong cách mỗi ngày cùng {BRAND.name}</Text>
                 <Text style={styles.brandFooterText}>{BRAND.promise}</Text>
               </View>
             </View>

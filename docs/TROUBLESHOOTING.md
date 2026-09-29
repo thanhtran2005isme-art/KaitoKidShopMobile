@@ -211,3 +211,17 @@ Migration tra Lookbook theo title và sản phẩm theo SKU, dùng `NOT EXISTS` 
 Seed hiện dùng `/lookbook/school-1.jpg` và `/lookbook/weekend-1.jpg` nhưng repository chưa có hai file ảnh này.
 
 API.Customer PHASE 9 có fallback SVG branded cho `/lookbook/*`, tương tự product placeholder. Nếu vẫn thấy 404 sau khi pull, restart API.Customer để middleware/route mới có hiệu lực. Khi media thật được thêm vào static-file provider, file thật sẽ được phục vụ trước fallback.
+
+## PHASE 10 vẫn thấy ảnh áo tím / "Hình ảnh sản phẩm đang cập nhật"
+
+Mobile lấy ảnh từ `SanPham.HinhAnh`. Fallback tím chỉ xuất hiện khi record vẫn dùng đường dẫn legacy `/products/*.jpg` không có file thật.
+
+Sau khi checkout PHASE 10, chạy:
+
+```bat
+"C:\xampp\mysql\bin\mysql.exe" -u root kaitokid < backend\Database\migrations\20260929_phase10_multiaudience_media.sql
+```
+
+Sau đó restart `run.bat` và refresh Expo. Migration cập nhật seed SKU chuẩn sang HTTPS photo URL, đồng bộ snapshot ảnh đơn cũ, bổ sung sample Nam/Nữ người lớn và Lookbook đa audience. Nếu dùng tài khoản MariaDB khác `root`, thay bằng credential local trong `backend/db.local.bat`.
+
+API.Customer vẫn giữ fallback `/products/*` và `/lookbook/*` để dữ liệu legacy hoặc URL lỗi không tạo 404; fallback không phải media production.

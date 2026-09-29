@@ -16,6 +16,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { AppIcon } from '@/components/ui/app-icon';
 import { BRAND_COLORS } from '@/constants/brand';
 import { useAuth } from '@/context/AuthContext';
 import { resolveMediaUrl } from '@/services/api-client';
@@ -286,7 +287,7 @@ export default function CreateReviewScreen() {
               hitSlop={8}
               onPress={() => router.back()}
               style={styles.backButton}>
-              <Text style={styles.backText}>‹</Text>
+              <AppIcon color={BRAND_COLORS.ink} name="arrowLeft" size={22} />
             </Pressable>
             <View style={styles.headerCopy}>
               <Text style={styles.eyebrow}>ĐÁNH GIÁ ĐƠN {orderCode}</Text>
@@ -310,7 +311,7 @@ export default function CreateReviewScreen() {
               <Text style={styles.productMeta}>
                 {'Size ' + item.size + ' · ' + item.color}
               </Text>
-              <Text style={styles.verified}>✓ Mua hàng đã xác minh</Text>
+              <Text style={styles.verified}>Mua hàng đã xác minh</Text>
             </View>
           </View>
 
@@ -361,7 +362,7 @@ export default function CreateReviewScreen() {
                 setComment(value);
                 if (error) setError(null);
               }}
-              placeholder="Ví dụ: chất vải mềm, bé mặc thoải mái, size vừa..."
+              placeholder="Ví dụ: chất vải mềm, mặc thoải mái, size vừa..."
               placeholderTextColor="#9CA3AF"
               style={styles.commentInput}
               textAlignVertical="top"
@@ -400,7 +401,7 @@ export default function CreateReviewScreen() {
                         )
                       }
                       style={styles.removeImageButton}>
-                      <Text style={styles.removeImageText}>×</Text>
+                      <AppIcon color="#FFFFFF" name="close" size={18} />
                     </Pressable>
                   </View>
                 ))}

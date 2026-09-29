@@ -1,8 +1,9 @@
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { AppIcon } from '@/components/ui/app-icon';
 import { BRAND_COLORS } from '@/constants/brand';
 import { useAuth } from '@/context/AuthContext';
 import { useShopping } from '@/context/ShoppingContext';
@@ -97,13 +98,17 @@ export function ProductCard({
         <View style={styles.imageWrap}>
           {image ? (
             <Image
+              accessibilityLabel={product.name}
+              cachePolicy="memory-disk"
               contentFit="cover"
               source={{ uri: image }}
               style={styles.image}
               transition={180}
             />
           ) : (
-            <Text style={styles.imageFallback}>👚</Text>
+            <View style={styles.imageFallbackWrap}>
+              <AppIcon color={BRAND_COLORS.primary} name="image" size={38} />
+            </View>
           )}
 
           <View style={styles.badges}>
@@ -201,8 +206,9 @@ export function ProductCard({
           wished ? 'Bỏ khỏi danh sách yêu thích' : 'Thêm vào danh sách yêu thích'
         }
         accessibilityRole="button"
+        accessibilityState={{ disabled: wishlistBusy, selected: wished }}
         disabled={wishlistBusy}
-        hitSlop={8}
+        hitSlop={4}
         onPress={() => void handleWishlist()}
         style={({ pressed }) => [
           styles.wishlistButton,
@@ -210,13 +216,15 @@ export function ProductCard({
           pressed && styles.wishlistPressed,
           wishlistBusy && styles.wishlistBusy,
         ]}>
-        <Text
-          style={[
-            styles.wishlistIcon,
-            wished && styles.wishlistIconActive,
-          ]}>
-          {wishlistBusy ? '…' : wished ? '♥' : '♡'}
-        </Text>
+        {wishlistBusy ? (
+          <ActivityIndicator color={BRAND_COLORS.primary} size="small" />
+        ) : (
+          <AppIcon
+            color={wished ? BRAND_COLORS.danger : BRAND_COLORS.ink}
+            name={wished ? 'heartFilled' : 'heart'}
+            size={21}
+          />
+        )}
       </Pressable>
     </View>
   );
@@ -249,14 +257,20 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   image: { width: '100%', height: '100%' },
-  imageFallback: { fontSize: 44 },
+  imageFallbackWrap: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: BRAND_COLORS.primarySoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   wishlistButton: {
     position: 'absolute',
     top: 14,
     right: 14,
     zIndex: 3,
-    width: 34,
-    height: 34,
+    width: 44,
+    height: 44,
     borderRadius: 13,
     backgroundColor: 'rgba(255,255,255,0.94)',
     alignItems: 'center',
@@ -268,19 +282,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#FEF2F2',
     borderColor: '#FECACA',
   },
-  wishlistPressed: {
-    transform: [{ scale: 0.94 }],
-  },
+  wishlistPressed: { opacity: 0.72 },
   wishlistBusy: { opacity: 0.58 },
-  wishlistIcon: {
-    color: BRAND_COLORS.ink,
-    fontSize: 21,
-    lineHeight: 23,
-    fontWeight: '900',
-  },
-  wishlistIconActive: {
-    color: BRAND_COLORS.danger,
-  },
   badges: {
     position: 'absolute',
     left: 8,

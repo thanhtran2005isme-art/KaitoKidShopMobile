@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { AppIcon } from '@/components/ui/app-icon';
 import { BRAND_COLORS } from '@/constants/brand';
 import { useAuth } from '@/context/AuthContext';
 import { useCheckout } from '@/context/CheckoutContext';
@@ -364,7 +365,7 @@ export default function CheckoutAddressScreen() {
                 styles.backButton,
                 pressed && styles.pressed,
               ]}>
-              <Text style={styles.backText}>‹</Text>
+              <AppIcon color={BRAND_COLORS.ink} name="arrowLeft" size={22} />
             </Pressable>
             <View style={styles.headerCopy}>
               <Text style={styles.eyebrow}>SỔ ĐỊA CHỈ</Text>
@@ -551,7 +552,7 @@ export default function CheckoutAddressScreen() {
                   hitSlop={8}
                   onPress={closeForm}
                   style={styles.closeButton}>
-                  <Text style={styles.closeText}>×</Text>
+                  <AppIcon color={BRAND_COLORS.ink} name="close" size={20} />
                 </Pressable>
               </View>
 

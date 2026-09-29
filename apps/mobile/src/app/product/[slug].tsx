@@ -17,6 +17,7 @@ import { ProductReviewsPreview } from '@/components/product/product-reviews-prev
 import { ProductSizeGuide } from '@/components/product/product-size-guide';
 import { ProductCard } from '@/components/product/product-card';
 import { QuantitySelector } from '@/components/product/quantity-selector';
+import { AppIcon } from '@/components/ui/app-icon';
 import { BRAND, BRAND_COLORS } from '@/constants/brand';
 import { useAuth } from '@/context/AuthContext';
 import { useShopping } from '@/context/ShoppingContext';
@@ -534,7 +535,7 @@ export default function ProductDetailScreen() {
               accessibilityLabel="Quay lại"
               onPress={() => router.back()}
               style={styles.floatingButton}>
-              <Text style={styles.backText}>‹</Text>
+              <AppIcon color={BRAND_COLORS.ink} name="arrowLeft" size={22} />
             </Pressable>
 
             <Pressable
@@ -613,7 +614,7 @@ export default function ProductDetailScreen() {
               actionLabel={canShowSizeGuide ? 'Hướng dẫn chọn size' : undefined}
               helper={
                 canShowSizeGuide
-                  ? 'Size KaitoKid ưu tiên theo chiều cao của bé.'
+                  ? 'Tham khảo chiều cao và độ tuổi cho size trẻ em.'
                   : undefined
               }
               isDisabled={isSizeDisabled}
@@ -686,18 +687,18 @@ export default function ProductDetailScreen() {
 
             <View style={styles.trustGrid}>
               <View style={styles.trustCard}>
-                <Text style={styles.trustIcon}>↻</Text>
+                <AppIcon color={BRAND_COLORS.primary} name="return" size={24} />
                 <Text style={styles.trustTitle}>Đổi trả 7 ngày</Text>
-                <Text style={styles.trustText}>An tâm chọn size cho bé</Text>
+                <Text style={styles.trustText}>Đổi size thuận tiện</Text>
               </View>
               <View style={styles.trustCard}>
-                <Text style={styles.trustIcon}>🚚</Text>
+                <AppIcon color={BRAND_COLORS.primary} name="truck" size={24} />
                 <Text style={styles.trustTitle}>Freeship 499K</Text>
                 <Text style={styles.trustText}>Giao hàng toàn quốc</Text>
               </View>
               <View style={styles.trustCard}>
-                <Text style={styles.trustIcon}>✓</Text>
-                <Text style={styles.trustTitle}>Ưu tiên thoải mái</Text>
+                <AppIcon color={BRAND_COLORS.primary} name="shield" size={24} />
+                <Text style={styles.trustTitle}>Mua sắm an tâm</Text>
                 <Text style={styles.trustText}>{BRAND.promise}</Text>
               </View>
             </View>
@@ -735,7 +736,7 @@ export default function ProductDetailScreen() {
                 <View style={styles.relatedHeading}>
                   <View>
                     <Text style={styles.sectionEyebrow}>GỢI Ý THÊM</Text>
-                    <Text style={styles.sectionTitle}>Có thể bé cũng thích</Text>
+                    <Text style={styles.sectionTitle}>Có thể bạn cũng thích</Text>
                   </View>
                   <Pressable onPress={() => router.push('/categories')}>
                     <Text style={styles.more}>Xem thêm</Text>
@@ -792,13 +793,11 @@ export default function ProductDetailScreen() {
               pressed && styles.actionPressed,
               actionBusy === 'wishlist' && styles.actionDisabled,
             ]}>
-            <Text
-              style={[
-                styles.wishlistActionIcon,
-                wished && styles.wishlistActionIconActive,
-              ]}>
-              {actionBusy === 'wishlist' ? '…' : wished ? '♥' : '♡'}
-            </Text>
+            <AppIcon
+              color={wished ? BRAND_COLORS.danger : BRAND_COLORS.ink}
+              name={wished ? 'heartFilled' : 'heart'}
+              size={22}
+            />
           </Pressable>
 
           <Pressable
@@ -835,7 +834,7 @@ export default function ProductDetailScreen() {
             {!isOutOfStock &&
             !selectedOutOfStock &&
             actionBusy !== 'cart' ? (
-              <Text style={styles.cartActionArrow}>→</Text>
+              <AppIcon color="#FFFFFF" name="arrowRight" size={21} />
             ) : null}
           </Pressable>
         </View>

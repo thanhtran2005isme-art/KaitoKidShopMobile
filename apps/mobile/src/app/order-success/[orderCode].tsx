@@ -3,6 +3,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { CheckoutStepper } from '@/components/checkout/checkout-stepper';
+import { AppIcon } from '@/components/ui/app-icon';
 import { BRAND_COLORS } from '@/constants/brand';
 import { useCheckout } from '@/context/CheckoutContext';
 
@@ -41,7 +42,7 @@ export default function OrderSuccessScreen() {
 
         <View style={styles.heroCard}>
           <View style={styles.successMark}>
-            <Text style={styles.successMarkText}>✓</Text>
+            <AppIcon color="#FFFFFF" name="check" size={30} />
           </View>
           <Text style={styles.eyebrow}>ĐẶT HÀNG THÀNH CÔNG</Text>
           <Text style={styles.title}>Cảm ơn bạn đã chọn KaitoKid</Text>

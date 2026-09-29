@@ -13,6 +13,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { OrderCard } from '@/components/orders/order-card';
+import { AppIcon } from '@/components/ui/app-icon';
 import { BRAND_COLORS } from '@/constants/brand';
 import { useAuth } from '@/context/AuthContext';
 import { ordersApi } from '@/services/orders.api';
@@ -148,7 +149,7 @@ export default function OrdersScreen() {
               styles.backButton,
               pressed && styles.pressed,
             ]}>
-            <Text style={styles.backText}>‹</Text>
+            <AppIcon color={BRAND_COLORS.ink} name="arrowLeft" size={22} />
           </Pressable>
           <View style={styles.headerCopy}>
             <Text style={styles.eyebrow}>ĐƠN HÀNG CỦA TÔI</Text>
