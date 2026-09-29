@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { AppIcon } from '@/components/ui/app-icon';
 import { BRAND_COLORS } from '@/constants/brand';
 import { useAuth } from '@/context/AuthContext';
 import { accountApi } from '@/services/account.api';
@@ -190,7 +191,7 @@ export default function AccountPointsScreen() {
               hitSlop={8}
               onPress={() => router.back()}
               style={styles.backButton}>
-              <Text style={styles.backText}>‹</Text>
+              <AppIcon color={BRAND_COLORS.ink} name="arrowLeft" size={22} />
             </Pressable>
             <View style={styles.headerCopy}>
               <Text style={styles.eyebrow}>KAITOKID LOYALTY</Text>
@@ -254,7 +255,7 @@ export default function AccountPointsScreen() {
                 accessibilityRole="button"
                 onPress={() => router.push('/account/vouchers')}
                 style={styles.successLink}>
-                <Text style={styles.successLinkText}>Xem voucher ›</Text>
+                <Text style={styles.successLinkText}>Xem voucher</Text>
               </Pressable>
             </View>
           ) : null}

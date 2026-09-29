@@ -2,20 +2,12 @@ import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { AppIcon } from '@/components/ui/app-icon';
 import { BRAND_COLORS } from '@/constants/brand';
 import { resolveMediaUrl } from '@/services/api-client';
 import type { Category } from '@/types/shop';
 
 const PASTELS = ['#EDE9FE', '#DBEAFE', '#FEF3C7', '#FCE7F3', '#DCFCE7', '#FFE4E6'];
-
-function fallbackIcon(name: string) {
-  const value = name.toLowerCase();
-  if (value.includes('quần')) return '👖';
-  if (value.includes('váy') || value.includes('đầm')) return '👗';
-  if (value.includes('phụ kiện')) return '🧢';
-  if (value.includes('áo khoác')) return '🧥';
-  return '👕';
-}
 
 export function CategoryStrip({ categories }: { categories: Category[] }) {
   const router = useRouter();
@@ -30,7 +22,7 @@ export function CategoryStrip({ categories }: { categories: Category[] }) {
       <View style={styles.headingRow}>
         <View style={styles.headingCopy}>
           <Text style={styles.eyebrow}>DANH MỤC</Text>
-          <Text style={styles.heading}>Bé đang cần gì?</Text>
+          <Text style={styles.heading}>Khám phá danh mục</Text>
         </View>
         <Pressable onPress={() => router.push('/categories')}>
           <Text style={styles.more}>Xem tất cả</Text>
@@ -62,7 +54,7 @@ export function CategoryStrip({ categories }: { categories: Category[] }) {
                     transition={180}
                   />
                 ) : (
-                  <Text style={styles.fallback}>{fallbackIcon(item.name)}</Text>
+                  <AppIcon color={BRAND_COLORS.primaryDark} name="clothing" size={30} />
                 )}
               </View>
               <Text numberOfLines={2} style={styles.label}>
@@ -121,7 +113,6 @@ const styles = StyleSheet.create({
     borderColor: '#E5E7EB',
   },
   image: { width: '100%', height: '100%' },
-  fallback: { fontSize: 31 },
   label: {
     color: '#374151',
     fontSize: 11,

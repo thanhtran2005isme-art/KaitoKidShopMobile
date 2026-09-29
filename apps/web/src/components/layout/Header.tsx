@@ -272,10 +272,14 @@ interface DynamicMegaDropdownProps {
 }
 
 function DynamicMegaDropdown({ categories, gender, genderLabel }: DynamicMegaDropdownProps) {
-  // Filter root categories phù hợp với gender
+  // TreEm là nhóm tuổi; Nam/Nu/Unisex mới là giá trị giới tính sản phẩm.
   const visibleRoots = categories.filter(
     (root) => root.gioiTinh === 'all' || root.gioiTinh === gender,
   );
+  const scopeQuery =
+    gender === 'treem'
+      ? 'ageGroup=TreEm'
+      : `gender=${gender === 'nu' ? 'Nu' : 'Nam'}`;
 
   if (visibleRoots.length === 0) {
     return null;
@@ -292,12 +296,12 @@ function DynamicMegaDropdown({ categories, gender, genderLabel }: DynamicMegaDro
               items={
                 root.children.length > 0
                   ? root.children.map((child) => ({
-                      to: `/products?gender=${encodeURIComponent(genderLabel)}&category=${encodeURIComponent(child.name)}`,
+                      to: `/products?${scopeQuery}&category=${encodeURIComponent(child.name)}`,
                       label: child.name,
                     }))
                   : [
                       {
-                        to: `/products?gender=${encodeURIComponent(genderLabel)}&category=${encodeURIComponent(root.name)}`,
+                        to: `/products?${scopeQuery}&category=${encodeURIComponent(root.name)}`,
                         label: `Tất cả ${root.name}`,
                       },
                     ]
@@ -317,7 +321,7 @@ function DynamicMegaDropdown({ categories, gender, genderLabel }: DynamicMegaDro
             <img src="/Nhat.png" alt="Best Sellers" />
             <div className="mega-featured-text">
               <h5>Bán chạy nhất</h5>
-              <Link to={`/products?gender=${encodeURIComponent(genderLabel)}`}>Xem tất cả →</Link>
+              <Link to={`/products?${scopeQuery}`}>Xem tất cả →</Link>
             </div>
           </div>
         </div>

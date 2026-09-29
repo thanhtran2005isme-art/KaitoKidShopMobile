@@ -14,6 +14,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { OrderStatusBadge } from '@/components/orders/order-status-badge';
+import { AppIcon } from '@/components/ui/app-icon';
 import { BRAND_COLORS } from '@/constants/brand';
 import { useAuth } from '@/context/AuthContext';
 import { useShopping } from '@/context/ShoppingContext';
@@ -267,7 +268,7 @@ export default function OrderDetailScreen() {
               styles.backButton,
               pressed && styles.pressed,
             ]}>
-            <Text style={styles.backText}>‹</Text>
+            <AppIcon color={BRAND_COLORS.ink} name="arrowLeft" size={22} />
           </Pressable>
           <View style={styles.headerCopy}>
             <Text style={styles.eyebrow}>CHI TIẾT ĐƠN HÀNG</Text>
@@ -332,7 +333,7 @@ export default function OrderDetailScreen() {
               pressed && styles.pressed,
             ]}>
             <Text style={styles.trackButtonText}>Theo dõi hành trình</Text>
-            <Text style={styles.trackArrow}>›</Text>
+            <AppIcon color={BRAND_COLORS.primary} name="chevronRight" size={20} />
           </Pressable>
         </View>
 
@@ -371,7 +372,7 @@ export default function OrderDetailScreen() {
                   {order.status === 'completed' ? (
                     item.hasReviewed ? (
                       <Text style={[styles.reviewMeta, styles.reviewMetaDone]}>
-                        ✓ Đã đánh giá
+                        Đã đánh giá
                       </Text>
                     ) : (
                       <Pressable

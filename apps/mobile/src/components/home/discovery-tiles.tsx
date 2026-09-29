@@ -2,6 +2,7 @@ import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 
+import { AppIcon } from '@/components/ui/app-icon';
 import { BRAND_COLORS } from '@/constants/brand';
 import { resolveMediaUrl } from '@/services/api-client';
 import type { HomepageBlock } from '@/types/shop';
@@ -12,6 +13,21 @@ function decodeRoutePart(value: string) {
   } catch {
     return value;
   }
+}
+
+function parseQuery(value: string) {
+  const result: Record<string, string> = {};
+  value
+    .split('&')
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .forEach((part) => {
+      const [rawKey, ...rest] = part.split('=');
+      const rawValue = rest.join('=');
+      if (!rawKey || !rawValue) return;
+      result[decodeRoutePart(rawKey)] = decodeRoutePart(rawValue.replace(/\+/g, ' '));
+    });
+  return result;
 }
 
 export function DiscoveryTiles({ items }: { items?: HomepageBlock[] }) {
@@ -25,12 +41,24 @@ export function DiscoveryTiles({ items }: { items?: HomepageBlock[] }) {
 
   const open = (link?: string | null) => {
     const target = link?.trim();
-    const categoryMatch = target?.match(/^\/?(?:category|categories)\/([^/?#]+)/i);
+    if (!target) {
+      router.push('/categories');
+      return;
+    }
 
-    if (categoryMatch?.[1]) {
+    const [pathPart, queryPart = ''] = target.split('?');
+    const categoryMatch = pathPart.match(/^\/?(?:category|categories)\/([^/?#]+)/i);
+    const routeIsCategories = /^\/?(?:category|categories)\/?$/i.test(pathPart);
+    const query = parseQuery(queryPart);
+
+    if (categoryMatch?.[1] || routeIsCategories) {
       router.push({
         pathname: '/categories',
-        params: { category: decodeRoutePart(categoryMatch[1]) },
+        params: {
+          ...(categoryMatch?.[1] ? { category: decodeRoutePart(categoryMatch[1]) } : {}),
+          ...(query.gender ? { gender: query.gender } : {}),
+          ...(query.ageGroup ? { ageGroup: query.ageGroup } : {}),
+        },
       });
       return;
     }
@@ -43,9 +71,12 @@ export function DiscoveryTiles({ items }: { items?: HomepageBlock[] }) {
       <View style={styles.headingRow}>
         <View style={styles.headingCopy}>
           <Text style={styles.eyebrow}>KHÁM PHÁ</Text>
-          <Text style={styles.heading}>Chọn nhanh cho bé</Text>
+          <Text style={styles.heading}>Chọn nhanh theo phong cách</Text>
         </View>
-        <Pressable onPress={() => router.push('/categories')}>
+        <Pressable
+          accessibilityLabel="Xem tất cả danh mục"
+          accessibilityRole="button"
+          onPress={() => router.push('/categories')}>
           <Text style={styles.more}>Xem tất cả</Text>
         </Pressable>
       </View>
@@ -56,6 +87,8 @@ export function DiscoveryTiles({ items }: { items?: HomepageBlock[] }) {
           return (
             <Pressable
               key={item.id}
+              accessibilityLabel={item.title || 'Khám phá sản phẩm'}
+              accessibilityRole="button"
               onPress={() => open(item.link)}
               style={({ pressed }) => [
                 styles.tile,
@@ -64,6 +97,8 @@ export function DiscoveryTiles({ items }: { items?: HomepageBlock[] }) {
               ]}>
               {image ? (
                 <Image
+                  accessibilityLabel={item.title || 'KaitoKid'}
+                  cachePolicy="memory-disk"
                   contentFit="cover"
                   source={{ uri: image }}
                   style={StyleSheet.absoluteFill}
@@ -71,7 +106,7 @@ export function DiscoveryTiles({ items }: { items?: HomepageBlock[] }) {
                 />
               ) : (
                 <View style={styles.fallback}>
-                  <Text style={styles.fallbackIcon}>✦</Text>
+                  <AppIcon color={BRAND_COLORS.primary} name="sparkles" size={34} />
                 </View>
               )}
               <View style={styles.overlay} />
@@ -137,11 +172,6 @@ const styles = StyleSheet.create({
     backgroundColor: BRAND_COLORS.primarySoft,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  fallbackIcon: {
-    color: BRAND_COLORS.primary,
-    fontSize: 34,
-    fontWeight: '900',
   },
   overlay: {
     ...StyleSheet.absoluteFillObject,

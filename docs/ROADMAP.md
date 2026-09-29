@@ -1,5 +1,7 @@
 # KaitoKid Mobile Roadmap
 
+> **Brand scope update 2026-09-24:** D020 supersede D009. KaitoKid Shop Fashion phục vụ Nam/Nữ/Trẻ em và nhiều lứa tuổi. Các đoạn PHASE 1 kids-only bên dưới là lịch sử triển khai bộ seed Mobile, không được dùng để xóa nghiệp vụ Web Nam/Nữ/Trẻ em.
+
 Roadmap này là thứ tự triển khai chính. Không nhảy phase khi phần phụ thuộc cốt lõi của phase trước chưa ổn định.
 
 **Spec chi tiết cho toàn bộ phần còn lại PHASE 5 → PHASE 10:** `docs/PHASES_5_10.md`. File đó là checklist triển khai/acceptance chính cho các phase chưa hoàn thành.
@@ -35,15 +37,11 @@ Roadmap này là thứ tự triển khai chính. Không nhảy phase khi phần 
 - thêm migration không phá bảng cho database local hiện tại:
   `backend/Database/migrations/20260922_phase1_kids_branding.sql`.
 
-### Việc vận hành cần làm sau khi pull PHASE 1
+### Việc vận hành lịch sử của PHASE 1
 
-Chạy migration trên database local hiện tại:
+Migration `20260922_phase1_kids_branding.sql` từng dùng để đưa sample Mobile về kids-only trong PHASE 1.
 
-```bat
-"C:\xampp\mysql\bin\mysql.exe" -u root kaitokid < backend\Database\migrations\20260922_phase1_kids_branding.sql
-```
-
-Sau đó restart `run.bat`.
+> Trên PHASE 10 hiện tại, **không chạy migration PHASE 1 sau migration PHASE 10**. D020 đã supersede kids-only; trạng thái sample hiện hành được chốt bởi `20260929_phase10_multiaudience_media.sql`.
 
 ## PHASE 2 — Nâng cấp Home
 
@@ -301,3 +299,15 @@ PHASE 5 Cart
 - cập nhật `AI_HANDOFF.md`, `ROADMAP.md`, `DECISIONS.md` hoặc `TROUBLESHOOTING.md` khi trạng thái bền vững thay đổi;
 - không commit secret;
 - không sửa dữ liệu thành thời trang người lớn trở lại.
+
+## PHASE 10 — hardening đang nghiệm thu
+
+Đã có ở branch PHASE 10:
+
+- Mobile copy/token theo D020 Nam/Nữ/Trẻ em;
+- icon system `expo-symbols` thay Unicode/emoji ở các khu vực đã polish;
+- filter Mobile/Web/Backend và network hardening;
+- migration `20260929_phase10_multiaudience_media.sql` cho sample đa audience + media URL từ CSDL;
+- static/build gate `scripts\phase10-check.bat`.
+
+PHASE 10 vẫn **chưa hoàn tất** cho tới khi migration được chạy trên máy development và test matrix Android/Expo Web + E2E A–E pass.

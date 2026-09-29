@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { AppIcon } from '@/components/ui/app-icon';
 import { BRAND_COLORS } from '@/constants/brand';
 import { useAuth } from '@/context/AuthContext';
 import { useNotifications } from '@/context/NotificationsContext';
@@ -228,7 +229,7 @@ export default function NotificationsScreen() {
             <Text style={styles.cardTitle}>{item.title}</Text>
             <Text style={styles.body}>{item.body}</Text>
             {item.link?.startsWith('/') && !item.link.startsWith('//') ? (
-              <Text style={styles.linkHint}>Mở nội dung liên quan ›</Text>
+              <Text style={styles.linkHint}>Mở nội dung liên quan</Text>
             ) : null}
           </Pressable>
 
@@ -296,7 +297,7 @@ export default function NotificationsScreen() {
             hitSlop={8}
             onPress={() => router.back()}
             style={styles.backButton}>
-            <Text style={styles.backText}>‹</Text>
+            <AppIcon color={BRAND_COLORS.ink} name="arrowLeft" size={22} />
           </Pressable>
           <View style={styles.headerCopy}>
             <Text style={styles.eyebrow}>TRUNG TÂM THÔNG BÁO</Text>

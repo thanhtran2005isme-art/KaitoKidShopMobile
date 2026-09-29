@@ -1,18 +1,21 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { AppIcon } from '@/components/ui/app-icon';
 import { BRAND_COLORS } from '@/constants/brand';
 
 export function CartEmptyState({ onContinue }: { onContinue: () => void }) {
   return (
     <View style={styles.wrap}>
       <View style={styles.iconWrap}>
-        <Text style={styles.icon}>🛍️</Text>
+        <AppIcon color={BRAND_COLORS.primary} name="bag" size={36} />
       </View>
       <Text style={styles.title}>Giỏ hàng đang trống</Text>
       <Text style={styles.description}>
-        Chọn những món mềm mại, thoải mái và phù hợp với bé để bắt đầu đơn hàng.
+        Khám phá sản phẩm phù hợp với phong cách của bạn để bắt đầu đơn hàng.
       </Text>
       <Pressable
+        accessibilityLabel="Khám phá sản phẩm"
+        accessibilityRole="button"
         onPress={onContinue}
         style={({ pressed }) => [
           styles.button,
@@ -40,7 +43,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  icon: { fontSize: 40 },
   title: {
     color: BRAND_COLORS.ink,
     fontSize: 22,

@@ -16,6 +16,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { CheckoutOrderSummary } from '@/components/checkout/checkout-order-summary';
 import { CheckoutReviewModal } from '@/components/checkout/checkout-review-modal';
 import { CheckoutStepper } from '@/components/checkout/checkout-stepper';
+import { AppIcon } from '@/components/ui/app-icon';
 import { BRAND_COLORS } from '@/constants/brand';
 import { useAuth } from '@/context/AuthContext';
 import { useCheckout } from '@/context/CheckoutContext';
@@ -506,7 +507,7 @@ export default function CheckoutScreen() {
                 styles.backButton,
                 pressed && styles.pressed,
               ]}>
-              <Text style={styles.backText}>‹</Text>
+              <AppIcon color={BRAND_COLORS.ink} name="arrowLeft" size={22} />
             </Pressable>
             <View style={styles.headerCopy}>
               <Text style={styles.eyebrow}>CHECKOUT KAITOKID</Text>

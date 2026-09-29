@@ -34,7 +34,7 @@ Nếu môi trường công cụ không chạy được script search của skill
 
 ## Brand override KaitoKid
 
-KaitoKid là thời trang trẻ em 0–12 tuổi. Người mua chủ yếu là phụ huynh/người chăm sóc, vì vậy commerce UI cần thân thiện nhưng rõ ràng, thực dụng và dễ kiểm tra.
+Theo D020, KaitoKid Shop Fashion phục vụ Nam/Nữ/Trẻ em, nhiều lứa tuổi và unisex. Commerce UI phải trung tính theo audience, đọc đúng `GioiTinh` + `NhomTuoi` từ dữ liệu và không áp copy trẻ em lên toàn catalog.
 
 Mobile dùng token hiện tại từ `apps/mobile/src/constants/brand.ts`:
 
@@ -64,6 +64,7 @@ Với React Native UI mới:
 - có pressed/loading/disabled feedback;
 - tránh animation thừa trong critical flow như checkout;
 - không thêm emoji làm icon UI mới; dùng icon treatment nhất quán của project;
+- Mobile PHASE 10 dùng `expo-symbols` làm icon system chung cho Android/iOS/Expo Web; không dùng ký tự Unicode/emoji thay icon khi đã có symbol tương ứng;
 - trên Expo Web, giới hạn max content width thay vì kéo layout mobile toàn màn hình.
 
 ## PHASE 6 Checkout design system
@@ -137,7 +138,7 @@ Quy tắc:
 
 ## PHASE 9 Collections + Lookbook + Recommendation design system
 
-PHASE 9 dùng mô hình **discovery cards + immersive shop-the-look + explainable recommendations**, giữ KaitoKid là e-commerce trẻ em thực dụng thay vì biến Home thành feed quá dài.
+PHASE 9 dùng mô hình **discovery cards + immersive shop-the-look + explainable recommendations**, giữ KaitoKid là e-commerce thời trang thực dụng thay vì biến Home thành feed quá dài.
 
 Quy tắc:
 
@@ -159,3 +160,21 @@ Quy tắc:
 - Durable UI/UX workflow + KaitoKid overrides: file này
 - Codex design intelligence: `skill/.codex/skills/ui-ux-pro-max/`
 - Current implementation: Git `main`
+
+
+## PHASE 10 — Auth + Guest Account: Editorial Fashion × Soft Tech
+
+Luồng guest account, login, register và forgot-password dùng cùng một visual system:
+
+- hero thời trang ưu tiên media thật từ Lookbook/Banner backend; lỗi media phải fallback về gradient brand, không để màn trắng;
+- Guest Account là teaser thành viên: hero + floating sheet + lợi ích Đơn hàng/Yêu thích/Điểm & voucher + CTA rõ;
+- Login/Register dùng white floating sheet, label luôn hiển thị, icon `expo-symbols`, field-local validation và inline server error;
+- mật khẩu có show/hide button tối thiểu khoảng 44px;
+- Login hỗ trợ identifier email hoặc số điện thoại đúng contract API.Auth;
+- Register bám validation backend hiện tại: Name required, Email hợp lệ, Phone optional, Password tối thiểu 6 ký tự;
+- Forgot Password gọi endpoint thật `POST /api/Auth/forgot-password`; không tiết lộ email có tồn tại hay không;
+- dùng `KeyboardAvoidingView`, keyboard/autocomplete phù hợp và max-width trên Expo Web;
+- motion chỉ dùng cho hero/sheet/focus/press/loading, khoảng 110–320ms; không dùng animation trang trí vô hạn;
+- `useReducedMotion()` phải tắt entrance/transition không cần thiết cho người nhạy cảm với chuyển động;
+- màu tím là action/focus chính; cam chỉ là accent thương hiệu;
+- không thêm social login chỉ để trang trí nếu Mobile chưa tích hợp OAuth flow thật.

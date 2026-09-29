@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { AppIcon } from '@/components/ui/app-icon';
 import { BRAND_COLORS } from '@/constants/brand';
 import { useAuth } from '@/context/AuthContext';
 import { accountApi } from '@/services/account.api';
@@ -113,7 +114,7 @@ export default function DeleteAccountScreen() {
               hitSlop={8}
               onPress={() => router.back()}
               style={styles.backButton}>
-              <Text style={styles.backText}>‹</Text>
+              <AppIcon color={BRAND_COLORS.ink} name="arrowLeft" size={22} />
             </Pressable>
             <View style={styles.headerCopy}>
               <Text style={styles.eyebrow}>VÙNG NGUY HIỂM</Text>

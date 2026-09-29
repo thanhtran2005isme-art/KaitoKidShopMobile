@@ -1,3 +1,4 @@
+using System.Linq.Expressions;
 using System.Text.Json;
 using API.Customer.Data;
 using API.Customer.DTOs;
@@ -18,8 +19,17 @@ public class ProductService(CustomerDbContext db) : IProductService
         if (!string.IsNullOrEmpty(filter.Category))
             query = query.Where(p => p.Category == filter.Category);
 
+        if (!string.IsNullOrEmpty(filter.Subcategory))
+            query = query.Where(p => p.Subcategory == filter.Subcategory);
+
         if (!string.IsNullOrEmpty(filter.Gender))
             query = query.Where(p => p.Gender == filter.Gender);
+
+        if (!string.IsNullOrEmpty(filter.Style))
+            query = query.Where(p => p.Style == filter.Style);
+
+        if (!string.IsNullOrEmpty(filter.AgeGroup))
+            query = query.Where(p => p.AgeGroup == filter.AgeGroup);
 
         if (!string.IsNullOrEmpty(filter.Search))
             query = query.Where(p => p.Name.Contains(filter.Search) || p.Description.Contains(filter.Search));
@@ -29,6 +39,12 @@ public class ProductService(CustomerDbContext db) : IProductService
 
         if (filter.MaxPrice.HasValue)
             query = query.Where(p => p.Price <= filter.MaxPrice.Value);
+
+        if (filter.MinRating.HasValue)
+            query = query.Where(p => p.Rating >= filter.MinRating.Value);
+
+        query = ApplyJsonArrayAnyFilter(query, filter.Sizes, p => p.Sizes);
+        query = ApplyJsonArrayAnyFilter(query, filter.Colors, p => p.Colors);
 
         if (filter.IsNew == true)
             query = query.Where(p => p.IsNew);
@@ -347,6 +363,44 @@ public class ProductService(CustomerDbContext db) : IProductService
         }).ToList(),
         CreatedAt = p.CreatedAt
     };
+
+    private static IQueryable<Product> ApplyJsonArrayAnyFilter(
+        IQueryable<Product> query,
+        string? rawFilter,
+        Expression<Func<Product, string?>> selector)
+    {
+        var values = (rawFilter ?? string.Empty)
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(value => value.Replace("\"", string.Empty))
+            .Where(value => value.Length > 0)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        if (values.Length == 0) return query;
+
+        var parameter = selector.Parameters[0];
+        Expression? predicateBody = null;
+
+        foreach (var value in values)
+        {
+            var selected = selector.Body;
+            var notNull = Expression.NotEqual(
+                selected,
+                Expression.Constant(null, typeof(string)));
+            var contains = Expression.Call(
+                selected,
+                nameof(string.Contains),
+                Type.EmptyTypes,
+                Expression.Constant($"\"{value}\""));
+            var current = Expression.AndAlso(notNull, contains);
+            predicateBody = predicateBody is null
+                ? current
+                : Expression.OrElse(predicateBody, current);
+        }
+
+        return query.Where(
+            Expression.Lambda<Func<Product, bool>>(predicateBody!, parameter));
+    }
 
     private static T? Deserialize<T>(string? json)
     {

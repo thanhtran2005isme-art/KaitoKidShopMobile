@@ -106,6 +106,12 @@ export const shopApi = {
     };
   },
 
+  getBanners(position = 'homepage') {
+    return apiRequest<Banner[]>(
+      `/api/banners?position=${encodeURIComponent(position)}`,
+    );
+  },
+
   getCategories() {
     return apiRequest<Category[]>('/api/categories');
   },
@@ -119,6 +125,24 @@ export const shopApi = {
 
   getRelatedProducts(productId: number, count = 6) {
     return apiRequest<Product[]>(`/api/products/${productId}/related?count=${count}`);
+  },
+
+  getProducts(filters: {
+    category?: string;
+    gender?: string;
+    ageGroup?: string;
+    page?: number;
+    pageSize?: number;
+  }) {
+    const query = [
+      filters.category ? `Category=${encodeURIComponent(filters.category)}` : null,
+      filters.gender ? `Gender=${encodeURIComponent(filters.gender)}` : null,
+      filters.ageGroup ? `AgeGroup=${encodeURIComponent(filters.ageGroup)}` : null,
+      `Page=${filters.page ?? 1}`,
+      `PageSize=${filters.pageSize ?? 20}`,
+    ].filter(Boolean).join('&');
+
+    return apiRequest<PagedResult<Product>>(`/api/products?${query}`);
   },
 
   getProductsByCategory(category: string, page = 1, pageSize = 20) {

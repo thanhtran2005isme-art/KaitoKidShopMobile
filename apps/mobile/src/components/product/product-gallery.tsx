@@ -12,6 +12,7 @@ import {
   View,
 } from 'react-native';
 
+import { AppIcon } from '@/components/ui/app-icon';
 import { BRAND_COLORS } from '@/constants/brand';
 import { resolveMediaUrl } from '@/services/api-client';
 
@@ -73,7 +74,7 @@ export function ProductGallery({ images }: ProductGalleryProps) {
               />
             ) : (
               <View style={styles.fallback}>
-                <Text style={styles.fallbackIcon}>👕</Text>
+                <AppIcon color={BRAND_COLORS.primary} name="image" size={54} />
                 <Text style={styles.fallbackText}>Ảnh sản phẩm đang cập nhật</Text>
               </View>
             )}
@@ -112,7 +113,7 @@ export function ProductGallery({ images }: ProductGalleryProps) {
                   transition={120}
                 />
               ) : (
-                <Text style={styles.thumbnailFallback}>👕</Text>
+                <AppIcon color={BRAND_COLORS.primary} name="image" size={24} />
               )}
             </Pressable>
           ))}

@@ -10,13 +10,15 @@ This file is intentionally concise. It describes the current state needed to con
 - Local repo path (máy Windows hiện tại): `C:\Users\Admin\Videos\KaitoKidShop`
 - Default branch: `main`
 - Project name used in docs/UI: KaitoKidShop
-- Brand: **KaitoKid = thời trang trẻ em 0–12 tuổi**
+- Brand: **KaitoKid Shop Fashion = thời trang + phụ kiện cho Nam/Nữ/Trẻ em, nhiều lứa tuổi; D020 supersede D009 kids-only**
 - Brand rules: `docs/BRAND.md`
 - UI/UX durable rules: `docs/UI_UX.md`; source skill: `skill/.codex/skills/ui-ux-pro-max/SKILL.md`
-- Current roadmap: PHASE 1–9 hoàn tất ở mức code, tiếp theo PHASE 10 — Polish UI + performance + testing
+- Current roadmap: PHASE 1–9 hoàn tất ở mức code; PHASE 10 đang triển khai và chỉ hoàn tất sau runtime test matrix
 - PHASE 5–10 đã có acceptance criteria, API dependencies, UI/state scope và ranh giới chi tiết trong `docs/PHASES_5_10.md`.
 - Roadmap source: `docs/ROADMAP.md`
 - Detailed remaining PHASE 5–10 spec: `docs/PHASES_5_10.md`
+- PHASE 10 static/build gate: `npm run phase10:check` hoặc `scripts\phase10-check.bat`; vẫn cần manual Android/Expo Web E2E trước khi đánh dấu hoàn tất.
+- PHASE 10 đã bắt đầu đồng bộ Mobile với D020: copy kids-only ở Home/common states được loại bỏ và icon Unicode/emoji chính được thay bằng `expo-symbols` cross-platform.
 - Structure: full-stack monorepo
 - Git convention: mọi commit do AI/GPT tạo phải có phần mô tả bằng **tiếng Việt**; có thể giữ tiền tố Conventional Commits như `feat:`, `fix:`, `docs:`.
 - Commit granularity: mặc định **một task/fix/PHASE = một commit duy nhất**; không commit từng file/từng bước. Với PR, ưu tiên squash merge để `main` chỉ có một commit cho công việc đó.
@@ -47,7 +49,7 @@ KaitoKidShop/
 - `http://127.0.0.1:8081` is Expo Web for the mobile app, not the separate Vite web app.
 - Customer API environment variable: `EXPO_PUBLIC_API_URL`
 - Auth API environment variable: `EXPO_PUBLIC_AUTH_API_URL`
-- `apps/mobile/app.config.js` can auto-detect a LAN IPv4 for API.Customer when no explicit customer API URL is provided.
+- `apps/mobile/app.config.js` auto-detects a LAN IPv4 cho cả API.Customer và API.Auth khi không có URL explicit; Android emulator ưu tiên `10.0.2.2`, còn launcher chỉ ép `127.0.0.1` khi có đúng 1 ADB device để reverse port an toàn.
 
 ### Web
 
@@ -72,10 +74,11 @@ KaitoKidShop/
 - Backend DbContexts register through `AddMariaDb<TContext>()`
 - Legacy SQL Server migrations remain as history and are excluded from compilation.
 - Initial/fresh MariaDB schema source: `backend/Database/KaitoKid_MariaDB.sql`
-- Dữ liệu seed đã chuẩn hóa sang trẻ em.
-- Database local hiện tại cần chạy `backend/Database/migrations/20260922_phase1_kids_branding.sql` sau khi pull PHASE 1.
+- PHASE 1 từng chuẩn hóa sample Mobile sang trẻ em; PHASE 10 bổ sung migration đa audience để sample hiện có Nam/Nữ/Trẻ em theo D020.
+- `20260922_phase1_kids_branding.sql` là migration lịch sử của PHASE 1. Trên branch PHASE 10, **không chạy lại migration này sau PHASE 10** vì nó sẽ đưa sample về kids-only; migration hiện hành để chốt sample là `20260929_phase10_multiaudience_media.sql`.
 - PHASE 4 thêm migration idempotent `backend/Database/migrations/20260922_phase4_cart_reservation.sql` để bảo đảm các cột reservation của giỏ hàng tồn tại.
-- PHASE 9 thêm migration idempotent `backend/Database/migrations/20260924_phase9_discovery_seed.sql` để bổ sung Season/Style + hotspot mẫu cho Lookbook; không thêm bảng mới.
+- PHASE 9 thêm migration idempotent `backend/Database/migrations/20260924_phase9_discovery_seed.sql` để bổ sung discovery seed.
+- PHASE 10 thêm migration idempotent `backend/Database/migrations/20260929_phase10_multiaudience_media.sql`; migration tự bảo đảm cột `Lookbook.Season/Style`, nên có thể dùng để chốt sample hiện tại sau các migration cũ.
 
 ## Local database credentials
 
@@ -143,8 +146,8 @@ As of 2026-09-22:
 - Login mobile hiện dùng `AuthContext.login(email, password)` để lưu access token/session cho các API được bảo vệ.
 - Expo Web renders the mobile app successfully at `127.0.0.1:8081`.
 - API.Customer serves shared media from `apps/web/public` so existing banner URLs such as `/slide_1.jpg` resolve on port 5265.
-- Seed product image paths under `/products/` currently have no source files in the repository; API.Customer returns a branded placeholder instead of 404 until real product media is added.
-- Seed Lookbook paths `/lookbook/school-1.jpg` và `/lookbook/weekend-1.jpg` cũng chưa có file media; PHASE 9 thêm branded fallback ở API.Customer để không trả 404 cho discovery trong lúc chờ media thật.
+- PHASE 10 thêm `backend/Database/migrations/20260929_phase10_multiaudience_media.sql`: các seed product chuẩn được đổi sang HTTPS photo URL lưu trực tiếp trong `SanPham.HinhAnh`, đồng thời bổ sung sample Nam/Nữ người lớn. `/products/*` fallback vẫn giữ cho dữ liệu cũ hoặc media lỗi. Ảnh HTTPS này là **demo media**, chưa thay thế pipeline upload/storage production.
+- PHASE 10 cập nhật 2 Lookbook seed hiện có sang HTTPS photo URL và bổ sung 2 Lookbook Nam/Nữ; `/lookbook/*` fallback vẫn giữ cho record legacy.
 
 ## Known non-blocking item
 
@@ -153,6 +156,7 @@ As of 2026-09-22:
 - PHASE 7 có regression tests cho `canCancel`, tracking ownership và reorder ownership; chưa chạy được `dotnet test`/Expo runtime trong connector.
 - PHASE 8 có regression tests cho review ownership/variant, HasReviewed theo biến thể, notification ownership và delete-account release reservation; chưa chạy được `dotnet test`/Expo runtime trong connector.
 - PHASE 9 có regression tests cho Collection filter server-side và recommendation personalized/fallback; connector chưa chạy được `dotnet test`/Expo runtime nên cần xác nhận trên máy development sau khi pull.
+- Sau khi pull PHASE 10, database local cần chạy `backend/Database/migrations/20260929_phase10_multiaudience_media.sql` trước khi nghiệm thu Home/Category/media; migration idempotent và chỉ sửa các seed SKU/row chuẩn.
 - Wishlist/Add-to-cart, Cart, Checkout, Orders/Tracking, Reviews/Notifications/Account và Discovery PHASE 9 đã được nối ở mức code. PHASE 10 còn polish/performance/test matrix toàn hệ thống.
 - Seed hiện chưa có ảnh phụ hoặc `TonKhoBienThe` mẫu; Add to Cart dùng product-level reservation fallback qua `SanPham.SoLuongDaGiu`.
 - Sau khi pull PHASE 4 cần chạy migration reservation và restart API.Customer trước khi test Add to Cart.
@@ -175,3 +179,17 @@ As of 2026-09-22:
 13. Trước PHASE 10, xác nhận runtime PHASE 9 trên máy development: migration discovery, Collection list/detail, Lookbook filter/hotspot, recommendation guest/login và Home sections.
 
 For exact historical changes, use Git rather than relying on this file.
+
+
+## PHASE 10 Auth UI update (2026-09-29)
+
+Guest Account + Login + Register được redesign theo `docs/UI_UX.md` và `ui-ux-pro-max`:
+
+- fashion hero lấy media từ Lookbook/Banner backend, có gradient fallback;
+- shared components: `components/auth/auth-fashion-hero.tsx`, `auth-field.tsx`, `auth-primary-button.tsx`, `guest-account-experience.tsx`;
+- Login dùng identifier email/phone + password, inline error, forgot-password;
+- Register validation khớp API.Auth `RegisterDTO`;
+- Forgot Password gọi endpoint backend thật;
+- Reanimated motion ngắn + reduced-motion support.
+
+Chưa được ghi nhận PASS runtime cho tới khi chạy local gate và test Android/Expo Web.

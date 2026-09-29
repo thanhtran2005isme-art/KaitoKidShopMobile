@@ -25,18 +25,22 @@ export function productColorValue(name: string) {
   return PRODUCT_COLOR_MAP[name.trim().toLowerCase()] || '#D1D5DB';
 }
 
-export function productGenderLabel(value?: string | null) {
+export function productGenderLabel(value?: string | null, ageGroup?: string | null) {
   const normalized = value?.trim().toLowerCase();
-  if (normalized === 'nam') return 'Bé trai';
-  if (normalized === 'nu' || normalized === 'nữ') return 'Bé gái';
-  if (normalized === 'unisex') return 'Unisex';
-  return value || 'Trẻ em';
+  const age = ageGroup?.trim().toLowerCase();
+  const isKid = age === 'treem' || age === 'trẻ em';
+
+  if (normalized === 'nam') return isKid ? 'Bé trai' : 'Nam';
+  if (normalized === 'nu' || normalized === 'nữ') return isKid ? 'Bé gái' : 'Nữ';
+  if (normalized === 'unisex') return isKid ? 'Unisex trẻ em' : 'Unisex';
+  return value || 'Mọi giới tính';
 }
 
 export function productAgeLabel(value?: string | null) {
   const normalized = value?.trim().toLowerCase();
-  if (normalized === 'treem' || normalized === 'trẻ em') return '0–12 tuổi';
-  return value || '0–12 tuổi';
+  if (normalized === 'treem' || normalized === 'trẻ em') return 'Trẻ em';
+  if (normalized === 'nguoilon' || normalized === 'người lớn') return 'Người lớn';
+  return value || 'Không giới hạn';
 }
 
 export function htmlToPlainText(value?: string | null) {
@@ -131,7 +135,7 @@ export function buildProductFacts(product: ProductDetail): ProductSpecRow[] {
   const rows: ProductSpecRow[] = [
     { label: 'Mã sản phẩm', value: product.sku },
     { label: 'Danh mục', value: product.subcategory || product.category },
-    { label: 'Dành cho', value: productGenderLabel(product.gender) },
+    { label: 'Dành cho', value: productGenderLabel(product.gender, product.ageGroup) },
     { label: 'Độ tuổi', value: productAgeLabel(product.ageGroup) },
   ];
 

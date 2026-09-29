@@ -13,6 +13,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ProductCard } from '@/components/product/product-card';
+import { AppIcon } from '@/components/ui/app-icon';
 import { BRAND_COLORS } from '@/constants/brand';
 import { useProductGrid } from '@/hooks/use-product-grid';
 import { resolveMediaUrl } from '@/services/api-client';
@@ -133,7 +134,7 @@ export default function CollectionDetailScreen() {
                 accessibilityRole="button"
                 onPress={() => router.back()}
                 style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}>
-                <Text style={styles.backText}>‹</Text>
+                <AppIcon color={BRAND_COLORS.ink} name="arrowLeft" size={22} />
               </Pressable>
               <Text style={styles.topTitle}>Bộ sưu tập</Text>
             </View>

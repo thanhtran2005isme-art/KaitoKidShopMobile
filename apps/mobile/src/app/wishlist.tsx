@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { AppIcon } from '@/components/ui/app-icon';
 import { BRAND_COLORS } from '@/constants/brand';
 import { useAuth } from '@/context/AuthContext';
 import { useShopping } from '@/context/ShoppingContext';
@@ -67,7 +68,7 @@ export default function WishlistScreen() {
             accessibilityLabel="Quay lại"
             onPress={() => router.back()}
             style={styles.backButton}>
-            <Text style={styles.backText}>‹</Text>
+            <AppIcon color={BRAND_COLORS.ink} name="arrowLeft" size={22} />
           </Pressable>
           <Text style={styles.headerTitle}>Yêu thích</Text>
           <View style={styles.headerSpacer} />
@@ -75,9 +76,9 @@ export default function WishlistScreen() {
 
         <View style={styles.authState}>
           <View style={styles.authIcon}>
-            <Text style={styles.authIconText}>♡</Text>
+            <AppIcon color={BRAND_COLORS.danger} name="heart" size={38} />
           </View>
-          <Text style={styles.stateTitle}>Lưu những món bé yêu thích</Text>
+          <Text style={styles.stateTitle}>Lưu những sản phẩm bạn yêu thích</Text>
           <Text style={styles.stateText}>
             Đăng nhập để đồng bộ danh sách yêu thích trên tài khoản KaitoKid.
           </Text>
@@ -103,7 +104,7 @@ export default function WishlistScreen() {
           accessibilityLabel="Quay lại"
           onPress={() => router.back()}
           style={styles.backButton}>
-          <Text style={styles.backText}>‹</Text>
+          <AppIcon color={BRAND_COLORS.ink} name="arrowLeft" size={22} />
         </Pressable>
         <View style={styles.headerCopy}>
           <Text style={styles.headerTitle}>Yêu thích</Text>
@@ -155,7 +156,7 @@ export default function WishlistScreen() {
                         transition={160}
                       />
                     ) : (
-                      <Text style={styles.imageFallback}>👕</Text>
+                      <AppIcon color={BRAND_COLORS.primary} name="image" size={32} />
                     )}
                   </View>
 
@@ -173,7 +174,7 @@ export default function WishlistScreen() {
                       ) : null}
                     </View>
 
-                    <Text style={styles.openText}>Xem sản phẩm →</Text>
+                    <View style={styles.openRow}><Text style={styles.openText}>Xem sản phẩm</Text><AppIcon color={BRAND_COLORS.primary} name="arrowRight" size={14} /></View>
                   </View>
                 </Pressable>
 
@@ -186,9 +187,11 @@ export default function WishlistScreen() {
                     pressed && styles.pressed,
                     removing && styles.disabled,
                   ]}>
-                  <Text style={styles.removeIcon}>
-                    {removing ? '…' : '♥'}
-                  </Text>
+                  {removing ? (
+                    <ActivityIndicator color={BRAND_COLORS.danger} size="small" />
+                  ) : (
+                    <AppIcon color={BRAND_COLORS.danger} name="heartFilled" size={20} />
+                  )}
                 </Pressable>
               </View>
             );
@@ -196,7 +199,7 @@ export default function WishlistScreen() {
           ListEmptyComponent={
             <View style={styles.empty}>
               <View style={styles.emptyIcon}>
-                <Text style={styles.emptyIconText}>♡</Text>
+                <AppIcon color={BRAND_COLORS.primary} name="heart" size={38} />
               </View>
               <Text style={styles.stateTitle}>Chưa có sản phẩm yêu thích</Text>
               <Text style={styles.stateText}>
@@ -238,11 +241,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#F3F4F6',
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  backText: {
-    color: BRAND_COLORS.ink,
-    fontSize: 31,
-    lineHeight: 33,
   },
   headerCopy: { flex: 1 },
   headerTitle: {
@@ -289,7 +287,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   image: { width: '100%', height: '100%' },
-  imageFallback: { fontSize: 34 },
   productCopy: {
     flex: 1,
     paddingVertical: 5,
@@ -317,6 +314,11 @@ const styles = StyleSheet.create({
     fontSize: 10,
     textDecorationLine: 'line-through',
   },
+  openRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
   openText: {
     color: BRAND_COLORS.primary,
     fontSize: 9,
@@ -329,11 +331,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#FEF2F2',
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  removeIcon: {
-    color: BRAND_COLORS.danger,
-    fontSize: 20,
-    fontWeight: '900',
   },
   pressed: { opacity: 0.7 },
   disabled: { opacity: 0.5 },
@@ -361,11 +358,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#FEF2F2',
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  authIconText: {
-    color: BRAND_COLORS.danger,
-    fontSize: 42,
-    fontWeight: '900',
   },
   stateTitle: {
     color: BRAND_COLORS.ink,
@@ -422,10 +414,5 @@ const styles = StyleSheet.create({
     backgroundColor: BRAND_COLORS.primarySoft,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  emptyIconText: {
-    color: BRAND_COLORS.primary,
-    fontSize: 40,
-    fontWeight: '900',
   },
 });

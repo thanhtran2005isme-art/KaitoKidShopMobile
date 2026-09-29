@@ -38,12 +38,16 @@ function detectLanIpv4() {
 
 module.exports = () => {
   const explicitApiUrl = process.env.EXPO_PUBLIC_API_URL?.trim().replace(/\/+$/, '') || null;
+  const explicitAuthApiUrl = process.env.EXPO_PUBLIC_AUTH_API_URL?.trim().replace(/\/+$/, '') || null;
   const lanIpv4 = process.env.EAS_BUILD === 'true' ? null : detectLanIpv4();
   const autoApiUrl = lanIpv4 ? `http://${lanIpv4}:5265` : null;
+  const autoAuthApiUrl = lanIpv4 ? `http://${lanIpv4}:5053` : null;
   const apiUrl = explicitApiUrl || autoApiUrl;
+  const authApiUrl = explicitAuthApiUrl || autoAuthApiUrl;
 
   if (process.env.NODE_ENV !== 'production') {
     console.log(`[KaitoKid] API.Customer: ${apiUrl || 'platform fallback'}`);
+    console.log(`[KaitoKid] API.Auth: ${authApiUrl || 'platform fallback'}`);
   }
 
   return {
@@ -62,7 +66,9 @@ module.exports = () => {
     extra: {
       ...(baseConfig.extra || {}),
       apiUrl,
+      authApiUrl,
       apiUrlSource: explicitApiUrl ? 'env' : autoApiUrl ? 'lan-auto' : 'platform-fallback',
+      authApiUrlSource: explicitAuthApiUrl ? 'env' : autoAuthApiUrl ? 'lan-auto' : 'platform-fallback',
     },
   };
 };
