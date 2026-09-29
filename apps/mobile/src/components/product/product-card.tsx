@@ -18,9 +18,11 @@ function formatPrice(value: number) {
 export function ProductCard({
   product,
   width = 168,
+  wishlistPlacement = 'overlay',
 }: {
   product: Product;
   width?: number;
+  wishlistPlacement?: 'overlay' | 'inline';
 }) {
   const router = useRouter();
   const { token } = useAuth();
@@ -208,22 +210,35 @@ export function ProductCard({
         accessibilityRole="button"
         accessibilityState={{ disabled: wishlistBusy, selected: wished }}
         disabled={wishlistBusy}
-        hitSlop={4}
+        hitSlop={wishlistPlacement === 'overlay' ? 4 : undefined}
         onPress={() => void handleWishlist()}
         style={({ pressed }) => [
-          styles.wishlistButton,
-          wished && styles.wishlistButtonActive,
+          wishlistPlacement === 'overlay'
+            ? styles.wishlistButton
+            : styles.wishlistInlineButton,
+          wishlistPlacement === 'overlay' && wished && styles.wishlistButtonActive,
           pressed && styles.wishlistPressed,
           wishlistBusy && styles.wishlistBusy,
         ]}>
         {wishlistBusy ? (
           <ActivityIndicator color={BRAND_COLORS.primary} size="small" />
         ) : (
-          <AppIcon
-            color={wished ? BRAND_COLORS.danger : BRAND_COLORS.ink}
-            name={wished ? 'heartFilled' : 'heart'}
-            size={21}
-          />
+          <>
+            <AppIcon
+              color={wished ? BRAND_COLORS.danger : BRAND_COLORS.ink}
+              name={wished ? 'heartFilled' : 'heart'}
+              size={wishlistPlacement === 'overlay' ? 21 : 18}
+            />
+            {wishlistPlacement === 'inline' ? (
+              <Text
+                style={[
+                  styles.wishlistInlineText,
+                  wished && styles.wishlistInlineTextActive,
+                ]}>
+                {wished ? 'Đã lưu' : 'Yêu thích'}
+              </Text>
+            ) : null}
+          </>
         )}
       </Pressable>
     </View>
@@ -281,6 +296,24 @@ const styles = StyleSheet.create({
   wishlistButtonActive: {
     backgroundColor: '#FEF2F2',
     borderColor: '#FECACA',
+  },
+  wishlistInlineButton: {
+    minHeight: 44,
+    marginTop: 5,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: BRAND_COLORS.line,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  wishlistInlineText: {
+    color: BRAND_COLORS.ink,
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  wishlistInlineTextActive: {
+    color: BRAND_COLORS.danger,
   },
   wishlistPressed: { opacity: 0.72 },
   wishlistBusy: { opacity: 0.58 },

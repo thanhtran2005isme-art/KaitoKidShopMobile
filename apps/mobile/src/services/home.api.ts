@@ -129,6 +129,7 @@ export const shopApi = {
 
   getProducts(filters: {
     category?: string;
+    subcategory?: string;
     gender?: string;
     ageGroup?: string;
     page?: number;
@@ -136,6 +137,7 @@ export const shopApi = {
   }) {
     const query = [
       filters.category ? `Category=${encodeURIComponent(filters.category)}` : null,
+      filters.subcategory ? `Subcategory=${encodeURIComponent(filters.subcategory)}` : null,
       filters.gender ? `Gender=${encodeURIComponent(filters.gender)}` : null,
       filters.ageGroup ? `AgeGroup=${encodeURIComponent(filters.ageGroup)}` : null,
       `Page=${filters.page ?? 1}`,
