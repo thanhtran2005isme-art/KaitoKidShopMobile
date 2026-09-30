@@ -12,7 +12,8 @@
     "start:dev": "prisma generate && nest start --watch",
     "db:introspect": "prisma db pull && prisma generate",
     "db:generate": "prisma generate",
-    "db:audit": "npm run build && node dist/scripts/audit-legacy-db.js"
+    "db:audit": "npm run build && node dist/scripts/audit-legacy-db.js",
+    "test:catalog": "npm run build && node --test test/catalog-contract.test.mjs"
   },
   "dependencies": {
     "@nestjs/common": "11.2.5",

@@ -56,3 +56,10 @@ Không xóa backend C# trong các phase đầu.
 - Không đổi test sang `dist/src/*`; layout đó là lỗi cấu hình build cũ.
 
 - Audit schema tôn trọng `@@lower_case_table_names`: Windows/MariaDB case-insensitive được đối chiếu không phân biệt hoa/thường; Linux case-sensitive vẫn kiểm tra đúng casing. Audit không đổi tên bảng hay dữ liệu.
+
+## Tiến độ code trên nhánh stacked
+
+- Phase nền NestJS/Prisma: implemented, còn chờ runtime DB audit local.
+- Catalog read-only: Products, Categories, Banners, HomepageBlocks, Collections, Lookbooks đã được mirror ở mức source.
+- Chưa cutover Web/Mobile; C# vẫn là backend đang phục vụ.
+- Catalog Node phải chạy `npm run test:catalog` và parity test với MariaDB thật trước khi merge/cutover.
