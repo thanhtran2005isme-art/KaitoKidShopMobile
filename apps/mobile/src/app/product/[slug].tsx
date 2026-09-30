@@ -33,6 +33,7 @@ import {
   htmlToPlainText,
   supportsKidSizeGuide,
 } from '@/utils/product-detail';
+import { releaseWebFocus } from '@/utils/web-focus';
 
 function formatPrice(value: number) {
   return `${Math.round(value).toLocaleString('vi-VN')}đ`;
@@ -72,6 +73,11 @@ export default function ProductDetailScreen() {
     type: 'success' | 'error';
     text: string;
   } | null>(null);
+
+  const goBack = () => {
+    releaseWebFocus();
+    router.back();
+  };
 
   useEffect(() => {
     if (!feedback) return;
@@ -257,7 +263,7 @@ export default function ProductDetailScreen() {
     return (
       <SafeAreaView style={styles.center}>
         <Text style={styles.errorTitle}>Thiếu mã sản phẩm</Text>
-        <Pressable onPress={() => router.back()} style={styles.darkButton}>
+        <Pressable onPress={goBack} style={styles.darkButton}>
           <Text style={styles.darkButtonText}>Quay lại</Text>
         </Pressable>
       </SafeAreaView>
@@ -286,7 +292,7 @@ export default function ProductDetailScreen() {
             style={styles.primaryButton}>
             <Text style={styles.primaryButtonText}>Thử lại</Text>
           </Pressable>
-          <Pressable onPress={() => router.back()} style={styles.darkButton}>
+          <Pressable onPress={goBack} style={styles.darkButton}>
             <Text style={styles.darkButtonText}>Quay lại</Text>
           </Pressable>
         </View>
@@ -326,6 +332,7 @@ export default function ProductDetailScreen() {
   const productPath = `/product/${product.slug || product.id}`;
 
   const requireLogin = () => {
+    releaseWebFocus();
     router.push({
       pathname: '/auth/login',
       params: { redirect: productPath },
@@ -533,7 +540,7 @@ export default function ProductDetailScreen() {
           <View style={styles.mediaActions}>
             <Pressable
               accessibilityLabel="Quay lại"
-              onPress={() => router.back()}
+              onPress={goBack}
               style={styles.floatingButton}>
               <AppIcon color={BRAND_COLORS.ink} name="arrowLeft" size={22} />
             </Pressable>
@@ -621,7 +628,10 @@ export default function ProductDetailScreen() {
               label="Kích cỡ"
               onAction={
                 canShowSizeGuide
-                  ? () => setSizeGuideVisible(true)
+                  ? () => {
+                      releaseWebFocus();
+                      setSizeGuideVisible(true);
+                    }
                   : undefined
               }
               onSelect={chooseSize}
@@ -738,7 +748,11 @@ export default function ProductDetailScreen() {
                     <Text style={styles.sectionEyebrow}>GỢI Ý THÊM</Text>
                     <Text style={styles.sectionTitle}>Có thể bạn cũng thích</Text>
                   </View>
-                  <Pressable onPress={() => router.push('/categories')}>
+                  <Pressable
+                    onPress={() => {
+                      releaseWebFocus();
+                      router.push('/categories');
+                    }}>
                     <Text style={styles.more}>Xem thêm</Text>
                   </Pressable>
                 </View>
@@ -842,7 +856,10 @@ export default function ProductDetailScreen() {
 
       <ProductSizeGuide
         availableSizes={sizes}
-        onClose={() => setSizeGuideVisible(false)}
+        onClose={() => {
+          releaseWebFocus();
+          setSizeGuideVisible(false);
+        }}
         visible={sizeGuideVisible}
       />
     </SafeAreaView>

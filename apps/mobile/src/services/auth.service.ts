@@ -49,6 +49,14 @@ export type RegisterRequest = {
   password: string;
 };
 
+export type AuthTokenResponse = {
+  accessToken: string;
+  refreshToken?: string;
+  expiresAt?: string;
+  user?: unknown;
+  token?: string;
+};
+
 async function request<T>(url: string, options: RequestInit): Promise<T> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 15000);
@@ -111,12 +119,19 @@ async function request<T>(url: string, options: RequestInit): Promise<T> {
 }
 
 export function login(data: LoginRequest) {
-  return request('/api/Auth/login', {
+  return request<AuthTokenResponse>('/api/Auth/login', {
     method: 'POST',
     body: JSON.stringify({
       identifier: data.email,
       password: data.password,
     }),
+  });
+}
+
+export function refreshAccessToken(refreshToken: string) {
+  return request<AuthTokenResponse>('/api/Auth/refresh', {
+    method: 'POST',
+    body: JSON.stringify({ refreshToken }),
   });
 }
 

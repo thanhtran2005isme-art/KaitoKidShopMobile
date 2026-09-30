@@ -1029,10 +1029,7 @@ const styles = StyleSheet.create({
     backgroundColor: BRAND_COLORS.surface,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: BRAND_COLORS.primarySoft,
-    shadowColor: BRAND_COLORS.ink,
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 2 },
+    boxShadow: '0 2px 8px rgba(17, 24, 39, 0.06)',
     elevation: 2,
   },
   audienceTab: {

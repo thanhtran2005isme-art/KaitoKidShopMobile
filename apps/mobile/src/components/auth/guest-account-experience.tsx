@@ -172,10 +172,7 @@ const styles = StyleSheet.create({
     paddingTop: 10,
     paddingBottom: 20,
     gap: 17,
-    shadowColor: '#111827',
-    shadowOpacity: 0.08,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 8 },
+    boxShadow: '0 8px 18px rgba(17, 24, 39, 0.08)',
     elevation: 4,
   },
   sheetHandle: {
