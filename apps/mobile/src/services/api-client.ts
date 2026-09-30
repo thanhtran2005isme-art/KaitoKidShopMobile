@@ -16,6 +16,14 @@ const runtimeApiUrl =
 
 const shouldPreferAndroidEmulatorFallback = Platform.OS === 'android' && !Device.isDevice && !explicitApiUrl;
 
+type UnauthorizedHandler = () => Promise<string | null>;
+
+let unauthorizedHandler: UnauthorizedHandler | null = null;
+
+export function setUnauthorizedHandler(handler: UnauthorizedHandler | null) {
+  unauthorizedHandler = handler;
+}
+
 export const API_BASE_URL = (
   explicitApiUrl ||
   (shouldPreferAndroidEmulatorFallback ? fallbackApiUrl : runtimeApiUrl || fallbackApiUrl) ||
@@ -52,16 +60,16 @@ async function getErrorMessage(response: Response) {
   }
 }
 
-export async function apiRequest<T>(
+async function fetchWithTimeout(
   path: string,
-  init?: RequestInit,
-  timeoutMs = 15000,
-): Promise<T> {
+  init: RequestInit | undefined,
+  timeoutMs: number,
+) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
-    const response = await fetch(`${API_BASE_URL}${path.startsWith('/') ? path : `/${path}`}`, {
+    return await fetch(`${API_BASE_URL}${path.startsWith('/') ? path : `/${path}`}`, {
       ...init,
       headers: {
         Accept: 'application/json',
@@ -69,8 +77,46 @@ export async function apiRequest<T>(
       },
       signal: controller.signal,
     });
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+export async function apiRequest<T>(
+  path: string,
+  init?: RequestInit,
+  timeoutMs = 15000,
+): Promise<T> {
+  try {
+    let response = await fetchWithTimeout(path, init, timeoutMs);
+
+    const requestHeaders = new Headers(init?.headers);
+    const authorization = requestHeaders.get('Authorization');
+
+    if (
+      response.status === 401 &&
+      authorization?.toLowerCase().startsWith('bearer ') &&
+      unauthorizedHandler
+    ) {
+      const refreshedToken = await unauthorizedHandler();
+
+      if (refreshedToken) {
+        requestHeaders.set('Authorization', `Bearer ${refreshedToken}`);
+        response = await fetchWithTimeout(
+          path,
+          {
+            ...init,
+            headers: requestHeaders,
+          },
+          timeoutMs,
+        );
+      }
+    }
 
     if (!response.ok) {
+      if (response.status === 401 && authorization) {
+        throw new Error('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
+      }
       throw new Error(await getErrorMessage(response));
     }
 
@@ -98,8 +144,6 @@ export async function apiRequest<T>(
     }
 
     throw error;
-  } finally {
-    clearTimeout(timeout);
   }
 }
 

@@ -179,8 +179,9 @@ Kiểm tra:
 
 1. Đăng nhập qua mobile để `AuthContext` lưu access token.
 2. Sau login, `ShoppingContext` phải tự refresh wishlist/cart count.
-3. Nếu token cũ hết hạn, logout/login lại.
-4. Không hard-code Bearer token vào source hoặc `.env`.
+3. Mobile tự refresh access token qua `/api/Auth/refresh` trước khi hết hạn và retry một lần khi API.Customer trả 401 cho request Bearer.
+4. Nếu refresh token cũng hết hạn/không hợp lệ, session được xóa và người dùng đăng nhập lại.
+5. Không hard-code Bearer token vào source hoặc `.env`.
 
 ## Add to Cart báo size/màu không hợp lệ
 

@@ -4,6 +4,7 @@ import { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Platform,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -72,6 +73,13 @@ export default function AccountScreen() {
   );
 
   const confirmLogout = () => {
+    if (Platform.OS === 'web') {
+      if (window.confirm('Đăng xuất?\n\nBạn sẽ cần đăng nhập lại để xem dữ liệu mua sắm được bảo vệ.')) {
+        void logout();
+      }
+      return;
+    }
+
     Alert.alert(
       'Đăng xuất?',
       'Bạn sẽ cần đăng nhập lại để xem dữ liệu mua sắm được bảo vệ.',

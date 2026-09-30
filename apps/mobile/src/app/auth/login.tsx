@@ -1,6 +1,9 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
 import { useRef, useState } from 'react';
 import {
+  ActivityIndicator,
+  Image,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -12,17 +15,47 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, { FadeInUp, useReducedMotion } from 'react-native-reanimated';
 
-import { AuthFashionHero } from '@/components/auth/auth-fashion-hero';
 import { AuthField } from '@/components/auth/auth-field';
-import { AuthPrimaryButton } from '@/components/auth/auth-primary-button';
 import { AppIcon } from '@/components/ui/app-icon';
-import { BRAND, BRAND_COLORS } from '@/constants/brand';
 import { useAuth } from '@/context/AuthContext';
 
 type LoginErrors = {
   identifier?: string;
   password?: string;
 };
+
+const GOOGLE_MARK =
+  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABwAAAAcCAIAAAD9b0jDAAACV0lEQVR42mMUlFBnoDZgYqABGDqGsuCRY2RkdHOxd3a0NdDTUVSU4+bifPjoydVrN3fuPrB52+4fP37g1IgrovR1tSb0tujramGV/fDxU9/EGdNmLvj37x+mLDMnjwimaHCg94rFs6QkxXG5hYOD3dHeWlhYcPfeg0SFqa+X6+xpvaysKCHz/MXLS1eu/f79By5y6/bd9q5JRHlfVUXpwK51nJwcEO6jx0+7+6bu3H3gzdt3DAwMbKys5mZGlWV5Avz8fsFxEEHChm7ftMzc1AjCPnf+UlBE8qdPn9F9x8TEz8f7/sNHopKUsZE+3MSvX7/FJuVimsjAwPDv3z88JqIb6u7qAGf3T575/MVLKqRTHS0NOHvj5p1oSuNjwiQkxLCacvPW3Q2btmM3VECAD85+9PgJms6EuAhcyfbo8dPIhjKhBRaczcrKSoJ/WZhxhumrV2/gbDUVJeINff3mLU5DL125Dmd7ebqg6XR0CxKS1ICjsOg0uNSDB49xGoqc57LSEqSlJPG4LjMtHs4+dOQETkOvXrsJl+bi4lw4ZyIfHy9WE5MTohztraF+f/32yLFT+PJ+cXnD9+/QMs3IUO/Qng0RoQHI5YCmhuqieZO72+vgIq2dE9GKQSxFn6+X68K5k9Ei8Pbd+xDnG+rrIEvt2nMgIjaDqPI0ONB72sROtIIKE5w7fyk4IuXjp09EVSdr12/18I24eu0mLuN+//4zd8Ey3+A4TBPxlfyQ6sTT3cnJwcZAT1teXpabi/Pxk2c3bt45ePj45m27Xr9+S3J1Mlrvkw0A6Brfw7qKhC0AAAAASUVORK5CYII=';
+const TWITTER_MARK =
+  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABwAAAAcCAIAAAD9b0jDAAACHElEQVR42mMUlFBnoDZgYqABGOGGspCqgYODQ1tLnY2V9dz5Sz9//SLKpVxcnHhMzM9JfXL33O6tK7duWHLx9D49HU0uLs7Y6FAZaUmchrKwMB/cvV5NVRmriXnZKfXVxUxMUC1iYiLrVy+4e+2Epbnxx0+fcRoqLyarrKSwee0iUxMDNBO5ublqKwvRBAUF+H/9+i0oIBDk74XT0E+fPjMwMIiKCu/cvGJSb4uIsBBcSk1VmZmZGdP5vLw8585fWrhkFbIgMyePCJzz7dt3Z0dbKSkJBgYGPV2t9NQ4WWmpL1++MjExSUtJhAX7YRr66dPnsOg0NEFG5GwqKSEeGuybl50iJChAZGK4d/+hiZU7viT1n+F/Q00JSSns8eOnBJLUixevzl+8QpKh+w8dI5xOUzKKXrx4RbyhW7fvxhREiSgGBoYPHz7eunNPRVlRUkKMoIk7dx+YPW8pUXlfRVnRUF+HoIn////v6p2CVQrdpQwMDBcvXREVETYgZG5LR//6TduJNfTfv387dx9YuWbj379/TU0MsWrbuHlHZW0baaWUhrpKekpcVHgQVtndew+mZhX///+fKEPtbCxyMpMkJcS1tbBXXI8eP+3qnbJyzaa/f//iCRlGtIqPm5vLx9PVy8PZ2dEWuRg8cuzUvIXLN23Z+e/fP4JxyIirNmViYpKXkxEREXrz5t3zF69+/PhBfOJlHK2ih4ahAHMmrlBP9O56AAAAAElFTkSuQmCC';
+const GITHUB_MARK =
+  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABwAAAAcCAIAAAD9b0jDAAACyklEQVR42mMUlFBnoDZgYqABGDqGsuCXlpAQc3a0lZGWhIs8fPhk7/7Dr9+8JcdQKUmJlobyAD9PTKn///+vWL2xrrHz7bv3WPUyYo19ezurRXMm8fLy4HHO23fvI2Izzp67SFSYenk4r10+B7+JDAwMwkKC2zYstbY0JWyohrrK7Gm9TExMJ0+fy8gpO33mAqaeI8dOJWcUXbx8jZWVZeHcydJSkvjClJGRcerEDk5ODgYGhv0Hjq5au2n1us1hwX4Hjxx/8eIVJKAtLYzXrt/KwMBgZKCrr6slJCjQ390YFp2G06U+Xq6G+jpocbJyzUaIiQwMDM+ev4CYyMDAwMgIVePiZGdqYoDTUG9PFzj71p17+MP0+o3bcLanmxNOQ81MDCGMu/cebti0Hb+hS1ese/nyNYRtaWGC01BhIUEI48rV68TknEtXrkEY8rIyOA1lY2eDxxgxhjIzM0MYAgJ8OA19+/YdhKGlqUbQREZGRl1tTQj75as3OA29dv0WhKGirGhooIvfUDcXe1FRYQj76rWbOA09cuwUnL1o7iRtLZzlt5WF6bRJnXDuoSPHceZ9QQH+y2cPvP/wYe6C5VnpCUKCAsdOnNm+c9+suYv//v3LwMDAwcGRnZ7g6e5kZKgH1/Xu/Qd9U6evX79hd+n7Dx8nT58rLSVpb2MRFZ/59es3Gysze1sLiIkMDAw/fvzw83VHNpGBgaG7byqyiVjy/pTp8y5evmZvZ8XNxWVk4eoXHJeZW46s4PiJs8jcQ0dOzF+4gkCB8vXrt4CQhBOnzi6aOzkhNlxERBgtZP/8+Q1nb962Ozwm/dfv34SLvo+fPgWEJKzftK26omDezH5rKzNkWVZWNgYGhg8fP1XWtiak5P38+RNL+uXkEcEU/fvv345d+0+dOc/IyLh33+F79x/Cpbi4OJ+/eJmQkoecVIgq+UfrfUoAAIwsARSbWLDPAAAAAElFTkSuQmCC';
+
+function SocialMark({ source }: { source: string }) {
+  return (
+    <Image
+      accessible={false}
+      resizeMode="contain"
+      source={{ uri: source }}
+      style={styles.socialReferenceMark}
+    />
+  );
+}
+
+const LOGIN_COLORS = {
+  canvas: '#E8E8E8',
+  card: '#111827',
+  border: '#1F2937',
+  text: '#F3F4F6',
+  muted: '#9CA3AF',
+  accent: '#A78BFA',
+  success: '#86EFAC',
+  successBackground: '#13251D',
+  successBorder: '#1F5135',
+  danger: '#FCA5A5',
+  dangerBackground: '#2B171B',
+  dangerBorder: '#5B2730',
+} as const;
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -90,6 +123,7 @@ export default function LoginScreen() {
 
   return (
     <SafeAreaView edges={['top', 'bottom']} style={styles.safeArea}>
+      <StatusBar style="dark" />
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.flex}>
@@ -97,40 +131,16 @@ export default function LoginScreen() {
           contentContainerStyle={styles.content}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}>
-          <AuthFashionHero
-            eyebrow="MEMBER ACCESS"
-            height={270}
-            onBack={() => router.back()}
-            subtitle={BRAND.promise}
-            title="Chào mừng trở lại"
-          />
-
           <Animated.View
-            entering={
-              reducedMotion
-                ? undefined
-                : FadeInUp.duration(300).delay(70)
-            }
-            style={styles.sheet}>
-            <View style={styles.sheetHandle} />
-
-            <View style={styles.headingBlock}>
-              <Text style={styles.kicker}>ĐĂNG NHẬP KAITOKID</Text>
-              <Text style={styles.title}>Tiếp tục trải nghiệm của bạn</Text>
-              <Text style={styles.subtitle}>
-                Theo dõi đơn hàng, đồng bộ yêu thích, điểm thành viên và voucher trên một tài khoản.
-              </Text>
+            entering={reducedMotion ? undefined : FadeInUp.duration(280).delay(40)}
+            style={styles.card}>
+            <View style={styles.heading}>
+              <Text style={styles.title}>Đăng nhập</Text>
             </View>
 
             {registered ? (
               <View accessibilityRole="alert" style={styles.successCard}>
-                <View style={styles.successIcon}>
-                  <AppIcon
-                    color={BRAND_COLORS.success}
-                    name="check"
-                    size={18}
-                  />
-                </View>
+                <AppIcon color={LOGIN_COLORS.success} name="check" size={18} />
                 <Text style={styles.successText}>
                   Tài khoản đã sẵn sàng. Hãy đăng nhập để bắt đầu mua sắm.
                 </Text>
@@ -139,6 +149,7 @@ export default function LoginScreen() {
 
             <View style={styles.form}>
               <AuthField
+                appearance="dark"
                 autoCapitalize="none"
                 autoComplete="username"
                 autoCorrect={false}
@@ -158,14 +169,15 @@ export default function LoginScreen() {
                   clearError('identifier');
                 }}
                 onSubmitEditing={() => passwordRef.current?.focus()}
-                placeholder="email@domain.com hoặc 09xxxxxxxx"
                 returnKeyType="next"
+                showLeadingIcon={false}
                 textContentType="username"
                 value={identifier}
               />
 
               <AuthField
                 ref={passwordRef}
+                appearance="dark"
                 autoComplete="current-password"
                 error={fieldErrors.password}
                 icon="lock"
@@ -183,49 +195,37 @@ export default function LoginScreen() {
                   clearError('password');
                 }}
                 onSubmitEditing={() => void handleLogin()}
-                placeholder="Nhập mật khẩu"
                 returnKeyType="done"
                 secure
+                showLeadingIcon={false}
+                showSecureToggle={false}
                 textContentType="password"
                 value={password}
               />
 
-              <View style={styles.formMeta}>
-                <View style={styles.secureHint}>
-                  <AppIcon
-                    color={BRAND_COLORS.success}
-                    name="shield"
-                    size={16}
-                  />
-                  <Text style={styles.secureHintText}>Phiên đăng nhập được bảo vệ</Text>
-                </View>
-
-                <Pressable
-                  accessibilityLabel="Quên mật khẩu"
-                  accessibilityRole="button"
-                  onPress={() =>
-                    router.push({
-                      pathname: '/auth/forgot-password',
-                      params: identifier.includes('@')
-                        ? { email: identifier.trim() }
-                        : {},
-                    })
-                  }
-                  style={({ pressed }) => pressed && styles.pressed}>
-                  <Text style={styles.forgotText}>Quên mật khẩu?</Text>
-                </Pressable>
-              </View>
+              <Pressable
+                accessibilityLabel="Quên mật khẩu"
+                accessibilityRole="button"
+                hitSlop={11}
+                onPress={() =>
+                  router.push({
+                    pathname: '/auth/forgot-password',
+                    params: identifier.includes('@')
+                      ? { email: identifier.trim() }
+                      : {},
+                  })
+                }
+                style={({ pressed }) => [
+                  styles.forgotButton,
+                  pressed && styles.controlPressed,
+                ]}>
+                <Text style={styles.forgotText}>Quên mật khẩu?</Text>
+              </Pressable>
             </View>
 
             {serverError ? (
               <View accessibilityRole="alert" style={styles.errorCard}>
-                <View style={styles.errorIcon}>
-                  <AppIcon
-                    color={BRAND_COLORS.danger}
-                    name="warning"
-                    size={18}
-                  />
-                </View>
+                <AppIcon color={LOGIN_COLORS.danger} name="warning" size={18} />
                 <View style={styles.errorCopy}>
                   <Text style={styles.errorTitle}>Chưa thể đăng nhập</Text>
                   <Text style={styles.errorText}>{serverError}</Text>
@@ -233,79 +233,64 @@ export default function LoginScreen() {
               </View>
             ) : null}
 
-            <AuthPrimaryButton
-              label="Đăng nhập"
-              loading={loading}
-              loadingLabel="Đang xác thực..."
-              onPress={() => void handleLogin()}
-            />
-
-            <View style={styles.divider}>
-              <View style={styles.dividerLine} />
-              <Text style={styles.dividerText}>MỚI TẠI KAITOKID</Text>
-              <View style={styles.dividerLine} />
-            </View>
-
             <Pressable
-              accessibilityLabel="Tạo tài khoản KaitoKid mới"
+              accessibilityLabel="Đăng nhập"
               accessibilityRole="button"
-              onPress={() =>
-                router.push({
-                  pathname: '/auth/register',
-                  params: redirect ? { redirect } : {},
-                })
-              }
+              accessibilityState={{ disabled: loading, busy: loading }}
+              disabled={loading}
+              hitSlop={2}
+              onPress={() => void handleLogin()}
               style={({ pressed }) => [
-                styles.secondaryButton,
-                pressed && styles.secondaryPressed,
+                styles.signButton,
+                loading && styles.signButtonDisabled,
+                pressed && !loading && styles.signButtonPressed,
               ]}>
-              <View style={styles.secondaryIcon}>
-                <AppIcon
-                  color={BRAND_COLORS.primary}
-                  name="user"
-                  size={20}
-                />
-              </View>
-              <View style={styles.secondaryCopy}>
-                <Text style={styles.secondaryTitle}>Tạo tài khoản mới</Text>
-                <Text style={styles.secondaryDescription}>
-                  Bắt đầu tích điểm và quản lý trải nghiệm mua sắm.
-                </Text>
-              </View>
-              <AppIcon
-                color={BRAND_COLORS.ink}
-                name="chevronRight"
-                size={20}
-              />
+              {loading ? (
+                <>
+                  <ActivityIndicator color={LOGIN_COLORS.canvas} size="small" />
+                  <Text style={styles.signButtonText}>Đang xác thực...</Text>
+                </>
+              ) : (
+                <Text style={styles.signButtonText}>Đăng nhập</Text>
+              )}
             </Pressable>
 
-            <View style={styles.benefitStrip}>
-              <View style={styles.benefitItem}>
-                <AppIcon
-                  color={BRAND_COLORS.primary}
-                  name="bag"
-                  size={18}
-                />
-                <Text style={styles.benefitText}>Đơn hàng</Text>
+            <View style={styles.socialDivider}>
+              <View style={styles.socialDividerLine} />
+              <Text style={styles.socialDividerText}>Đăng nhập bằng mạng xã hội</Text>
+              <View style={styles.socialDividerLine} />
+            </View>
+
+            <View
+              accessibilityLabel="Đăng nhập mạng xã hội: Google, Twitter, GitHub"
+              accessibilityRole="text"
+              style={styles.socialRow}>
+              <View style={styles.socialIconSlot}>
+                <SocialMark source={GOOGLE_MARK} />
               </View>
-              <View style={styles.benefitDivider} />
-              <View style={styles.benefitItem}>
-                <AppIcon
-                  color="#BE185D"
-                  name="heart"
-                  size={18}
-                />
-                <Text style={styles.benefitText}>Yêu thích</Text>
+              <View style={styles.socialIconSlot}>
+                <SocialMark source={TWITTER_MARK} />
               </View>
-              <View style={styles.benefitDivider} />
-              <View style={styles.benefitItem}>
-                <AppIcon
-                  color={BRAND_COLORS.accent}
-                  name="gift"
-                  size={18}
-                />
-                <Text style={styles.benefitText}>Điểm & voucher</Text>
+              <View style={styles.socialIconSlot}>
+                <SocialMark source={GITHUB_MARK} />
               </View>
+            </View>
+
+            <View style={styles.signupRow}>
+              <Text style={styles.signupPrompt}>Chưa có tài khoản?</Text>
+              <Pressable
+                accessibilityLabel="Đăng ký tài khoản KaitoKid"
+                accessibilityRole="button"
+                hitSlop={14}
+                onPress={() =>
+                  router.push({
+                    pathname: '/auth/register',
+                    params: redirect ? { redirect } : {},
+                  })
+                }
+                style={({ pressed }) => pressed && styles.controlPressed}>
+                <Text style={styles.signupLink}>Đăng ký</Text>
+              </Pressable>
             </View>
           </Animated.View>
         </ScrollView>
@@ -316,207 +301,160 @@ export default function LoginScreen() {
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
-  safeArea: { flex: 1, backgroundColor: BRAND_COLORS.canvas },
+  safeArea: { flex: 1, backgroundColor: LOGIN_COLORS.canvas },
   content: {
     flexGrow: 1,
     width: '100%',
-    maxWidth: 720,
+    maxWidth: 640,
     alignSelf: 'center',
-    paddingBottom: 26,
+    justifyContent: 'center',
+    paddingHorizontal: 18,
+    paddingVertical: 24,
   },
-  sheet: {
+  card: {
     width: '100%',
-    maxWidth: 560,
+    maxWidth: 320,
     alignSelf: 'center',
-    marginTop: -24,
-    borderRadius: 30,
-    backgroundColor: BRAND_COLORS.surface,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: BRAND_COLORS.line,
-    paddingHorizontal: 20,
-    paddingTop: 10,
-    paddingBottom: 22,
-    gap: 18,
-    shadowColor: '#111827',
-    shadowOpacity: 0.08,
-    shadowRadius: 20,
-    shadowOffset: { width: 0, height: 9 },
-    elevation: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: LOGIN_COLORS.border,
+    backgroundColor: LOGIN_COLORS.card,
+    paddingHorizontal: 32,
+    paddingTop: 32,
+    paddingBottom: 25,
+    gap: 16,
   },
-  sheetHandle: {
-    width: 38,
-    height: 4,
-    borderRadius: 999,
-    backgroundColor: '#D1D5DB',
-    alignSelf: 'center',
-  },
-  headingBlock: { gap: 5 },
-  kicker: {
-    color: BRAND_COLORS.primary,
-    fontSize: 9,
-    fontWeight: '900',
-    letterSpacing: 1.2,
-  },
+  heading: { alignItems: 'center', marginBottom: 12 },
   title: {
-    color: BRAND_COLORS.ink,
-    fontSize: 27,
-    lineHeight: 32,
-    fontWeight: '900',
-    letterSpacing: -0.5,
+    color: LOGIN_COLORS.text,
+    fontSize: 23,
+    lineHeight: 28,
+    fontWeight: '600',
+    letterSpacing: -0.25,
+    textAlign: 'center',
   },
-  subtitle: {
-    color: BRAND_COLORS.muted,
+  form: { gap: 4 },
+  forgotButton: {
+    minHeight: 22,
+    alignSelf: 'flex-end',
+    justifyContent: 'center',
+    marginTop: -1,
+  },
+  forgotText: {
+    color: LOGIN_COLORS.text,
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: '500',
+  },
+  signButton: {
+    minHeight: 40,
+    borderRadius: 6,
+    backgroundColor: LOGIN_COLORS.accent,
+    paddingHorizontal: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  signButtonPressed: { opacity: 0.82 },
+  signButtonDisabled: { opacity: 0.62 },
+  signButtonText: {
+    color: '#111827',
+    fontSize: 14,
+    lineHeight: 18,
+    fontWeight: '600',
+  },
+  socialDivider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  socialDividerLine: {
+    flex: 1,
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: '#374151',
+  },
+  socialDividerText: {
+    color: LOGIN_COLORS.muted,
     fontSize: 14,
     lineHeight: 20,
+    fontWeight: '400',
+    textAlign: 'center',
   },
-  form: { gap: 15 },
-  formMeta: {
+  socialRow: {
     minHeight: 28,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 10,
+    justifyContent: 'center',
+    gap: 24,
+    marginTop: -9,
   },
-  secureHint: {
-    flexDirection: 'row',
+  socialIconSlot: {
+    width: 28,
+    height: 28,
     alignItems: 'center',
-    gap: 6,
-    flexShrink: 1,
+    justifyContent: 'center',
   },
-  secureHintText: {
-    color: BRAND_COLORS.muted,
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  forgotText: {
-    color: BRAND_COLORS.primary,
-    fontSize: 12,
-    fontWeight: '900',
+  socialReferenceMark: {
+    width: 28,
+    height: 28,
   },
   successCard: {
-    borderRadius: 18,
-    backgroundColor: '#F0FDF4',
+    borderRadius: 12,
+    backgroundColor: LOGIN_COLORS.successBackground,
     borderWidth: 1,
-    borderColor: '#BBF7D0',
+    borderColor: LOGIN_COLORS.successBorder,
     padding: 12,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-  },
-  successIcon: {
-    width: 34,
-    height: 34,
-    borderRadius: 12,
-    backgroundColor: '#DCFCE7',
-    alignItems: 'center',
-    justifyContent: 'center',
+    gap: 9,
   },
   successText: {
     flex: 1,
-    color: '#166534',
+    color: LOGIN_COLORS.success,
     fontSize: 12,
     lineHeight: 17,
-    fontWeight: '800',
+    fontWeight: '700',
   },
   errorCard: {
-    borderRadius: 18,
-    backgroundColor: '#FEF2F2',
+    borderRadius: 12,
+    backgroundColor: LOGIN_COLORS.dangerBackground,
     borderWidth: 1,
-    borderColor: '#FECACA',
+    borderColor: LOGIN_COLORS.dangerBorder,
     padding: 12,
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: 10,
-  },
-  errorIcon: {
-    width: 34,
-    height: 34,
-    borderRadius: 12,
-    backgroundColor: '#FEE2E2',
-    alignItems: 'center',
-    justifyContent: 'center',
+    gap: 9,
   },
   errorCopy: { flex: 1, gap: 2 },
   errorTitle: {
-    color: '#991B1B',
+    color: LOGIN_COLORS.danger,
     fontSize: 12,
     fontWeight: '900',
   },
   errorText: {
-    color: '#B91C1C',
+    color: LOGIN_COLORS.danger,
     fontSize: 11,
     lineHeight: 16,
   },
-  divider: {
+  signupRow: {
+    minHeight: 28,
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  dividerLine: { flex: 1, height: StyleSheet.hairlineWidth, backgroundColor: BRAND_COLORS.line },
-  dividerText: {
-    color: '#9CA3AF',
-    fontSize: 9,
-    fontWeight: '900',
-    letterSpacing: 1,
-  },
-  secondaryButton: {
-    minHeight: 72,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: BRAND_COLORS.line,
-    backgroundColor: '#FAFAFB',
-    padding: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 11,
-  },
-  secondaryPressed: { opacity: 0.78, backgroundColor: '#F3F4F6' },
-  secondaryIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 15,
-    backgroundColor: BRAND_COLORS.primarySoft,
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 5,
+    marginTop: -9,
   },
-  secondaryCopy: { flex: 1, gap: 2 },
-  secondaryTitle: {
-    color: BRAND_COLORS.ink,
+  signupPrompt: {
+    color: LOGIN_COLORS.muted,
+    fontSize: 12,
+    lineHeight: 17,
+  },
+  signupLink: {
+    color: LOGIN_COLORS.text,
     fontSize: 13,
-    fontWeight: '900',
+    lineHeight: 17,
+    fontWeight: '600',
   },
-  secondaryDescription: {
-    color: BRAND_COLORS.muted,
-    fontSize: 11,
-    lineHeight: 15,
-  },
-  benefitStrip: {
-    minHeight: 58,
-    borderRadius: 18,
-    backgroundColor: '#F9FAFB',
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: BRAND_COLORS.line,
-    paddingHorizontal: 11,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-around',
-  },
-  benefitItem: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 4,
-  },
-  benefitText: {
-    color: BRAND_COLORS.muted,
-    fontSize: 9,
-    fontWeight: '800',
-    textAlign: 'center',
-  },
-  benefitDivider: {
-    width: StyleSheet.hairlineWidth,
-    height: 30,
-    backgroundColor: BRAND_COLORS.line,
-  },
-  pressed: { opacity: 0.7 },
+  controlPressed: { opacity: 0.68 },
 });

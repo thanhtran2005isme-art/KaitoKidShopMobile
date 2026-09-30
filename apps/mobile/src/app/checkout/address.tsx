@@ -24,6 +24,7 @@ import type {
   CheckoutAddress,
   CheckoutAddressInput,
 } from '@/types/checkout';
+import { releaseWebFocus } from '@/utils/web-focus';
 
 type AddressForm = CheckoutAddressInput;
 type AddressField =
@@ -259,6 +260,7 @@ export default function CheckoutAddressScreen() {
 
   const choose = (address: CheckoutAddress) => {
     setSelectedAddress(address);
+    releaseWebFocus();
     router.back();
   };
 
@@ -333,12 +335,13 @@ export default function CheckoutAddressScreen() {
         <View style={styles.centerState}>
           <Text style={styles.stateTitle}>Phiên đăng nhập đã hết</Text>
           <Pressable
-            onPress={() =>
+            onPress={() => {
+              releaseWebFocus();
               router.replace({
                 pathname: '/auth/login',
                 params: { redirect: '/checkout/address' },
-              })
-            }
+              });
+            }}
             style={styles.primaryButton}>
             <Text style={styles.primaryButtonText}>Đăng nhập lại</Text>
           </Pressable>
@@ -360,7 +363,10 @@ export default function CheckoutAddressScreen() {
             <Pressable
               accessibilityLabel="Quay lại checkout"
               hitSlop={10}
-              onPress={() => router.back()}
+              onPress={() => {
+                releaseWebFocus();
+                router.back();
+              }}
               style={({ pressed }) => [
                 styles.backButton,
                 pressed && styles.pressed,
