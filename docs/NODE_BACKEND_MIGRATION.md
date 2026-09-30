@@ -82,3 +82,19 @@ Không xóa backend C# trong các phase đầu.
 - Node sweeper được triển khai nhưng **tắt mặc định trong giai đoạn C#/Node coexistence** để tránh hai process cùng release một reservation. Chỉ bật `CART_SWEEPER_ENABLED=true` sau khi C# sweeper đã dừng ở cutover.
 - Gate: `npm run build`, `npm run db:audit`, `npm run test:catalog`, `npm run test:customer-aux`, `npm run test:cart-reservation`.
 - Không reset/seed/copy MariaDB; Web/Mobile chưa cutover sang Node ở phase này.
+
+
+## Phase 7 — Checkout + Order + Coupon + Payment + Shipping
+
+- Mirror `/api/orders`: partial checkout selected `CartItemIds`, legacy all-cart fallback, list/detail, server-authoritative `canCancel`, cancel + hoàn kho/coupon.
+- Checkout luôn lock/revalidate cart + product + variant trước commit; trừ tồn thật và release reservation trong cùng transaction.
+- Coupon giữ rule C#: hiệu lực thời gian, usage limit, min-order, percent/fixed, max discount; checkout tăng `DaSuDung`, cancel/expiry hoàn đúng 1 lượt.
+- Combo được tính lại server-side trên chính selected cart rows; client không quyết định discount.
+- Shipping quote luôn được backend tính lại từ địa chỉ cấu trúc + trọng lượng; client-supplied fee/ETA không được tin.
+- Mock/GHN/GHTK fee providers được mirror; **create shipping order vẫn chỉ sinh mã DEV giả**, không gọi create-order thật của hãng vận chuyển.
+- Tracking `/api/shipping/track/:orderCode` bắt buộc JWT + ownership.
+- Payment giữ COD/ATM, bank config từ `CauHinhCuaHang`, ATM timeout 15 phút, instructions/status/cancel/simulate-paid/mark-paid.
+- Node payment expiry sweeper được triển khai nhưng mặc định tắt trong coexistence: `PAYMENT_SWEEPER_ENABLED=false`; chỉ bật sau khi C# sweeper dừng.
+- Order/payment email side-effect vẫn do C# giữ trong coexistence và sẽ chuyển cùng Email/Auth ở Phase 8; business transaction không phụ thuộc email.
+- Không thêm bảng/cột, không reset/seed/copy MariaDB, chưa cutover Web/Mobile.
+- Gate: `npm run build`, `npm run db:audit`, các gate cũ và `npm run test:checkout-order`.

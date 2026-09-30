@@ -342,3 +342,18 @@ CART_SWEEPER_ENABLED=false
 ```
 
 Chỉ đổi thành `true` khi đã dừng sweeper C# tại cutover. Việc gọi các endpoint Cart Node trực tiếp để parity test vẫn hoạt động khi sweeper Node tắt; reservation hết hạn tiếp tục do C# process xử lý trong giai đoạn coexistence.
+
+
+## Node migration: đơn ATM bị auto-cancel hai lần
+
+Trong coexistence, chỉ C# được làm owner của `PaymentExpirySweeper`. Node phải giữ:
+
+```env
+PAYMENT_SWEEPER_ENABLED=false
+```
+
+Chỉ bật Node sweeper sau khi background job C# đã dừng ở cutover. Endpoint `GET /api/payment/status/:orderCode` vẫn tự xử lý expiry có row lock/idempotent khi được gọi trực tiếp.
+
+## Node migration: shipping provider ngoài không trả phí
+
+Node đọc shipping config JSON từ `CauHinhCuaHang` trước, rồi mới fallback env. GHN cần token + shop ID; GHTK cần token. Không commit token thật. Nếu provider ngoài lỗi, service giữ behavior fallback Mock của C#; nếu `MockOnlyServeBranches=true` mà tỉnh không có branch KaitoKid thì Mock có thể trả rỗng theo đúng cấu hình.

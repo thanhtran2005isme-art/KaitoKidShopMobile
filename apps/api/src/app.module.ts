@@ -9,6 +9,10 @@ import { CartModule } from "./modules/cart/cart.module.js";
 import { CollectionsModule } from "./modules/collections/collections.module.js";
 import { HomepageBlocksModule } from "./modules/homepage-blocks/homepage-blocks.module.js";
 import { LookbooksModule } from "./modules/lookbooks/lookbooks.module.js";
+import { CouponModule } from "./modules/coupons/coupon.module.js";
+import { OrdersModule } from "./modules/orders/orders.module.js";
+import { PaymentModule } from "./modules/payment/payment.module.js";
+import { ShippingModule } from "./modules/shipping/shipping.module.js";
 import { NotificationsModule } from "./modules/notifications/notifications.module.js";
 import { ProductsModule } from "./modules/products/products.module.js";
 import { ReferralModule } from "./modules/referral/referral.module.js";
@@ -32,6 +36,10 @@ import { MigrationModule } from "./migration/migration.module.js";
     HomepageBlocksModule,
     CollectionsModule,
     LookbooksModule,
+    CouponModule,
+    ShippingModule,
+    OrdersModule,
+    PaymentModule,
     AccountModule,
     AddressesModule,
     WishlistModule,
