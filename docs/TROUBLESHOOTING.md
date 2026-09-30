@@ -384,3 +384,50 @@ Nếu `GOOGLE_CLIENT_ID` sai, cả ID token native và access token Expo Web đ�
 ## Node staff token bị 403 dù role là admin
 
 RBAC cố ý không bypass chỉ vì claim `role=admin`. Quyền được cho phép khi JWT có `user_type=staff` và một trong hai điều kiện đúng: `is_super_admin=true`, hoặc token chứa đúng claim `permission`. Đây là parity với hardening C# hiện tại.
+
+
+## Node Phase 9: Image Search `ready=false`
+
+Đây là soft-disable có chủ đích nếu một trong các điều kiện chưa đủ:
+
+- file `IMAGE_SEARCH_MODEL_PATH` chưa tồn tại;
+- `IMAGE_SEARCH_ENABLED=false`;
+- chưa có vector đúng `IMAGE_SEARCH_MODEL_NAME` trong `SanPhamEmbedding`.
+
+Không cần reset DB. Đặt model ONNX hợp lệ rồi restart Node; indexer chỉ được bật sau khi C# indexer dừng:
+
+```env
+IMAGE_SEARCH_INDEXER_ENABLED=true
+```
+
+Trong coexistence giữ `false`.
+
+## Node Phase 9: Web chat không kết nối Socket.IO
+
+Mặc định Web vẫn dùng SignalR/C#:
+
+```env
+VITE_CHAT_TRANSPORT=signalr
+VITE_CHAT_HUB_URL=http://localhost:5265/hubs/chat
+```
+
+Sau khi Node realtime runtime test PASS mới chuyển:
+
+```env
+VITE_CHAT_TRANSPORT=socketio
+VITE_CHAT_HUB_URL=http://localhost:5300/hubs/chat
+```
+
+Socket.IO không phải SignalR protocol; không trỏ Socket.IO client vào port 5265 C# và không trỏ SignalR client vào Node 5300.
+
+## `npm run cutover:audit` báo `BLOCKED_DO_NOT_DISABLE_CSHARP`
+
+Đây không phải lỗi DB nếu `database.compatible=true`. Audit cố ý chặn vì còn API C# chưa mirror. Không bật `NODE_FINAL_CUTOVER=true`, không xóa backend C#, không đổi toàn bộ Gateway/clients sang Node cho tới khi `legacyOnlySurfaces` rỗng.
+
+Nếu coexistence mà audit báo double-writer risk, tắt các flag Node writer:
+
+- `CART_SWEEPER_ENABLED=false`
+- `PAYMENT_SWEEPER_ENABLED=false`
+- `CHAT_SWEEPER_ENABLED=false`
+- `IMAGE_SEARCH_INDEXER_ENABLED=false`
+- `SHIPPING_SIMULATOR_ENABLED=false`

@@ -115,3 +115,55 @@ Không xóa backend C# trong các phase đầu.
 - Không thêm/drop/rename bảng; dùng trực tiếp MariaDB 52 bảng hiện tại, bao gồm auth/RBAC + `PendingRegistration`.
 - Chưa cutover Mobile/Web Auth base URL; C# API.Auth vẫn là backend reference cho tới runtime parity.
 - Gate thêm: `npm install`, `npm run build`, `npm run db:audit`, các gate cũ và `npm run test:auth-rbac`.
+
+
+## Phase 9 — Chat / Realtime + Search bằng ảnh + Background workers + Cutover gate
+
+- Mirror REST chat khách `/api/chat` và inbox nhân viên `/api/admin/chat` trên chính hai bảng `CuocHoiThoai` + `TinNhan`.
+- Ownership: customer JWT chỉ truy cập conversation của chính user; guest dùng `guestId`; staff bắt buộc `user_type=staff` + `chat.view/chat.reply` (super admin vẫn bypass theo rule Phase 8).
+- Claim conversation dùng conditional `UPDATE` atomic; agent khác không được cướp phiên đã nhận.
+- Rate limit mặc định 10 tin / 10 giây / conversation. Phiên closed được mở lại thành bot khi customer gửi tiếp, giống C#.
+- Chatbot giữ rule-first: tra đơn (owner-only), tồn kho khả dụng, coupon, FAQ; LLM OpenAI-compatible chỉ dùng cho free-form và được grounded từ DB/config.
+- Realtime Node dùng Socket.IO namespace `/hubs/chat`; JWT WebSocket đi qua cùng HS256 verifier với HTTP. Join room customer có ownership check.
+- Web giữ **dual transport**: mặc định `VITE_CHAT_TRANSPORT=signalr` để rollback C#; chỉ chuyển `socketio` sau runtime parity. Không đổi UI component contract.
+- Mirror `/api/search`, `/api/search/suggestions`, `/api/search/by-image/status`, `POST /api/search/by-image`.
+- Image Search dùng `onnxruntime-node` + `sharp`, CLIP preprocessing, cosine top-K và chính bảng `SanPhamEmbedding`. Thiếu model ONNX => soft-disable `ready=false`, API vẫn chạy.
+- Image embedding indexer luôn có thể load vector hiện có; vòng reindex ghi DB mặc định **tắt** trong coexistence.
+- Node thêm ShippingStatusSimulator parity nhưng mặc định tắt khi C# còn owner.
+- Tất cả Node writer nền mặc định false trong coexistence: Cart, Payment, Chat idle, Image indexer, Shipping simulator.
+- `npm run cutover:audit` kiểm tra DB 52 bảng, double-writer risk và legacy-only API surfaces.
+- `NODE_FINAL_CUTOVER=true` **không được phép** nếu cutover audit còn legacy-only surface; script trả exit code 1 thay vì báo ready giả.
+
+### Legacy-only blockers phát hiện khi rà toàn controller C#
+
+Kế hoạch 9 phase cũ chưa bao phủ toàn bộ API.Admin và một số customer auxiliary public surface. Vì vậy Phase 9 hoàn thiện module được chỉ định nhưng **không được xóa backend C#** cho tới khi các blocker mà `cutover:audit` liệt kê được mirror hoặc có quyết định loại bỏ có chủ đích.
+
+Blocker hiện tại gồm API.Admin CRUD/report/settings/CMS, AdminShipping, Attributes, Newsletter, ProductExtras/Q&A, Recommendations, Sitemap và public FlashSales legacy.
+
+Đây là correction của migration plan: "Phase 9 source implemented" không đồng nghĩa "toàn bộ C# removable".
+
+### Gate Phase 9
+
+```bat
+cd apps\api
+npm install
+npm run build
+npm run db:audit
+npm run test:catalog
+npm run test:customer-aux
+npm run test:cart-reservation
+npm run test:checkout-order
+npm run test:auth-rbac
+npm run test:final-cutover
+npm run cutover:audit
+```
+
+Web realtime dependency cũng cần:
+
+```bat
+cd apps\web
+npm install
+npm run build
+```
+
+Giữ `NODE_FINAL_CUTOVER=false` và các Node writer flags = false cho tới khi runtime parity + legacy blocker resolution hoàn tất.

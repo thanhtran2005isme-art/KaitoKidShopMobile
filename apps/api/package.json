@@ -17,7 +17,9 @@
     "test:customer-aux": "npm run build && node --test test/customer-aux-contract.test.mjs",
     "test:cart-reservation": "npm run build && node --test test/cart-reservation-contract.test.mjs",
     "test:checkout-order": "npm run build && node --test test/checkout-order-contract.test.mjs",
-    "test:auth-rbac": "npm run build && node --test test/auth-rbac-contract.test.mjs"
+    "test:auth-rbac": "npm run build && node --test test/auth-rbac-contract.test.mjs",
+    "test:final-cutover": "npm run build && node --test test/final-cutover-contract.test.mjs",
+    "cutover:audit": "npm run build && node dist/scripts/cutover-audit.js"
   },
   "dependencies": {
     "@nestjs/common": "11.2.5",
@@ -28,12 +30,18 @@
     "dotenv": "^17.2.3",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.2",
-    "bcryptjs": "^3.0.2"
+    "bcryptjs": "^3.0.2",
+    "@nestjs/websockets": "11.2.5",
+    "@nestjs/platform-socket.io": "11.2.5",
+    "socket.io": "^4.8.1",
+    "onnxruntime-node": "^1.22.0",
+    "sharp": "^0.34.4"
   },
   "devDependencies": {
     "@nestjs/cli": "11.0.7",
     "@types/node": "^22.18.0",
     "prisma": "7.10.0",
-    "typescript": "~5.9.3"
+    "typescript": "~5.9.3",
+    "@types/multer": "^2.0.0"
   }
 }

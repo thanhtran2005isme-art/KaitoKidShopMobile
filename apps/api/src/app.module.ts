@@ -6,6 +6,7 @@ import { AddressesModule } from "./modules/addresses/addresses.module.js";
 import { BannersModule } from "./modules/banners/banners.module.js";
 import { CategoriesModule } from "./modules/categories/categories.module.js";
 import { CartModule } from "./modules/cart/cart.module.js";
+import { ChatModule } from "./modules/chat/chat.module.js";
 import { CollectionsModule } from "./modules/collections/collections.module.js";
 import { HomepageBlocksModule } from "./modules/homepage-blocks/homepage-blocks.module.js";
 import { IdentityModule } from "./modules/identity/identity.module.js";
@@ -18,6 +19,7 @@ import { NotificationsModule } from "./modules/notifications/notifications.modul
 import { ProductsModule } from "./modules/products/products.module.js";
 import { ReferralModule } from "./modules/referral/referral.module.js";
 import { ReviewsModule } from "./modules/reviews/reviews.module.js";
+import { SearchModule } from "./modules/search/search.module.js";
 import { WishlistModule } from "./modules/wishlist/wishlist.module.js";
 import { DatabaseModule } from "./database/database.module.js";
 import { HealthModule } from "./health/health.module.js";
@@ -34,6 +36,7 @@ import { MigrationModule } from "./migration/migration.module.js";
     ProductsModule,
     CategoriesModule,
     CartModule,
+    ChatModule,
     BannersModule,
     HomepageBlocksModule,
     CollectionsModule,
@@ -48,6 +51,7 @@ import { MigrationModule } from "./migration/migration.module.js";
     ReviewsModule,
     NotificationsModule,
     ReferralModule,
+    SearchModule,
   ],
 })
 export class AppModule {}

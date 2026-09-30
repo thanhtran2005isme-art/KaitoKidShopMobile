@@ -7,7 +7,7 @@ import {
 import { createHmac, timingSafeEqual } from "node:crypto";
 import type { AuthenticatedUser } from "./authenticated-user.js";
 
-type JwtPayload = Record<string, unknown> & {
+export type JwtPayload = Record<string, unknown> & {
   exp?: number;
   nbf?: number;
   iss?: string;
@@ -36,7 +36,7 @@ const ROLE_KEYS = [
   "http://schemas.microsoft.com/ws/2008/06/identity/claims/role",
 ] as const;
 
-function firstClaim(payload: JwtPayload, keys: readonly string[]): string | undefined {
+export function firstClaim(payload: JwtPayload, keys: readonly string[]): string | undefined {
   for (const key of keys) {
     const value = payload[key];
     if (typeof value === "string" && value.length > 0) return value;
@@ -49,7 +49,7 @@ function decodeBase64UrlJson<T>(value: string): T {
   return JSON.parse(text) as T;
 }
 
-function verifyHs256(
+export function verifyHs256(
   token: string,
   key: string,
   expectedIssuer: string,
@@ -100,6 +100,35 @@ function verifyHs256(
   return payload;
 }
 
+export function authenticatedUserFromToken(token: string): AuthenticatedUser {
+  const key = process.env.JWT_KEY;
+  if (!key || key === "CHANGE_ME") {
+    throw new UnauthorizedException(
+      "Node API chưa được cấu hình JWT_KEY tương thích C#.",
+    );
+  }
+
+  const payload = verifyHs256(
+    token,
+    key,
+    process.env.JWT_ISSUER ?? "KaitoKid.API.Auth",
+    process.env.JWT_AUDIENCE ?? "KaitoKid.Client",
+  );
+  const rawId = firstClaim(payload, NAME_ID_KEYS);
+  const id = Number(rawId);
+  if (!Number.isSafeInteger(id) || id <= 0) {
+    throw new UnauthorizedException();
+  }
+
+  return {
+    id,
+    name: firstClaim(payload, NAME_KEYS) ?? "Khách hàng",
+    email: firstClaim(payload, EMAIL_KEYS),
+    role: firstClaim(payload, ROLE_KEYS),
+    claims: { ...payload },
+  };
+}
+
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
   canActivate(context: ExecutionContext): boolean {
@@ -118,24 +147,7 @@ export class JwtAuthGuard implements CanActivate {
 
     try {
       const token = header.slice("Bearer ".length).trim();
-      const payload = verifyHs256(
-        token,
-        key,
-        process.env.JWT_ISSUER ?? "KaitoKid.API.Auth",
-        process.env.JWT_AUDIENCE ?? "KaitoKid.Client",
-      );
-
-      const rawId = firstClaim(payload, NAME_ID_KEYS);
-      const id = Number(rawId);
-      if (!Number.isSafeInteger(id) || id <= 0) throw new UnauthorizedException();
-
-      request.user = {
-        id,
-        name: firstClaim(payload, NAME_KEYS) ?? "Khách hàng",
-        email: firstClaim(payload, EMAIL_KEYS),
-        role: firstClaim(payload, ROLE_KEYS),
-        claims: { ...payload },
-      };
+      request.user = authenticatedUserFromToken(token);
       return true;
     } catch (error) {
       if (error instanceof UnauthorizedException) throw error;
