@@ -327,3 +327,7 @@ MariaDB/MySQL trên Windows thường dùng `lower_case_table_names=1`, nên `in
 ### Cách xử lý hiện hành
 
 Audit đọc `@@lower_case_table_names`: giá trị khác `0` thì so sánh tên bảng không phân biệt hoa/thường; giá trị `0` thì giữ so sánh chính xác để không che lỗi casing trên Linux. Không đổi tên bảng và không sửa dữ liệu.
+
+### Node migration: lỗi `Cannot find module 'jose'`
+
+JWT compatibility không phụ thuộc package `jose`. Node dùng `node:crypto` để xác minh HS256, issuer, audience, exp/nbf và chữ ký tương thích token C# hiện tại.

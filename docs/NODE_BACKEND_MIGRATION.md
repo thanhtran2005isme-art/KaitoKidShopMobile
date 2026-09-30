@@ -63,3 +63,9 @@ Không xóa backend C# trong các phase đầu.
 - Catalog read-only: Products, Categories, Banners, HomepageBlocks, Collections, Lookbooks đã được mirror ở mức source.
 - Chưa cutover Web/Mobile; C# vẫn là backend đang phục vụ.
 - Catalog Node phải chạy `npm run test:catalog` và parity test với MariaDB thật trước khi merge/cutover.
+
+- Customer auxiliary: Account profile/loyalty/voucher/avatar, Address, Wishlist, Reviews, Notifications, Referral đã được mirror ở mức source.
+- Node xác thực trực tiếp JWT HS256 do C# Auth phát hành bằng `node:crypto`; `JWT_KEY/JWT_ISSUER/JWT_AUDIENCE` phải trùng C# trong giai đoạn coexistence.
+- **DELETE /api/account chưa chuyển ở phase này** vì bắt buộc phải nhả Cart/Variant reservation qua cùng business rule với CartService. Endpoint này tiếp tục do C# phục vụ cho tới phase Cart.
+- Các write flow reward/default-address/review/referral dùng transaction và ownership predicate.
+- Chưa cutover Web/Mobile; phải chạy `npm run test:customer-aux` + runtime parity trên MariaDB thật.
