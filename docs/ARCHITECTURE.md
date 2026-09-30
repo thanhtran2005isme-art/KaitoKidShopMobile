@@ -222,3 +222,25 @@ Seed Lookbook cho local development được bổ sung bằng migration idempote
 `backend/Database/migrations/20260924_phase9_discovery_seed.sql`
 
 Migration chỉ cập nhật metadata/hotspot seed, không tạo bảng mới.
+
+
+## Local registration / email-verification trust boundary
+
+Đăng ký email/password không tạo `NguoiDung` ngay khi client submit form.
+
+```text
+Mobile/Web register
+  -> POST /api/Auth/register
+  -> PendingRegistration
+       - BCrypt password hash
+       - SHA-256 verification-token hash
+       - expires
+  -> email verification link
+  -> GET /api/Auth/verify-email?token=...
+  -> validate one-time token + expiry
+  -> create NguoiDung (EmailDaXacThuc = 1)
+  -> delete PendingRegistration
+  -> user can login
+```
+
+Client không nhận JWT/refresh token từ register và không được coi request đăng ký là một session. Google/social login giữ flow riêng vì API.Auth đã xác minh credential và email-verified với provider trước khi upsert user.

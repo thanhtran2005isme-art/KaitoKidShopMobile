@@ -17,9 +17,9 @@ public class AuthController(
         int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "0");
 
     [HttpPost("register")]
-    public async Task<ActionResult<TokenDTO>> Register([FromBody] RegisterDTO dto)
+    public async Task<ActionResult<RegistrationPendingDTO>> Register([FromBody] RegisterDTO dto)
     {
-        try { return Ok(await authService.RegisterAsync(dto)); }
+        try { return Accepted(await authService.RegisterAsync(dto)); }
         catch (InvalidOperationException ex) { return BadRequest(new { message = ex.Message }); }
     }
 
@@ -103,8 +103,8 @@ public class AuthController(
     {
         try
         {
-            await authService.VerifyEmailAsync(token);
-            return Ok(new { message = "Xác thực email thành công." });
+            var message = await authService.VerifyEmailAsync(token);
+            return Ok(new { message });
         }
         catch (InvalidOperationException ex) { return BadRequest(new { message = ex.Message }); }
     }

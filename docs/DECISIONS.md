@@ -274,3 +274,24 @@ This file records durable decisions and their rationale. It is not a chronologic
 **Lý do**
 
 Giữ một trust boundary tại API.Auth, tái sử dụng session/JWT hiện có và tránh tin dữ liệu profile do client tự gửi.
+
+
+## D022 — Đăng ký local chỉ tạo tài khoản sau khi xác nhận email
+
+**Ngày:** 2026-09-30
+
+**Quyết định:** `POST /api/Auth/register` không tạo `NguoiDung` và không phát JWT. Backend tạo/cập nhật `PendingRegistration`, lưu mật khẩu dưới dạng BCrypt hash và chỉ lưu SHA-256 hash của token xác nhận. Khi người dùng mở link email hợp lệ, chưa hết hạn, `GET /api/Auth/verify-email` mới tạo `NguoiDung` với `EmailDaXacThuc = 1`, sau đó xóa dữ liệu pending.
+
+**Lý do:** Một email chưa được chứng minh quyền sở hữu không được trở thành tài khoản local hoạt động. Flow cũ tạo `NguoiDung` trước rồi mới gửi verify link nên không đáp ứng yêu cầu này.
+
+**Quy tắc:**
+
+- token xác nhận raw chỉ xuất hiện trong email; database chỉ giữ token hash;
+- pending password không lưu plaintext;
+- đăng ký lại cùng email chưa xác nhận thay thế yêu cầu pending cũ và vô hiệu link cũ;
+- token mặc định hết hạn sau 24 giờ, cấu hình qua `Auth:RegistrationVerificationHours`;
+- Mobile/Web chỉ hiển thị trạng thái “kiểm tra email”, không auto-login sau register;
+- Google/social login không đi qua PendingRegistration vì backend đã xác minh credential/email với provider;
+- migration `20260930_registration_email_verification.sql` là bắt buộc trên database hiện có.
+
+**Hệ quả:** API register trả `RegistrationPendingDTO` (HTTP 202) thay vì `TokenDTO`. Link verify thành công mới tạo account; sau đó user đăng nhập bình thường.

@@ -57,6 +57,8 @@ export default function RegisterScreen() {
   const [password, setPassword] = useState('');
   const [fieldErrors, setFieldErrors] = useState<RegisterErrors>({});
   const [serverError, setServerError] = useState<string | null>(null);
+  const [pendingEmail, setPendingEmail] = useState<string | null>(null);
+  const [pendingMessage, setPendingMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   const validateName = (value = fullName) =>
@@ -106,20 +108,19 @@ export default function RegisterScreen() {
     setServerError(null);
 
     try {
-      await register({
+      const result = await register({
         fullName: fullName.trim(),
         phoneNumber: phoneNumber.trim(),
         email: email.trim(),
         password,
       });
 
-      router.replace({
-        pathname: '/auth/login',
-        params: {
-          registered: '1',
-          ...(redirect ? { redirect } : {}),
-        },
-      });
+      setPendingEmail(result.email || email.trim().toLowerCase());
+      setPendingMessage(
+        result.message ||
+          'Đã gửi email xác nhận. Tài khoản sẽ được tạo sau khi bạn xác nhận email.',
+      );
+      setPassword('');
     } catch (error) {
       setServerError(
         error instanceof Error
@@ -149,8 +150,45 @@ export default function RegisterScreen() {
                 : FadeInUp.duration(280).delay(40)
             }
             style={styles.card}>
-            <Text style={styles.title}>Đăng ký</Text>
+            <Text style={styles.title}>
+              {pendingEmail ? 'Kiểm tra email' : 'Đăng ký'}
+            </Text>
 
+            {pendingEmail ? (
+              <View style={styles.pendingState}>
+                <View style={styles.pendingIcon}>
+                  <AppIcon color={REGISTER_COLORS.accent} name="mail" size={28} />
+                </View>
+                <Text style={styles.pendingTitle}>Xác nhận để tạo tài khoản</Text>
+                <Text style={styles.pendingText}>
+                  {pendingMessage}
+                </Text>
+                <Text selectable style={styles.pendingEmail}>
+                  {pendingEmail}
+                </Text>
+                <Text style={styles.pendingHint}>
+                  Mở liên kết trong email. Trước khi xác nhận, hệ thống chưa tạo tài khoản và bạn chưa thể đăng nhập.
+                </Text>
+
+                <Pressable
+                  accessibilityLabel="Quay lại màn đăng nhập"
+                  accessibilityRole="button"
+                  onPress={() =>
+                    router.replace({
+                      pathname: '/auth/login',
+                      params: redirect ? { redirect } : {},
+                    })
+                  }
+                  style={({ pressed }) => [
+                    styles.submitButton,
+                    styles.pendingLoginButton,
+                    pressed && styles.submitButtonPressed,
+                  ]}>
+                  <Text style={styles.submitButtonText}>Về đăng nhập</Text>
+                </Pressable>
+              </View>
+            ) : (
+              <>
             <View style={styles.form}>
               <AuthField
                 appearance="dark"
@@ -279,10 +317,10 @@ export default function RegisterScreen() {
               {loading ? (
                 <>
                   <ActivityIndicator color={REGISTER_COLORS.card} size="small" />
-                  <Text style={styles.submitButtonText}>Submitting...</Text>
+                  <Text style={styles.submitButtonText}>Đang gửi email...</Text>
                 </>
               ) : (
-                <Text style={styles.submitButtonText}>Submit</Text>
+                <Text style={styles.submitButtonText}>Đăng ký</Text>
               )}
             </Pressable>
 
@@ -304,6 +342,8 @@ export default function RegisterScreen() {
               <Text style={styles.dividerText}>Đã có tài khoản? Đăng nhập</Text>
               <View style={styles.dividerLine} />
             </Pressable>
+              </>
+            )}
           </Animated.View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -344,6 +384,52 @@ const styles = StyleSheet.create({
   form: {
     marginTop: 24,
     gap: 4,
+  },
+  pendingState: {
+    marginTop: 24,
+    alignItems: 'center',
+    gap: 10,
+  },
+  pendingIcon: {
+    width: 58,
+    height: 58,
+    borderRadius: 29,
+    borderWidth: 1,
+    borderColor: '#4C3C70',
+    backgroundColor: '#1B2233',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pendingTitle: {
+    color: REGISTER_COLORS.text,
+    textAlign: 'center',
+    fontSize: 17,
+    lineHeight: 23,
+    fontWeight: '700',
+  },
+  pendingText: {
+    color: REGISTER_COLORS.muted,
+    textAlign: 'center',
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  pendingEmail: {
+    color: REGISTER_COLORS.text,
+    textAlign: 'center',
+    fontSize: 12,
+    lineHeight: 18,
+    fontWeight: '700',
+  },
+  pendingHint: {
+    color: REGISTER_COLORS.muted,
+    textAlign: 'center',
+    fontSize: 11,
+    lineHeight: 17,
+  },
+  pendingLoginButton: {
+    width: '100%',
+    minHeight: 44,
+    marginTop: 6,
   },
   errorCard: {
     marginTop: 12,

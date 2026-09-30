@@ -49,6 +49,13 @@ export type RegisterRequest = {
   password: string;
 };
 
+export type RegistrationPendingResponse = {
+  message: string;
+  email: string;
+  expiresAt: string;
+  requiresEmailVerification: boolean;
+};
+
 export type AuthTokenResponse = {
   accessToken: string;
   refreshToken?: string;
@@ -141,7 +148,7 @@ export function refreshAccessToken(refreshToken: string) {
 }
 
 export function register(data: RegisterRequest) {
-  return request('/api/Auth/register', {
+  return request<RegistrationPendingResponse>('/api/Auth/register', {
     method: 'POST',
     body: JSON.stringify({
       name: data.fullName,

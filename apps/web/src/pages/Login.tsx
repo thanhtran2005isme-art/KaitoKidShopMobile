@@ -359,14 +359,17 @@ export default function Login() {
     setLoading(false);
 
     if (r.success) {
-      toast.success('Đăng ký tài khoản thành công!');
-      navigate('/');
+      toast.success(
+        r.message ||
+          'Đã gửi email xác nhận. Mở liên kết trong email để tạo tài khoản.',
+      );
+      setLoginIdentifier(r.email || regEmail.trim().toLowerCase());
+      setTab('login');
+      setRegPassword('');
+      setRegConfirm('');
     } else {
       toast.error(r.error || 'Đăng ký thất bại');
     }
-
-    // Backup: nếu register trả về token và auto-login (tùy backend),
-    // có thể navigate('/') ngay. Hiện tại chuyển về tab login cho an toàn.
   };
 
   // ==== Derived ================================================

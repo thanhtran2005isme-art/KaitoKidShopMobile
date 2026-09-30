@@ -45,9 +45,9 @@ export const authApi = {
     } catch (e) { return { success: false, error: getErrorMessage(e) }; }
   },
 
-  async register(data: { name: string; email: string; phone?: string; password: string; recaptchaToken?: string; otpCode?: string }): Promise<ApiResponse<TokenDTO>> {
+  async register(data: { name: string; email: string; phone?: string; password: string; recaptchaToken?: string; otpCode?: string }): Promise<ApiResponse<{ message: string; email: string; expiresAt: string; requiresEmailVerification: boolean }>> {
     try {
-      const res = await authClient.post<TokenDTO>('/api/auth/register', data);
+      const res = await authClient.post<{ message: string; email: string; expiresAt: string; requiresEmailVerification: boolean }>('/api/auth/register', data);
       return { success: true, data: res.data };
     } catch (e) { return { success: false, error: getErrorMessage(e) }; }
   },

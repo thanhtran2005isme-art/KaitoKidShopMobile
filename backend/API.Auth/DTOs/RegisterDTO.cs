@@ -21,3 +21,11 @@ public class RegisterDTO
 
     public string? RecaptchaToken { get; set; }
 }
+
+public class RegistrationPendingDTO
+{
+    public string Message { get; set; } = string.Empty;
+    public string Email { get; set; } = string.Empty;
+    public DateTime ExpiresAt { get; set; }
+    public bool RequiresEmailVerification { get; set; } = true;
+}

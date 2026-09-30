@@ -4,7 +4,7 @@ namespace API.Auth.Services;
 
 public interface IAuthService
 {
-    Task<TokenDTO> RegisterAsync(RegisterDTO dto);
+    Task<RegistrationPendingDTO> RegisterAsync(RegisterDTO dto);
     Task<TokenDTO> LoginAsync(LoginDTO dto);
     Task<TokenDTO> LoginWithTwoFactorAsync(TwoFactorLoginDTO dto);
     Task<TokenDTO> RefreshTokenAsync(string refreshToken);
@@ -17,7 +17,7 @@ public interface IAuthService
 
     // Email verify
     Task SendEmailVerifyAsync(int userId);
-    Task VerifyEmailAsync(string token);
+    Task<string> VerifyEmailAsync(string token);
 
     // Social
     Task<TokenDTO> LoginWithGoogleAsync(string? idToken, string? accessToken);

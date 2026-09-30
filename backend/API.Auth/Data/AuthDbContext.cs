@@ -9,6 +9,7 @@ public class AuthDbContext(DbContextOptions<AuthDbContext> options) : DbContext(
     public DbSet<PasswordResetToken> PasswordResetTokens => Set<PasswordResetToken>();
     public DbSet<OtpCode> OtpCodes => Set<OtpCode>();
     public DbSet<EmailVerificationToken> EmailVerificationTokens => Set<EmailVerificationToken>();
+    public DbSet<PendingRegistration> PendingRegistrations => Set<PendingRegistration>();
     public DbSet<LoginActivity> LoginActivities => Set<LoginActivity>();
     public DbSet<NhanVien> NhanVien => Set<NhanVien>();
     public DbSet<VaiTro> VaiTro => Set<VaiTro>();
@@ -22,6 +23,14 @@ public class AuthDbContext(DbContextOptions<AuthDbContext> options) : DbContext(
         {
             e.HasKey(u => u.Id);
             e.HasIndex(u => u.Email).IsUnique();
+        });
+
+        modelBuilder.Entity<PendingRegistration>(e =>
+        {
+            e.HasKey(p => p.Id);
+            e.HasIndex(p => p.Email).IsUnique();
+            e.HasIndex(p => p.TokenHash).IsUnique();
+            e.Property(p => p.TokenHash).HasMaxLength(64);
         });
 
         modelBuilder.Entity<NhanVien>(e =>
