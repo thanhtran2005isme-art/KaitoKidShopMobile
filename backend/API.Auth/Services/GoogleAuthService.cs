@@ -1,4 +1,5 @@
 using System.Net.Http.Headers;
+using System.Text.Json;
 using System.Text.Json.Serialization;
 
 namespace API.Auth.Services;
@@ -104,33 +105,49 @@ public class GoogleAuthService(
             var tokenInfoUrl =
                 $"https://oauth2.googleapis.com/tokeninfo?access_token={Uri.EscapeDataString(accessToken)}";
             var tokenResponse = await http.GetAsync(tokenInfoUrl);
+            var tokenBody = await tokenResponse.Content.ReadAsStringAsync();
+
             if (!tokenResponse.IsSuccessStatusCode)
             {
-                var body = await tokenResponse.Content.ReadAsStringAsync();
                 logger.LogWarning(
                     "Google access tokeninfo {Status}: {Body}",
                     (int)tokenResponse.StatusCode,
-                    body);
+                    tokenBody);
                 return null;
             }
 
-            var tokenInfo =
-                await tokenResponse.Content.ReadFromJsonAsync<GoogleAccessTokenInfo>();
-            if (tokenInfo is null) return null;
+            using var tokenDocument = JsonDocument.Parse(tokenBody);
+            var tokenInfo = tokenDocument.RootElement;
 
-            var audience = tokenInfo.Audience ?? tokenInfo.IssuedTo;
-            if (!string.Equals(audience, clientId, StringComparison.Ordinal))
+            if (!HasExpectedAudience(tokenInfo, clientId))
             {
                 logger.LogWarning(
-                    "Google access token audience mismatch: expect {Exp} got {Got}",
+                    "Google access token audience mismatch: expect {Exp}; aud={Aud}; azp={Azp}; audience={Audience}; issued_to={IssuedTo}",
                     clientId,
-                    audience);
+                    GetString(tokenInfo, "aud"),
+                    GetString(tokenInfo, "azp"),
+                    GetString(tokenInfo, "audience"),
+                    GetString(tokenInfo, "issued_to"));
                 return null;
             }
 
-            if (tokenInfo.ExpiresIn <= 0)
+            var hasRemainingLifetime =
+                TryGetInt64(tokenInfo, "expires_in", out var expiresIn);
+            var hasAbsoluteExpiry =
+                TryGetInt64(tokenInfo, "exp", out var expEpoch);
+
+            if ((hasRemainingLifetime && expiresIn <= 0) ||
+                (hasAbsoluteExpiry &&
+                 DateTimeOffset.FromUnixTimeSeconds(expEpoch) <=
+                 DateTimeOffset.UtcNow))
             {
                 logger.LogWarning("Google access token expired");
+                return null;
+            }
+
+            if (!hasRemainingLifetime && !hasAbsoluteExpiry)
+            {
+                logger.LogWarning("Google access tokeninfo không có thời hạn token.");
                 return null;
             }
 
@@ -153,14 +170,23 @@ public class GoogleAuthService(
 
             var profile =
                 await profileResponse.Content.ReadFromJsonAsync<GoogleProfileInfo>();
-            var subject = profile?.Sub ?? tokenInfo.UserId;
-            var email = profile?.Email ?? tokenInfo.Email;
+
+            var subject =
+                profile?.Sub ??
+                GetString(tokenInfo, "sub", "user_id");
+            var email =
+                profile?.Email ??
+                GetString(tokenInfo, "email");
             var emailVerified =
-                profile?.EmailVerified ?? tokenInfo.VerifiedEmail ?? false;
+                profile?.EmailVerified ??
+                GetBoolean(tokenInfo, "email_verified", "verified_email") ??
+                false;
 
             if (string.IsNullOrWhiteSpace(subject) ||
                 string.IsNullOrWhiteSpace(email))
             {
+                logger.LogWarning(
+                    "Google token/profile thiếu subject hoặc email.");
                 return null;
             }
 
@@ -178,6 +204,86 @@ public class GoogleAuthService(
             logger.LogError(ex, "Google access token verify exception");
             return null;
         }
+    }
+
+    private static bool HasExpectedAudience(
+        JsonElement root,
+        string expectedClientId)
+    {
+        foreach (var field in new[] { "aud", "azp", "audience", "issued_to" })
+        {
+            var value = GetString(root, field);
+            if (string.Equals(
+                    value,
+                    expectedClientId,
+                    StringComparison.Ordinal))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static string? GetString(
+        JsonElement root,
+        params string[] propertyNames)
+    {
+        foreach (var propertyName in propertyNames)
+        {
+            if (!root.TryGetProperty(propertyName, out var value))
+                continue;
+
+            if (value.ValueKind == JsonValueKind.String)
+                return value.GetString();
+
+            if (value.ValueKind is JsonValueKind.Number or
+                JsonValueKind.True or
+                JsonValueKind.False)
+            {
+                return value.GetRawText().Trim('"');
+            }
+        }
+
+        return null;
+    }
+
+    private static bool? GetBoolean(
+        JsonElement root,
+        params string[] propertyNames)
+    {
+        foreach (var propertyName in propertyNames)
+        {
+            if (!root.TryGetProperty(propertyName, out var value))
+                continue;
+
+            if (value.ValueKind == JsonValueKind.True) return true;
+            if (value.ValueKind == JsonValueKind.False) return false;
+
+            if (value.ValueKind == JsonValueKind.String &&
+                bool.TryParse(value.GetString(), out var parsed))
+            {
+                return parsed;
+            }
+        }
+
+        return null;
+    }
+
+    private static bool TryGetInt64(
+        JsonElement root,
+        string propertyName,
+        out long result)
+    {
+        result = 0;
+        if (!root.TryGetProperty(propertyName, out var value))
+            return false;
+
+        if (value.ValueKind == JsonValueKind.Number)
+            return value.TryGetInt64(out result);
+
+        return value.ValueKind == JsonValueKind.String &&
+               long.TryParse(value.GetString(), out result);
     }
 
     private string? GetClientId()
@@ -198,17 +304,6 @@ public class GoogleAuthService(
         [JsonPropertyName("picture")] public string? Picture { get; set; }
         [JsonPropertyName("aud")] public string? Aud { get; set; }
         [JsonPropertyName("exp")] public string? Exp { get; set; }
-    }
-
-    private sealed class GoogleAccessTokenInfo
-    {
-        [JsonPropertyName("audience")] public string? Audience { get; set; }
-        [JsonPropertyName("issued_to")] public string? IssuedTo { get; set; }
-        [JsonPropertyName("user_id")] public string? UserId { get; set; }
-        [JsonPropertyName("email")] public string? Email { get; set; }
-        [JsonPropertyName("verified_email")] public bool? VerifiedEmail { get; set; }
-        [JsonPropertyName("expires_in")] public int ExpiresIn { get; set; }
-        [JsonPropertyName("scope")] public string? Scope { get; set; }
     }
 
     private sealed class GoogleProfileInfo

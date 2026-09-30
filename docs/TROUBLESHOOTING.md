@@ -273,3 +273,10 @@ npx expo run:android
 ```
 
 Nếu gặp `DEVELOPER_ERROR`, gần như luôn do package name hoặc SHA-1 trong Android OAuth Client không khớp build đang cài trên máy.
+
+### Expo Web báo 401 `Token Google không hợp lệ`
+
+Nếu popup Google mở/chọn tài khoản thành công nhưng request `POST /api/Auth/google` trả 401, kiểm tra log API.Auth trước. Google `tokeninfo` hiện có thể trả schema mới như `aud`, `azp`, `sub`, `email_verified`, `exp`, `expires_in`; các tài liệu/API client cũ cũng có các tên `audience`, `issued_to`, `user_id`, `verified_email`.
+
+Backend phải chấp nhận cả hai schema nhưng vẫn **fail closed** nếu không có audience đúng `Google:ClientId` hoặc token hết hạn. Cảnh báo browser `Cross-Origin-Opener-Policy policy would block the window.closed call` có thể xuất hiện khi Google popup đóng và không phải nguyên nhân của 401 nếu request `/api/Auth/google` vẫn được gửi.
+
