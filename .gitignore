@@ -21,6 +21,9 @@ expo-env.d.ts
 dist/
 **/dist/
 
+# Generated Prisma Client
+/apps/api/src/generated/prisma/
+
 # .NET
 **/bin/
 **/obj/

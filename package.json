@@ -11,6 +11,11 @@
     "web:lint": "npm --prefix apps/web run lint",
     "mobile:typecheck": "npm --prefix apps/mobile exec tsc -- --noEmit",
     "backend:test": "dotnet test backend/KaitoKidShop.slnx",
+    "backend:node:install": "npm --prefix apps/api install",
+    "backend:node:dev": "npm --prefix apps/api run start:dev",
+    "backend:node:build": "npm --prefix apps/api run build",
+    "backend:node:db:introspect": "npm --prefix apps/api run db:introspect",
+    "backend:node:db:audit": "npm --prefix apps/api run db:audit",
     "phase10:check": "npm run mobile:lint && npm run mobile:typecheck && npm run web:lint && npm run web:build && npm run backend:test"
   }
 }

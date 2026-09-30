@@ -73,7 +73,7 @@ Confirm table count:
 "C:\xampp\mysql\bin\mysql.exe" -u root -e "SELECT COUNT(*) AS table_count FROM information_schema.tables WHERE table_schema='kaitokid' AND table_type='BASE TABLE';"
 ```
 
-Expected base table count for the current local schema: `51`.
+Expected base table count for the current local schema after email-registration verification migration: `52`.
 
 Confirm the application DB user exists:
 
@@ -301,3 +301,29 @@ Flow mới chỉ tạo `PendingRegistration` khi submit form; `NguoiDung` chỉ 
 5. Link mặc định hết hạn sau 24 giờ. Submit đăng ký lại cùng email sẽ phát token mới và làm link cũ mất hiệu lực.
 
 Không đưa Brevo API key, mật khẩu email hoặc verification token vào Git/log công khai.
+
+## Node migration: Prisma P1000 hoặc test không tìm thấy dist/modules
+
+### Prisma P1000 — Authentication failed
+
+Node migration dùng chính MariaDB `kaitokid` của backend C#. Nếu `npm run db:introspect` báo `P1000`, mật khẩu trong `apps/api/.env -> DATABASE_URL` không khớp user MariaDB hiện tại.
+
+Nguồn credential local là file gitignored `backend/db.local.bat`. Không commit hoặc gửi mật khẩu vào log/chat công khai.
+
+### `Cannot find module dist/scripts/...` hoặc `dist/modules/...`
+
+Build Node dùng `tsc -p tsconfig.build.json` với `rootDir=src` và `outDir=dist`. Output hợp lệ là `dist/main.js`, `dist/scripts/*`, `dist/modules/*`; `dist/src/*` là layout cũ bị sai.
+
+## Node migration: audit báo thiếu đủ 52 bảng dù actualTableCount = 52
+
+### Triệu chứng
+
+`db:audit` có thể báo `missingTables` chứa toàn bộ tên PascalCase như `NguoiDung`, trong khi `extraTables` lại chứa chính các bảng đó ở dạng chữ thường như `nguoidung`.
+
+### Nguyên nhân
+
+MariaDB/MySQL trên Windows thường dùng `lower_case_table_names=1`, nên `information_schema.TABLES` trả tên bảng chữ thường và phép so sánh tên bảng phải theo chế độ case-insensitive của server.
+
+### Cách xử lý hiện hành
+
+Audit đọc `@@lower_case_table_names`: giá trị khác `0` thì so sánh tên bảng không phân biệt hoa/thường; giá trị `0` thì giữ so sánh chính xác để không che lỗi casing trên Linux. Không đổi tên bảng và không sửa dữ liệu.
