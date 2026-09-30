@@ -331,3 +331,14 @@ Audit đọc `@@lower_case_table_names`: giá trị khác `0` thì so sánh tên
 ### Node migration: lỗi `Cannot find module 'jose'`
 
 JWT compatibility không phụ thuộc package `jose`. Node dùng `node:crypto` để xác minh HS256, issuer, audience, exp/nbf và chữ ký tương thích token C# hiện tại.
+
+
+## Node migration: reservation bị release hai lần khi chạy song song C# + Node
+
+Trong migration, C# `CartReservationSweeper` và Node không được cùng làm owner của job hết hạn giỏ. Node mặc định:
+
+```env
+CART_SWEEPER_ENABLED=false
+```
+
+Chỉ đổi thành `true` khi đã dừng sweeper C# tại cutover. Việc gọi các endpoint Cart Node trực tiếp để parity test vẫn hoạt động khi sweeper Node tắt; reservation hết hạn tiếp tục do C# process xử lý trong giai đoạn coexistence.

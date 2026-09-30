@@ -69,3 +69,16 @@ Không xóa backend C# trong các phase đầu.
 - **DELETE /api/account chưa chuyển ở phase này** vì bắt buộc phải nhả Cart/Variant reservation qua cùng business rule với CartService. Endpoint này tiếp tục do C# phục vụ cho tới phase Cart.
 - Các write flow reward/default-address/review/referral dùng transaction và ownership predicate.
 - Chưa cutover Web/Mobile; phải chạy `npm run test:customer-aux` + runtime parity trên MariaDB thật.
+
+
+## Phase 6 — Cart + Inventory + Reservation + Combo
+
+- Mirror các route `/api/cart`: list, add, update, remove, clear, remove-many, move-to-wishlist, cross-sell, cross-sell-products, combo discount selected và reorder.
+- Reservation 30 phút tiếp tục dùng chính `SanPham.SoLuongDaGiu`, `TonKhoBienThe.SoLuongDaGiu`, `GioHang.GiuDenLuc`; không tạo bảng/cột mới.
+- Mutation Cart dùng transaction và row lock theo thứ tự user → product → variant → cart để giảm race/oversell khi request đồng thời.
+- Release reservation luôn đồng bộ cả product và đúng size/màu variant, dùng `GREATEST(0,...)` để không tạo reserve âm.
+- `DELETE /api/account` được mở ở Node trong phase này vì đã có CartService để clear cart/release reserve trước khi anonymize dữ liệu phụ.
+- Combo giữ rule C#: ít nhất 2 ProductId khác nhau cùng `DanhMuc`, giảm 10% trên subtotal của category đủ điều kiện, round-to-even tương thích `decimal Math.Round`.
+- Node sweeper được triển khai nhưng **tắt mặc định trong giai đoạn C#/Node coexistence** để tránh hai process cùng release một reservation. Chỉ bật `CART_SWEEPER_ENABLED=true` sau khi C# sweeper đã dừng ở cutover.
+- Gate: `npm run build`, `npm run db:audit`, `npm run test:catalog`, `npm run test:customer-aux`, `npm run test:cart-reservation`.
+- Không reset/seed/copy MariaDB; Web/Mobile chưa cutover sang Node ở phase này.

@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable } from "@nestjs/common";
 import { randomInt } from "node:crypto";
 import { PrismaService } from "../../database/prisma.service.js";
+import { CartService } from "../cart/cart.service.js";
 import { toNumber, toNullableNumber } from "../../common/db-value.js";
 import { normalizePhone, resolveNextTier, utcDateOnly } from "./account.helpers.js";
 
@@ -34,7 +35,10 @@ interface UpdateProfileInput {
 
 @Injectable()
 export class AccountService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly cart: CartService,
+  ) {}
 
   async getProfile(userId: number) {
     const rows = await this.prisma.$queryRawUnsafe<ProfileRow[]>(
@@ -353,6 +357,67 @@ export class AccountService {
         endDate,
         message: `Chúc mừng sinh nhật! Bạn vừa nhận voucher giảm ${percent}%.`,
       };
+    });
+  }
+
+  async deleteAccount(userId: number, confirm: unknown) {
+    if (
+      typeof confirm !== "string" ||
+      confirm.trim().toUpperCase() !== "DELETE"
+    ) {
+      throw new BadRequestException("Vui lòng nhập DELETE để xác nhận.");
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      const users = await tx.$queryRawUnsafe<Array<{
+        id: unknown;
+        avatar: string | null;
+      }>>(
+        "SELECT Id AS id, AnhDaiDien AS avatar FROM NguoiDung WHERE Id = ? FOR UPDATE",
+        userId,
+      );
+      const user = users[0];
+      if (!user) return null;
+
+      await tx.$executeRawUnsafe(
+        `UPDATE NguoiDung
+         SET HoTen = ?, Email = ?, SoDienThoai = NULL, AnhDaiDien = NULL,
+             NgaySinh = NULL, DiemThuong = 0, CapBac = 'Member'
+         WHERE Id = ?`,
+        `Người dùng đã hủy #${userId}`,
+        `deleted-${userId}@kaitokid.local`,
+        userId,
+      );
+
+      await tx.$executeRawUnsafe(
+        `UPDATE MaGiamGia
+         SET TrangThai = 0
+         WHERE TrangThai = 1
+           AND (MaCoupon LIKE ? OR MaCoupon LIKE ?)`,
+        `PT${userId}-%`,
+        `BD${userId}-%`,
+      );
+
+      await this.cart.clearCartInTransaction(tx, userId);
+
+      await tx.$executeRawUnsafe(
+        "DELETE FROM DanhSachYeuThich WHERE NguoiDungId = ?",
+        userId,
+      );
+      await tx.$executeRawUnsafe(
+        "DELETE FROM DiaChi WHERE NguoiDungId = ?",
+        userId,
+      );
+      await tx.$executeRawUnsafe(
+        "DELETE FROM ThongBao WHERE NguoiDungId = ?",
+        userId,
+      );
+      await tx.$executeRawUnsafe(
+        "UPDATE DanhGia SET TenKhachHang = 'Người dùng ẩn danh' WHERE NguoiDungId = ?",
+        userId,
+      );
+
+      return { oldAvatar: user.avatar };
     });
   }
 

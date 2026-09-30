@@ -5,6 +5,7 @@ import { AccountModule } from "./modules/account/account.module.js";
 import { AddressesModule } from "./modules/addresses/addresses.module.js";
 import { BannersModule } from "./modules/banners/banners.module.js";
 import { CategoriesModule } from "./modules/categories/categories.module.js";
+import { CartModule } from "./modules/cart/cart.module.js";
 import { CollectionsModule } from "./modules/collections/collections.module.js";
 import { HomepageBlocksModule } from "./modules/homepage-blocks/homepage-blocks.module.js";
 import { LookbooksModule } from "./modules/lookbooks/lookbooks.module.js";
@@ -26,6 +27,7 @@ import { MigrationModule } from "./migration/migration.module.js";
     HealthModule,
     ProductsModule,
     CategoriesModule,
+    CartModule,
     BannersModule,
     HomepageBlocksModule,
     CollectionsModule,

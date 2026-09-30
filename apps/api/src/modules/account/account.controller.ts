@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   HttpStatus,
@@ -119,6 +120,22 @@ export class AccountController {
     const result = await this.account.getMyVouchers(user.id);
     if (!result) throw new NotFoundException();
     return result;
+  }
+
+  @Delete()
+  @HttpCode(HttpStatus.OK)
+  async deleteAccount(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() body: Record<string, unknown>,
+  ) {
+    const result = await this.account.deleteAccount(user.id, body.confirm);
+    if (!result) throw new NotFoundException();
+
+    await this.media.removePublicFile(result.oldAvatar);
+    return {
+      message:
+        "Đã hủy tài khoản và xử lý dữ liệu cá nhân theo chính sách lưu trữ đơn hàng.",
+    };
   }
 
   @Post("birthday-voucher")
