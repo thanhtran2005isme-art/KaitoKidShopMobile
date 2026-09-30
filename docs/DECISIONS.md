@@ -258,3 +258,19 @@ This file records durable decisions and their rationale. It is not a chronologic
 - Size trẻ em và người lớn cùng tồn tại; UI đọc danh sách size thật từ sản phẩm.
 
 **Hệ quả:** Không xóa hoặc đổi các route/menu Web Nam/Nữ/Trẻ em chỉ vì D009 cũ. D009 được giữ để bảo toàn lịch sử nhưng không còn là quyết định hiện hành.
+
+
+## D021 — Google login dùng backend làm trust boundary
+
+**Quyết định**
+
+- Mobile/Web không tự coi profile Google là phiên đăng nhập KaitoKid.
+- Android native lấy **ID token** bằng `@react-native-google-signin/google-signin`.
+- Expo Web lấy **OAuth access token** bằng Google Identity Services.
+- Cả hai credential đều gửi về `API.Auth /api/Auth/google`; backend gọi endpoint Google để xác minh token, kiểm tra audience đúng `Google:ClientId`, email verified, sau đó mới upsert user và phát JWT/refresh token nội bộ.
+- Web Client ID là public identifier nên có thể nằm trong cấu hình client; **Client Secret không được đưa vào Mobile/Web/Git**.
+- Android Google Sign-In cần OAuth Client loại Android đúng package + SHA-1 và cần native/development build; Expo Go không phải môi trường nghiệm thu OAuth native.
+
+**Lý do**
+
+Giữ một trust boundary tại API.Auth, tái sử dụng session/JWT hiện có và tránh tin dữ liệu profile do client tự gửi.

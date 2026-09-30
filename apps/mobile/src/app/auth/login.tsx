@@ -1,6 +1,6 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
@@ -18,6 +18,10 @@ import Animated, { FadeInUp, useReducedMotion } from 'react-native-reanimated';
 import { AuthField } from '@/components/auth/auth-field';
 import { AppIcon } from '@/components/ui/app-icon';
 import { useAuth } from '@/context/AuthContext';
+import {
+  preloadGoogleSignIn,
+  signInWithGoogle,
+} from '@/services/google-signin';
 
 type LoginErrors = {
   identifier?: string;
@@ -26,11 +30,6 @@ type LoginErrors = {
 
 const GOOGLE_MARK =
   'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABwAAAAcCAIAAAD9b0jDAAACV0lEQVR42mMUlFBnoDZgYqABGDqGsuCRY2RkdHOxd3a0NdDTUVSU4+bifPjoydVrN3fuPrB52+4fP37g1IgrovR1tSb0tujramGV/fDxU9/EGdNmLvj37x+mLDMnjwimaHCg94rFs6QkxXG5hYOD3dHeWlhYcPfeg0SFqa+X6+xpvaysKCHz/MXLS1eu/f79By5y6/bd9q5JRHlfVUXpwK51nJwcEO6jx0+7+6bu3H3gzdt3DAwMbKys5mZGlWV5Avz8fsFxEEHChm7ftMzc1AjCPnf+UlBE8qdPn9F9x8TEz8f7/sNHopKUsZE+3MSvX7/FJuVimsjAwPDv3z88JqIb6u7qAGf3T575/MVLKqRTHS0NOHvj5p1oSuNjwiQkxLCacvPW3Q2btmM3VECAD85+9PgJms6EuAhcyfbo8dPIhjKhBRaczcrKSoJ/WZhxhumrV2/gbDUVJeINff3mLU5DL125Dmd7ebqg6XR0CxKS1ICjsOg0uNSDB49xGoqc57LSEqSlJPG4LjMtHs4+dOQETkOvXrsJl+bi4lw4ZyIfHy9WE5MTohztraF+f/32yLFT+PJ+cXnD9+/QMs3IUO/Qng0RoQHI5YCmhuqieZO72+vgIq2dE9GKQSxFn6+X68K5k9Ei8Pbd+xDnG+rrIEvt2nMgIjaDqPI0ONB72sROtIIKE5w7fyk4IuXjp09EVSdr12/18I24eu0mLuN+//4zd8Ey3+A4TBPxlfyQ6sTT3cnJwcZAT1teXpabi/Pxk2c3bt45ePj45m27Xr9+S3J1Mlrvkw0A6Brfw7qKhC0AAAAASUVORK5CYII=';
-const TWITTER_MARK =
-  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABwAAAAcCAIAAAD9b0jDAAACHElEQVR42mMUlFBnoDZgYqABGOGGspCqgYODQ1tLnY2V9dz5Sz9//SLKpVxcnHhMzM9JfXL33O6tK7duWHLx9D49HU0uLs7Y6FAZaUmchrKwMB/cvV5NVRmriXnZKfXVxUxMUC1iYiLrVy+4e+2Epbnxx0+fcRoqLyarrKSwee0iUxMDNBO5ublqKwvRBAUF+H/9+i0oIBDk74XT0E+fPjMwMIiKCu/cvGJSb4uIsBBcSk1VmZmZGdP5vLw8585fWrhkFbIgMyePCJzz7dt3Z0dbKSkJBgYGPV2t9NQ4WWmpL1++MjExSUtJhAX7YRr66dPnsOg0NEFG5GwqKSEeGuybl50iJChAZGK4d/+hiZU7viT1n+F/Q00JSSns8eOnBJLUixevzl+8QpKh+w8dI5xOUzKKXrx4RbyhW7fvxhREiSgGBoYPHz7eunNPRVlRUkKMoIk7dx+YPW8pUXlfRVnRUF+HoIn////v6p2CVQrdpQwMDBcvXREVETYgZG5LR//6TduJNfTfv387dx9YuWbj379/TU0MsWrbuHlHZW0baaWUhrpKekpcVHgQVtndew+mZhX///+fKEPtbCxyMpMkJcS1tbBXXI8eP+3qnbJyzaa/f//iCRlGtIqPm5vLx9PVy8PZ2dEWuRg8cuzUvIXLN23Z+e/fP4JxyIirNmViYpKXkxEREXrz5t3zF69+/PhBfOJlHK2ih4ahAHMmrlBP9O56AAAAAElFTkSuQmCC';
-const GITHUB_MARK =
-  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABwAAAAcCAIAAAD9b0jDAAACyklEQVR42mMUlFBnoDZgYqABGDqGsuCXlpAQc3a0lZGWhIs8fPhk7/7Dr9+8JcdQKUmJlobyAD9PTKn///+vWL2xrrHz7bv3WPUyYo19ezurRXMm8fLy4HHO23fvI2Izzp67SFSYenk4r10+B7+JDAwMwkKC2zYstbY0JWyohrrK7Gm9TExMJ0+fy8gpO33mAqaeI8dOJWcUXbx8jZWVZeHcydJSkvjClJGRcerEDk5ODgYGhv0Hjq5au2n1us1hwX4Hjxx/8eIVJKAtLYzXrt/KwMBgZKCrr6slJCjQ390YFp2G06U+Xq6G+jpocbJyzUaIiQwMDM+ev4CYyMDAwMgIVePiZGdqYoDTUG9PFzj71p17+MP0+o3bcLanmxNOQ81MDCGMu/cebti0Hb+hS1ese/nyNYRtaWGC01BhIUEI48rV68TknEtXrkEY8rIyOA1lY2eDxxgxhjIzM0MYAgJ8OA19+/YdhKGlqUbQREZGRl1tTQj75as3OA29dv0WhKGirGhooIvfUDcXe1FRYQj76rWbOA09cuwUnL1o7iRtLZzlt5WF6bRJnXDuoSPHceZ9QQH+y2cPvP/wYe6C5VnpCUKCAsdOnNm+c9+suYv//v3LwMDAwcGRnZ7g6e5kZKgH1/Xu/Qd9U6evX79hd+n7Dx8nT58rLSVpb2MRFZ/59es3Gysze1sLiIkMDAw/fvzw83VHNpGBgaG7byqyiVjy/pTp8y5evmZvZ8XNxWVk4eoXHJeZW46s4PiJs8jcQ0dOzF+4gkCB8vXrt4CQhBOnzi6aOzkhNlxERBgtZP/8+Q1nb962Ozwm/dfv34SLvo+fPgWEJKzftK26omDezH5rKzNkWVZWNgYGhg8fP1XWtiak5P38+RNL+uXkEcEU/fvv345d+0+dOc/IyLh33+F79x/Cpbi4OJ+/eJmQkoecVIgq+UfrfUoAAIwsARSbWLDPAAAAAElFTkSuQmCC';
-
 function SocialMark({ source }: { source: string }) {
   return (
     <Image
@@ -59,7 +58,7 @@ const LOGIN_COLORS = {
 
 export default function LoginScreen() {
   const router = useRouter();
-  const { login } = useAuth();
+  const { login, loginWithGoogle } = useAuth();
   const params = useLocalSearchParams<{
     redirect?: string | string[];
     registered?: string | string[];
@@ -79,6 +78,11 @@ export default function LoginScreen() {
   const [fieldErrors, setFieldErrors] = useState<LoginErrors>({});
   const [serverError, setServerError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
+
+  useEffect(() => {
+    preloadGoogleSignIn();
+  }, []);
 
   const validate = () => {
     const next: LoginErrors = {};
@@ -119,6 +123,33 @@ export default function LoginScreen() {
   const clearError = (field: keyof LoginErrors) => {
     setFieldErrors((current) => ({ ...current, [field]: undefined }));
     if (serverError) setServerError(null);
+  };
+
+  const handleGoogleLogin = async () => {
+    if (loading || googleLoading) return;
+
+    setGoogleLoading(true);
+    setServerError(null);
+
+    try {
+      const credential = await signInWithGoogle();
+      if (!credential) return;
+
+      await loginWithGoogle(credential);
+      router.replace(
+        redirect && redirect.startsWith('/')
+          ? (redirect as any)
+          : '/(tabs)',
+      );
+    } catch (error) {
+      setServerError(
+        error instanceof Error
+          ? error.message
+          : 'Không thể đăng nhập bằng Google. Vui lòng thử lại.',
+      );
+    } finally {
+      setGoogleLoading(false);
+    }
   };
 
   return (
@@ -236,14 +267,17 @@ export default function LoginScreen() {
             <Pressable
               accessibilityLabel="Đăng nhập"
               accessibilityRole="button"
-              accessibilityState={{ disabled: loading, busy: loading }}
-              disabled={loading}
+              accessibilityState={{
+                disabled: loading || googleLoading,
+                busy: loading,
+              }}
+              disabled={loading || googleLoading}
               hitSlop={2}
               onPress={() => void handleLogin()}
               style={({ pressed }) => [
                 styles.signButton,
-                loading && styles.signButtonDisabled,
-                pressed && !loading && styles.signButtonPressed,
+                (loading || googleLoading) && styles.signButtonDisabled,
+                pressed && !loading && !googleLoading && styles.signButtonPressed,
               ]}>
               {loading ? (
                 <>
@@ -257,23 +291,35 @@ export default function LoginScreen() {
 
             <View style={styles.socialDivider}>
               <View style={styles.socialDividerLine} />
-              <Text style={styles.socialDividerText}>Đăng nhập bằng mạng xã hội</Text>
+              <Text style={styles.socialDividerText}>Hoặc đăng nhập bằng Google</Text>
               <View style={styles.socialDividerLine} />
             </View>
 
-            <View
-              accessibilityLabel="Đăng nhập mạng xã hội: Google, Twitter, GitHub"
-              accessibilityRole="text"
-              style={styles.socialRow}>
-              <View style={styles.socialIconSlot}>
-                <SocialMark source={GOOGLE_MARK} />
-              </View>
-              <View style={styles.socialIconSlot}>
-                <SocialMark source={TWITTER_MARK} />
-              </View>
-              <View style={styles.socialIconSlot}>
-                <SocialMark source={GITHUB_MARK} />
-              </View>
+            <View style={styles.socialRow}>
+              <Pressable
+                accessibilityLabel="Đăng nhập bằng Google"
+                accessibilityRole="button"
+                accessibilityState={{
+                  disabled: loading || googleLoading,
+                  busy: googleLoading,
+                }}
+                disabled={loading || googleLoading}
+                hitSlop={8}
+                onPress={() => void handleGoogleLogin()}
+                style={({ pressed }) => [
+                  styles.googleButton,
+                  pressed && !googleLoading && styles.googleButtonPressed,
+                  (loading || googleLoading) && styles.googleButtonDisabled,
+                ]}>
+                {googleLoading ? (
+                  <ActivityIndicator
+                    color={LOGIN_COLORS.text}
+                    size="small"
+                  />
+                ) : (
+                  <SocialMark source={GOOGLE_MARK} />
+                )}
+              </Pressable>
             </View>
 
             <View style={styles.signupRow}>
@@ -389,12 +435,18 @@ const styles = StyleSheet.create({
     gap: 24,
     marginTop: -9,
   },
-  socialIconSlot: {
-    width: 28,
-    height: 28,
+  googleButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: '#374151',
+    backgroundColor: '#0F172A',
     alignItems: 'center',
     justifyContent: 'center',
   },
+  googleButtonPressed: { opacity: 0.74 },
+  googleButtonDisabled: { opacity: 0.55 },
   socialReferenceMark: {
     width: 28,
     height: 28,

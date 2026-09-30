@@ -11,8 +11,10 @@ import { Platform } from 'react-native';
 
 import {
   login as loginApi,
+  loginWithGoogle as googleLoginApi,
   refreshAccessToken,
   type AuthTokenResponse,
+  type GoogleLoginCredential,
 } from '@/services/auth.service';
 import { setUnauthorizedHandler } from '@/services/api-client';
 
@@ -53,6 +55,7 @@ type AuthContextType = {
   user: any;
   loading: boolean;
   login: (email: string, password: string) => Promise<any>;
+  loginWithGoogle: (credential: GoogleLoginCredential) => Promise<any>;
   logout: () => Promise<void>;
 };
 
@@ -196,12 +199,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return result;
   }
 
+  async function loginWithGoogle(credential: GoogleLoginCredential) {
+    const result = await googleLoginApi(credential);
+    await persistTokenResponse(result);
+    return result;
+  }
+
   async function logout() {
     await clearSession();
   }
 
   return (
-    <AuthContext.Provider value={{ token, user, loading, login, logout }}>
+    <AuthContext.Provider
+      value={{ token, user, loading, login, loginWithGoogle, logout }}>
       {children}
     </AuthContext.Provider>
   );

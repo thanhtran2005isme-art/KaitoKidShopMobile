@@ -226,3 +226,50 @@ Sau khi checkout PHASE 10, chạy:
 Sau đó restart `run.bat` và refresh Expo. Migration cập nhật seed SKU chuẩn sang HTTPS photo URL, đồng bộ snapshot ảnh đơn cũ, bổ sung sample Nam/Nữ người lớn và Lookbook đa audience. Nếu dùng tài khoản MariaDB khác `root`, thay bằng credential local trong `backend/db.local.bat`.
 
 API.Customer vẫn giữ fallback `/products/*` và `/lookbook/*` để dữ liệu legacy hoặc URL lỗi không tạo 404; fallback không phải media production.
+
+
+## Google Sign-In Mobile/Web
+
+KaitoKid dùng Google OAuth theo hai đường nhưng đều quy về API.Auth `POST /api/Auth/google`:
+
+- **Android native**: `@react-native-google-signin/google-signin` lấy Google ID token rồi gửi backend.
+- **Expo Web**: Google Identity Services lấy OAuth access token rồi gửi backend.
+- Backend luôn kiểm tra token với Google và bắt buộc audience khớp `Google:ClientId` trước khi phát JWT KaitoKid.
+
+Google Web Client ID hiện tại là public OAuth identifier (không phải secret) và có thể override bằng:
+
+```text
+EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID=<web-client-id>
+Google__ClientId=<web-client-id>
+```
+
+### Google Cloud cho Expo Web
+
+Trong OAuth Client loại **Web application**, thêm Authorized JavaScript origins dùng khi dev:
+
+```text
+http://localhost:8081
+http://127.0.0.1:8081
+```
+
+Luồng popup token không cần lưu Client Secret ở Mobile/Web.
+
+### Google Cloud cho Android
+
+App Android dùng package:
+
+```text
+com.kaitokid.shopmobile
+```
+
+Tạo thêm OAuth Client ID loại **Android** cho đúng package trên và SHA-1 của APK/dev build. Web Client ID vẫn là giá trị truyền vào `GoogleSignin.configure({ webClientId })` để ID token có audience mà backend kiểm tra.
+
+Google Sign-In native **không chạy trong Expo Go** vì cần native module. Dùng development/native build, ví dụ:
+
+```bat
+cd apps\mobile
+npm install
+npx expo run:android
+```
+
+Nếu gặp `DEVELOPER_ERROR`, gần như luôn do package name hoặc SHA-1 trong Android OAuth Client không khớp build đang cài trên máy.

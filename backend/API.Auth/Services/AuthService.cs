@@ -320,11 +320,23 @@ public class AuthService(
     }
 
     // ============ GOOGLE LOGIN ============
-    public async Task<TokenDTO> LoginWithGoogleAsync(string idToken)
+    public async Task<TokenDTO> LoginWithGoogleAsync(string? idToken, string? accessToken)
     {
-        var info = await google.VerifyIdTokenAsync(idToken)
-            ?? throw new UnauthorizedAccessException("Token Google không hợp lệ");
-        if (!info.EmailVerified) throw new UnauthorizedAccessException("Email Google chưa xác thực");
+        GoogleUserInfo? info = null;
+
+        if (!string.IsNullOrWhiteSpace(idToken))
+        {
+            info = await google.VerifyIdTokenAsync(idToken);
+        }
+        else if (!string.IsNullOrWhiteSpace(accessToken))
+        {
+            info = await google.VerifyAccessTokenAsync(accessToken);
+        }
+
+        if (info is null)
+            throw new UnauthorizedAccessException("Token Google không hợp lệ");
+        if (!info.EmailVerified)
+            throw new UnauthorizedAccessException("Email Google chưa xác thực");
 
         var user = await UpsertSocialUser(info.Email, info.Name, info.Picture, "google", info.Subject);
         await activity.LogAsync(user.Id, user.Email, "google", true);
