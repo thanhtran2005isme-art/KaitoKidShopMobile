@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using API.Auth.Data;
 using API.Auth.DTOs;
@@ -26,7 +27,7 @@ public class AuthService(
     private int LockoutMinutes => int.Parse(config["Auth:LockoutMinutes"] ?? "15");
 
     // ============ REGISTER ============
-    public async Task<TokenDTO> RegisterAsync(RegisterDTO dto)
+    public async Task<RegistrationPendingDTO> RegisterAsync(RegisterDTO dto)
     {
         if (RequireRecaptcha)
         {
@@ -34,44 +35,104 @@ public class AuthService(
             if (!ok) throw new InvalidOperationException("Bạn có vẻ là bot. Vui lòng thử lại.");
         }
 
-        if (string.IsNullOrWhiteSpace(dto.Name)) throw new InvalidOperationException("Tên không được để trống");
+        if (string.IsNullOrWhiteSpace(dto.Name))
+            throw new InvalidOperationException("Tên không được để trống");
         if (string.IsNullOrWhiteSpace(dto.Password) || dto.Password.Length < 6)
             throw new InvalidOperationException("Mật khẩu phải có ít nhất 6 ký tự");
 
-        var emailLower = dto.Email.Trim().ToLower();
+        var emailLower = dto.Email.Trim().ToLowerInvariant();
         if (await db.Users.AnyAsync(u => u.Email == emailLower))
             throw new InvalidOperationException("Email đã được sử dụng");
 
+        // OTP (nếu bật) chỉ là lớp xác minh bổ sung. Tài khoản vẫn chưa được
+        // tạo cho tới khi người dùng click link xác nhận email.
         if (RequireOtp)
         {
             if (string.IsNullOrWhiteSpace(dto.OtpCode))
                 throw new InvalidOperationException("Vui lòng nhập mã OTP đã gửi tới email.");
             var verified = await otp.VerifyAsync(emailLower, "register", dto.OtpCode);
-            if (!verified) throw new InvalidOperationException("Mã OTP không đúng hoặc đã hết hạn.");
+            if (!verified)
+                throw new InvalidOperationException("Mã OTP không đúng hoặc đã hết hạn.");
         }
 
-        var user = new User
-        {
-            Name = dto.Name.Trim(),
-            Email = emailLower,
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password),
-            Phone = dto.Phone?.Trim(),
-            Role = "user",
-            EmailVerified = RequireOtp,
-            Provider = "local",
-        };
+        var now = DateTime.UtcNow;
+        var verifyHours = int.TryParse(
+            config["Auth:RegistrationVerificationHours"],
+            out var configuredHours)
+            ? Math.Clamp(configuredHours, 1, 168)
+            : 24;
+        var expiresAt = now.AddHours(verifyHours);
 
-        db.Users.Add(user);
+        var rawToken = Convert
+            .ToHexString(RandomNumberGenerator.GetBytes(32))
+            .ToLowerInvariant();
+        var tokenHash = HashVerificationToken(rawToken);
+        var passwordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password);
+
+        var pending = await db.PendingRegistrations
+            .FirstOrDefaultAsync(p => p.Email == emailLower);
+
+        if (pending is null)
+        {
+            pending = new PendingRegistration
+            {
+                Name = dto.Name.Trim(),
+                Email = emailLower,
+                Phone = string.IsNullOrWhiteSpace(dto.Phone)
+                    ? null
+                    : dto.Phone.Trim(),
+                PasswordHash = passwordHash,
+                TokenHash = tokenHash,
+                ExpiresAt = expiresAt,
+                CreatedAt = now,
+            };
+            db.PendingRegistrations.Add(pending);
+        }
+        else
+        {
+            // Đăng ký lại cùng email trước khi xác nhận = thay yêu cầu cũ và
+            // vô hiệu link cũ, không tạo thêm tài khoản/bản ghi trùng.
+            pending.Name = dto.Name.Trim();
+            pending.Phone = string.IsNullOrWhiteSpace(dto.Phone)
+                ? null
+                : dto.Phone.Trim();
+            pending.PasswordHash = passwordHash;
+            pending.TokenHash = tokenHash;
+            pending.ExpiresAt = expiresAt;
+            pending.UpdatedAt = now;
+        }
+
         await db.SaveChangesAsync();
 
-        // Auto-send email verify link nếu không yêu cầu OTP
-        if (!RequireOtp)
-        {
-            await SendEmailVerifyAsync(user.Id);
-        }
+        var verifyBaseUrl =
+            config["Auth:EmailVerifyUrl"] ??
+            "http://localhost:5173/verify-email";
+        var separator = verifyBaseUrl.Contains('?') ? '&' : '?';
+        var verifyUrl =
+            $"{verifyBaseUrl}{separator}token={Uri.EscapeDataString(rawToken)}";
 
-        await activity.LogAsync(user.Id, user.Email, "local", true, "register");
-        return GenerateTokenResponse(user);
+        var html = BuildEmailTemplate("Xác nhận đăng ký", $@"
+            <p>Bạn vừa yêu cầu đăng ký tài khoản KaitoKid bằng email <strong>{emailLower}</strong>.</p>
+            <p><strong>Tài khoản chưa được tạo.</strong> Hãy nhấn nút dưới đây để xác nhận bạn sở hữu email này và hoàn tất việc tạo tài khoản.</p>
+            <p style='text-align:center;margin:24px 0'>
+                <a href='{verifyUrl}' style='background:#7c3aed;color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:600'>Xác nhận và tạo tài khoản</a>
+            </p>
+            <p style='color:#64748b;font-size:13px'>Link có hiệu lực trong {verifyHours} giờ. Link cũ sẽ mất hiệu lực nếu bạn gửi lại đăng ký.</p>
+            <p style='color:#94a3b8;font-size:12px'>Nếu nút không mở được, copy link: <br />{verifyUrl}</p>");
+
+        await email.SendAsync(
+            emailLower,
+            "[KaitoKid] Xác nhận đăng ký tài khoản",
+            html);
+
+        return new RegistrationPendingDTO
+        {
+            Message =
+                "Đã gửi email xác nhận. Tài khoản chỉ được tạo sau khi bạn mở liên kết xác nhận trong email.",
+            Email = emailLower,
+            ExpiresAt = expiresAt,
+            RequiresEmailVerification = true,
+        };
     }
 
     // ============ LOGIN ============
@@ -306,17 +367,86 @@ public class AuthService(
         await email.SendAsync(user.Email, "[KaitoKid] Xác thực địa chỉ email", html);
     }
 
-    public async Task VerifyEmailAsync(string token)
+    public async Task<string> VerifyEmailAsync(string token)
     {
-        var record = await db.EmailVerificationTokens
-            .FirstOrDefaultAsync(t => t.Token == token && t.VerifiedAt == null && t.ExpiresAt > DateTime.UtcNow);
-        if (record is null) throw new InvalidOperationException("Link xác thực không hợp lệ hoặc đã hết hạn.");
+        if (string.IsNullOrWhiteSpace(token))
+            throw new InvalidOperationException("Link xác thực không hợp lệ.");
 
-        var user = await db.Users.FindAsync(record.UserId);
-        if (user is null) throw new InvalidOperationException("Tài khoản không tồn tại");
-        user.EmailVerified = true;
-        record.VerifiedAt = DateTime.UtcNow;
+        var now = DateTime.UtcNow;
+        var tokenHash = HashVerificationToken(token);
+
+        // Luồng đăng ký mới: chỉ khi token email hợp lệ mới tạo NguoiDung.
+        var pending = await db.PendingRegistrations
+            .FirstOrDefaultAsync(p => p.TokenHash == tokenHash);
+
+        if (pending is not null)
+        {
+            if (pending.ExpiresAt <= now)
+            {
+                db.PendingRegistrations.Remove(pending);
+                await db.SaveChangesAsync();
+                throw new InvalidOperationException(
+                    "Link xác nhận đã hết hạn. Vui lòng đăng ký lại để nhận email mới.");
+            }
+
+            var existing = await db.Users
+                .FirstOrDefaultAsync(u => u.Email == pending.Email);
+
+            if (existing is not null)
+            {
+                // Trường hợp hiếm do request verify đồng thời hoặc dữ liệu đã
+                // được tạo bởi một provider khác: không tạo bản ghi trùng.
+                db.PendingRegistrations.Remove(pending);
+                await db.SaveChangesAsync();
+                return "Email này đã có tài khoản KaitoKid. Bạn có thể đăng nhập.";
+            }
+
+            var user = new User
+            {
+                Name = pending.Name,
+                Email = pending.Email,
+                PasswordHash = pending.PasswordHash,
+                Phone = pending.Phone,
+                Role = "user",
+                EmailVerified = true,
+                Provider = "local",
+                CreatedAt = now,
+            };
+
+            db.Users.Add(user);
+            db.PendingRegistrations.Remove(pending);
+            await db.SaveChangesAsync();
+
+            await activity.LogAsync(
+                user.Id,
+                user.Email,
+                "local",
+                true,
+                "register-email-verified");
+
+            return "Xác thực email thành công. Tài khoản KaitoKid đã được tạo. Bạn có thể đăng nhập.";
+        }
+
+        // Backward compatibility cho các tài khoản local cũ từng được tạo
+        // trước khi bắt buộc xác nhận email trước khi tạo NguoiDung.
+        var record = await db.EmailVerificationTokens
+            .FirstOrDefaultAsync(t =>
+                t.Token == token &&
+                t.VerifiedAt == null &&
+                t.ExpiresAt > now);
+
+        if (record is null)
+            throw new InvalidOperationException(
+                "Link xác thực không hợp lệ, đã được sử dụng hoặc đã hết hạn.");
+
+        var legacyUser = await db.Users.FindAsync(record.UserId);
+        if (legacyUser is null)
+            throw new InvalidOperationException("Tài khoản không tồn tại");
+
+        legacyUser.EmailVerified = true;
+        record.VerifiedAt = now;
         await db.SaveChangesAsync();
+        return "Xác thực email thành công. Bạn có thể đăng nhập.";
     }
 
     // ============ GOOGLE LOGIN ============
@@ -458,6 +588,12 @@ public class AuthService(
         Phone = user.Phone, Avatar = user.Avatar, Role = user.Role,
         CreatedAt = user.CreatedAt,
     };
+
+    private static string HashVerificationToken(string token)
+    {
+        var hash = SHA256.HashData(Encoding.UTF8.GetBytes(token));
+        return Convert.ToHexString(hash).ToLowerInvariant();
+    }
 
     private static string BuildEmailTemplate(string title, string content) => $@"
         <div style='font-family:Inter,Arial,sans-serif;max-width:560px;margin:0 auto;border:1px solid #e5e7eb;border-radius:12px;overflow:hidden'>

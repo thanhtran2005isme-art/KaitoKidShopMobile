@@ -42,7 +42,7 @@ export default function VerifyEmail() {
             <PiCheckCircleFill className="auth-page-success-icon" />
             <h2>Xác thực thành công!</h2>
             <p>{message}</p>
-            <Link to="/" className="auth-page-success-back">Về trang chủ</Link>
+            <Link to="/login" className="auth-page-success-back">Đăng nhập</Link>
           </>
         )}
         {status === 'error' && (

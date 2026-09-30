@@ -280,3 +280,24 @@ Nếu popup Google mở/chọn tài khoản thành công nhưng request `POST /a
 
 Backend phải chấp nhận cả hai schema nhưng vẫn **fail closed** nếu không có audience đúng `Google:ClientId` hoặc token hết hạn. Cảnh báo browser `Cross-Origin-Opener-Policy policy would block the window.closed call` có thể xuất hiện khi Google popup đóng và không phải nguyên nhân của 401 nếu request `/api/Auth/google` vẫn được gửi.
 
+
+
+## Đăng ký email: không nhận được mail xác nhận
+
+Flow mới chỉ tạo `PendingRegistration` khi submit form; `NguoiDung` chỉ xuất hiện sau khi click link xác nhận.
+
+1. Chạy migration:
+   ```bat
+   "C:\xampp\mysql\bin\mysql.exe" -u root kaitokid < backend\Database\migrations\20260930_registration_email_verification.sql
+   ```
+2. Restart API.Auth sau migration.
+3. Nếu startup log ghi `Email backend : CONSOLE (mock)`, email **không đi ra Internet**; link chỉ được in trong console. Muốn gửi thật, cấu hình Brevo bằng environment/local secret, không commit key:
+   ```bat
+   set Email__Brevo__ApiKey=<BREVO_API_KEY>
+   set Email__Brevo__SenderEmail=<EMAIL_DA_XAC_THUC_TREN_BREVO>
+   set Email__Brevo__SenderName=KaitoKid Shop
+   ```
+4. `Auth__EmailVerifyUrl` phải là URL mà người nhận email mở được. Web dev mặc định là `http://localhost:5173/verify-email`. Nếu chỉ test API trực tiếp có thể trỏ tới `http://<LAN-IP>:5053/api/Auth/verify-email`; production phải dùng domain HTTPS công khai.
+5. Link mặc định hết hạn sau 24 giờ. Submit đăng ký lại cùng email sẽ phát token mới và làm link cũ mất hiệu lực.
+
+Không đưa Brevo API key, mật khẩu email hoặc verification token vào Git/log công khai.

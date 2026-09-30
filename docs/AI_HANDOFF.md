@@ -70,7 +70,7 @@ KaitoKidShop/
 - Local server used during development: MariaDB `10.4.32` from XAMPP
 - EF provider: `Pomelo.EntityFrameworkCore.MySql 8.0.3`
 - Database: `kaitokid`
-- Verified base table count: `51`
+- Verified base table count trước migration đăng ký-email: `51`; sau `20260930_registration_email_verification.sql`: `52`
 - Backend DbContexts register through `AddMariaDb<TContext>()`
 - Legacy SQL Server migrations remain as history and are excluded from compilation.
 - Initial/fresh MariaDB schema source: `backend/Database/KaitoKid_MariaDB.sql`
@@ -145,6 +145,7 @@ As of 2026-09-22:
 - Product Detail cho phép mở cả sản phẩm `active` và `out-of-stock`; Home/Search vẫn chỉ liệt kê sản phẩm đang bán.
 - Login mobile hiện dùng `AuthContext.login(email, password)` để lưu access token/session cho các API được bảo vệ.
 - Google login Mobile/Web đã được nối thật: Android native lấy Google ID token, Expo Web lấy OAuth access token, API.Auth xác minh credential với Google rồi phát JWT/refresh token KaitoKid; Expo Go không hỗ trợ native Google module nên Android cần development/native build.
+- Đăng ký local bằng email dùng pending-registration: `POST /api/Auth/register` chỉ lưu dữ liệu tạm (password đã BCrypt, token chỉ lưu SHA-256 hash) và gửi link xác nhận; chỉ `GET /api/Auth/verify-email?token=...` hợp lệ mới tạo `NguoiDung` với `EmailDaXacThuc=1`. Mobile/Web không auto-login trước bước xác nhận.
 - Mobile tự refresh access token bằng refresh token, gom các refresh đồng thời thành một request và retry một lần các request Bearer bị 401; refresh token hỏng/hết hạn sẽ xóa session.
 - Expo Web renders the mobile app successfully at `127.0.0.1:8081`.
 - API.Customer serves shared media from `apps/web/public` so existing banner URLs such as `/slide_1.jpg` resolve on port 5265.
@@ -162,6 +163,7 @@ As of 2026-09-22:
 - Wishlist/Add-to-cart, Cart, Checkout, Orders/Tracking, Reviews/Notifications/Account và Discovery PHASE 9 đã được nối ở mức code. PHASE 10 còn polish/performance/test matrix toàn hệ thống.
 - Seed hiện chưa có ảnh phụ hoặc `TonKhoBienThe` mẫu; Add to Cart dùng product-level reservation fallback qua `SanPham.SoLuongDaGiu`.
 - Sau khi pull PHASE 4 cần chạy migration reservation và restart API.Customer trước khi test Add to Cart.
+- Sau commit đăng ký xác nhận-email, cần chạy `backend/Database/migrations/20260930_registration_email_verification.sql` và restart API.Auth. Muốn email đi thật phải cấu hình Brevo; nếu ApiKey trống backend dùng ConsoleEmailService mock.
 - A NuGet warning about a known vulnerability in `Microsoft.OpenApi 2.0.0` has been observed during API.Auth build. It did not block startup, but dependency remediation should be handled separately rather than mixed into unrelated changes.
 
 ## How a new AI/chat should resume

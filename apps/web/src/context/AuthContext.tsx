@@ -11,7 +11,7 @@ interface AuthContextType {
   loading: boolean;
   isAdmin: boolean;
   login: (identifier: string, password: string, recaptchaToken?: string) => Promise<{ success: boolean; error?: string; requireTwoFactor?: boolean; identifier?: string; password?: string }>;
-  register: (data: { name: string; email: string; phone?: string; password: string; recaptchaToken?: string; otpCode?: string }) => Promise<{ success: boolean; error?: string }>;
+  register: (data: { name: string; email: string; phone?: string; password: string; recaptchaToken?: string; otpCode?: string }) => Promise<{ success: boolean; error?: string; message?: string; email?: string }>;
   logout: () => void;
   refreshUser: () => Promise<void>;
 }
@@ -52,25 +52,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const register = async (data: { name: string; email: string; phone?: string; password: string; recaptchaToken?: string; otpCode?: string }) => {
     const r = await authApi.register(data);
-    if (r.success && r.data) {
-      const { accessToken, refreshToken, user } = r.data;
-      if (accessToken && user) {
-        const { tokenStorage } = await import('../services/tokenStorage');
-        tokenStorage.setAccessToken(accessToken);
-        if (refreshToken) tokenStorage.setRefreshToken(refreshToken);
-        const mappedUser: User = {
-          id: user.id,
-          name: user.name,
-          email: user.email,
-          phone: user.phone,
-          avatar: user.avatar,
-          role: user.role.toLowerCase() === 'admin' ? 'admin' : 'user',
-        };
-        tokenStorage.setCurrentUser(mappedUser);
-        setUser(mappedUser);
-      }
-    }
-    return { success: r.success, error: r.error };
+    return {
+      success: r.success,
+      error: r.error,
+      message: r.data?.message,
+      email: r.data?.email,
+    };
   };
 
   const refreshUser = async () => {
