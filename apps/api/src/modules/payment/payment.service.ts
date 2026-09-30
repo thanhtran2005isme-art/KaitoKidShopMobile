@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable } from "@nestjs/common";
 import { toNumber } from "../../common/db-value.js";
 import { PrismaService } from "../../database/prisma.service.js";
+import { AuthEmailService, paymentReceivedHtml } from "../identity/email.service.js";
 import { CouponService } from "../coupons/coupon.service.js";
 import {
   isExpiredUnpaidOrder,
@@ -37,6 +38,7 @@ export class PaymentService {
     private readonly shipping: ShippingService,
     private readonly inventory: OrderInventoryService,
     private readonly coupons: CouponService,
+    private readonly email: AuthEmailService,
   ) {}
 
   async getConfig() {
@@ -257,6 +259,16 @@ export class PaymentService {
           result.order.shippingServiceCode ?? "standard",
         ).catch(() => undefined);
       }
+
+      void this.email.send(
+        result.order.customerEmail,
+        `[KaitoKid] Đã nhận thanh toán đơn ${result.order.orderCode}`,
+        paymentReceivedHtml({
+          customerName: result.order.customerName,
+          orderCode: result.order.orderCode,
+          total: toNumber(result.order.total),
+        }),
+      ).catch(() => undefined);
     }
 
     return {

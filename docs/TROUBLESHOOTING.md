@@ -357,3 +357,30 @@ Chỉ bật Node sweeper sau khi background job C# đã dừng ở cutover. Endp
 ## Node migration: shipping provider ngoài không trả phí
 
 Node đọc shipping config JSON từ `CauHinhCuaHang` trước, rồi mới fallback env. GHN cần token + shop ID; GHTK cần token. Không commit token thật. Nếu provider ngoài lỗi, service giữ behavior fallback Mock của C#; nếu `MockOnlyServeBranches=true` mà tỉnh không có branch KaitoKid thì Mock có thể trả rỗng theo đúng cấu hình.
+
+
+## Node migration Phase 8: build báo thiếu `bcryptjs`
+
+Phase 8 thêm BCrypt pure-JS để tương thích trực tiếp `MatKhauHash` của C#. Sau khi pull branch Phase 8 cần chạy:
+
+```bat
+cd apps\api
+npm install
+npm run build
+```
+
+Không đổi/reset hash trong DB. Hash BCrypt cũ tiếp tục đăng nhập được; plain-text legacy nếu có chỉ được chấp nhận khi khớp chính xác rồi rehash sau lần đăng nhập hợp lệ.
+
+## Node Auth trả 401 Google/Facebook
+
+Node không dùng token OAuth giả. Cần cấu hình local/deploy, không commit secret:
+
+- `GOOGLE_CLIENT_ID`: phải đúng Web Client ID mà Mobile/Web đang dùng làm audience.
+- `FACEBOOK_APP_ID`: bắt buộc để bật Facebook verification path.
+- Brevo/reCAPTCHA/OAuth secrets chỉ nằm trong `.env` local hoặc secret manager.
+
+Nếu `GOOGLE_CLIENT_ID` sai, cả ID token native và access token Expo Web đều fail closed. Node hỗ trợ các field tokeninfo hiện tại `aud/azp` và legacy `audience/issued_to`.
+
+## Node staff token bị 403 dù role là admin
+
+RBAC cố ý không bypass chỉ vì claim `role=admin`. Quyền được cho phép khi JWT có `user_type=staff` và một trong hai điều kiện đúng: `is_super_admin=true`, hoặc token chứa đúng claim `permission`. Đây là parity với hardening C# hiện tại.

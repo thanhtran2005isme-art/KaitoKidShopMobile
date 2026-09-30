@@ -3,6 +3,7 @@ import { randomBytes } from "node:crypto";
 import { toNumber } from "../../common/db-value.js";
 import type { SqlClient } from "../../common/sql-client.js";
 import { PrismaService } from "../../database/prisma.service.js";
+import { AuthEmailService, orderConfirmationHtml } from "../identity/email.service.js";
 import { evaluateComboRows } from "../cart/combo-discount.helpers.js";
 import { distinctPositiveIds } from "../cart/cart.helpers.js";
 import { CouponService } from "../coupons/coupon.service.js";
@@ -102,6 +103,7 @@ export class OrdersService {
     private readonly coupons: CouponService,
     private readonly shipping: ShippingService,
     private readonly inventory: OrderInventoryService,
+    private readonly email: AuthEmailService,
   ) {}
 
   async createOrder(userId: number, input: CreateOrderInput) {
@@ -475,6 +477,22 @@ export class OrdersService {
 
     const order = await this.getOrderById(userId, result.orderId);
     if (!order) throw new Error("Không thể đọc lại đơn hàng vừa tạo.");
+
+    const frontendUrl = (
+      process.env.FRONTEND_BASE_URL ?? "http://localhost:5173"
+    ).replace(/\/+$/, "");
+    void this.email.send(
+      order.customerEmail,
+      `[KaitoKid] Xác nhận đơn hàng ${order.orderCode}`,
+      orderConfirmationHtml({
+        customerName: order.customerName,
+        orderCode: order.orderCode,
+        total: order.total,
+        paymentMethod: order.paymentMethod,
+        trackingUrl: `${frontendUrl}/orders`,
+      }),
+    ).catch(() => undefined);
+
     return order;
   }
 

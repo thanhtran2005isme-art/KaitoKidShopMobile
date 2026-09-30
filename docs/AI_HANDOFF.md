@@ -1,6 +1,6 @@
 # AI Handoff — Current State
 
-Last updated: 2026-09-24
+Last updated: 2026-09-30
 
 This file is intentionally concise. It describes the current state needed to continue work quickly. Historical detail belongs in `docs/history/`, and exact code history belongs in Git.
 
@@ -30,7 +30,8 @@ This file is intentionally concise. It describes the current state needed to con
 KaitoKidShop/
 ├─ apps/
 │  ├─ mobile/       Expo + React Native
-│  └─ web/          React + TypeScript + Vite
+│  ├─ web/          React + TypeScript + Vite
+│  └─ api/          NestJS + Prisma (Node migration, chưa cutover)
 ├─ backend/         ASP.NET Core services + database assets
 ├─ scripts/         Windows development launchers
 ├─ docs/            durable project/AI context
@@ -79,6 +80,26 @@ KaitoKidShop/
 - PHASE 4 thêm migration idempotent `backend/Database/migrations/20260922_phase4_cart_reservation.sql` để bảo đảm các cột reservation của giỏ hàng tồn tại.
 - PHASE 9 thêm migration idempotent `backend/Database/migrations/20260924_phase9_discovery_seed.sql` để bổ sung discovery seed.
 - PHASE 10 thêm migration idempotent `backend/Database/migrations/20260929_phase10_multiaudience_media.sql`; migration tự bảo đảm cột `Lookbook.Season/Style`, nên có thể dùng để chốt sample hiện tại sau các migration cũ.
+
+## Node backend migration — current stacked state
+
+Migration C# → NestJS đang đi theo chuỗi Draft PR riêng, **không thay thế roadmap Mobile PHASE 1–10** ở trên.
+
+- Node app: `apps/api`, NestJS 11 + TypeScript + Prisma 7 + `@prisma/adapter-mariadb`, port mặc định `5300`.
+- Dùng **chính MariaDB `kaitokid` hiện tại**; không reset/drop/reseed/copy dữ liệu.
+- Cấm trên DB đang dùng: `prisma migrate reset`, `prisma migrate dev`, `prisma db push`; introspection dùng `prisma db pull`.
+- C# tiếp tục là reference/oracle và backend phục vụ cho tới khi parity runtime + cutover hoàn tất.
+- Draft PR stack hiện tại:
+  - #30 foundation;
+  - #31 catalog read-only;
+  - #32 customer auxiliary;
+  - #33 cart/inventory/reservation;
+  - #34 checkout/order/coupon/payment/shipping;
+  - #35 auth/email/social/OTP/2FA/staff-RBAC.
+- Phase 8 Node đã mirror source-level Auth + Staff/RBAC và tiếp quản order/payment email side-effect. Chưa cutover Web/Mobile sang Node.
+- Phase 8 gate local cần `npm install` (dependency mới `bcryptjs`), sau đó build/db audit + toàn bộ contract tests tới `test:auth-rbac`.
+- Sau Phase 8, Phase 9 Node mới xử lý chat/realtime/chatbot/image/background workers + final cutover.
+- Chi tiết migration/invariants/gate: `docs/NODE_BACKEND_MIGRATION.md`.
 
 ## Local database credentials
 

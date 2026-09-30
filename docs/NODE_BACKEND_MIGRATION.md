@@ -95,6 +95,23 @@ Không xóa backend C# trong các phase đầu.
 - Tracking `/api/shipping/track/:orderCode` bắt buộc JWT + ownership.
 - Payment giữ COD/ATM, bank config từ `CauHinhCuaHang`, ATM timeout 15 phút, instructions/status/cancel/simulate-paid/mark-paid.
 - Node payment expiry sweeper được triển khai nhưng mặc định tắt trong coexistence: `PAYMENT_SWEEPER_ENABLED=false`; chỉ bật sau khi C# sweeper dừng.
-- Order/payment email side-effect vẫn do C# giữ trong coexistence và sẽ chuyển cùng Email/Auth ở Phase 8; business transaction không phụ thuộc email.
+- Order/payment email side-effect được Phase 8 tiếp quản bằng email provider Node; business transaction vẫn không phụ thuộc email và email failure không rollback order/payment.
 - Không thêm bảng/cột, không reset/seed/copy MariaDB, chưa cutover Web/Mobile.
 - Gate: `npm run build`, `npm run db:audit`, các gate cũ và `npm run test:checkout-order`.
+
+
+## Phase 8 — Auth + Email Verify + Social + OTP/2FA + Staff/RBAC
+
+- Mirror toàn bộ customer Auth contract `/api/Auth`: register pending, login, login-2fa, refresh rotation, change-password, me, forgot/reset password, send/verify email, OTP, Google/Facebook, 2FA và login activity.
+- Đăng ký local giữ invariant mới nhất: `POST /register` chỉ upsert `PendingRegistration` với BCrypt hash + SHA-256 verification-token hash; chỉ verify-email hợp lệ mới tạo `NguoiDung`.
+- Password dùng `bcryptjs` cost 11, đọc được BCrypt C# hiện có. Plain-text legacy chỉ được chấp nhận khi khớp chính xác rồi rehash ngay; chỉ placeholder admin lịch sử được phép dùng mật khẩu bootstrap tương thích, không có fallback Admin@123 rộng cho hash lỗi.
+- JWT Node phát HS256 cùng `JWT_KEY/JWT_ISSUER/JWT_AUDIENCE`; customer claims giữ `nameid/unique_name/email/role`. Refresh token 64-byte random được rotate và lưu ở `NguoiDung`.
+- Google native ID token + Expo Web OAuth access token đều verify backend và bắt buộc đúng audience/client ID; Facebook vẫn mirror Graph profile contract hiện tại.
+- OTP: 6 số, 5 phút, cooldown 60 giây, tối đa 5 lần thử. TOTP: SHA1/6 số/30 giây, drift ±1 step, issuer `KaitoKidShop`.
+- Email dùng Brevo khi có local secret; nếu không có thì mock log console để dev lấy verification/reset link. Cùng provider xử lý email xác nhận order và payment received; email failure không rollback nghiệp vụ. Không commit API key/token.
+- Mirror staff auth `/api/auth/staff` và management `/api/auth/staff-management`: lock sau 5 lần sai, JWT staff với `user_type`, `is_super_admin`, permission claims; CRUD staff/role và permission read-only.
+- RBAC không bypass theo role string `admin`; chỉ super admin claim hoặc đúng granular permission được phép.
+- Staff refresh token giữ parity C# hiện tại: được phát cho client nhưng chưa persistence/revoke endpoint riêng.
+- Không thêm/drop/rename bảng; dùng trực tiếp MariaDB 52 bảng hiện tại, bao gồm auth/RBAC + `PendingRegistration`.
+- Chưa cutover Mobile/Web Auth base URL; C# API.Auth vẫn là backend reference cho tới runtime parity.
+- Gate thêm: `npm install`, `npm run build`, `npm run db:audit`, các gate cũ và `npm run test:auth-rbac`.

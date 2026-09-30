@@ -8,6 +8,7 @@ import { CategoriesModule } from "./modules/categories/categories.module.js";
 import { CartModule } from "./modules/cart/cart.module.js";
 import { CollectionsModule } from "./modules/collections/collections.module.js";
 import { HomepageBlocksModule } from "./modules/homepage-blocks/homepage-blocks.module.js";
+import { IdentityModule } from "./modules/identity/identity.module.js";
 import { LookbooksModule } from "./modules/lookbooks/lookbooks.module.js";
 import { CouponModule } from "./modules/coupons/coupon.module.js";
 import { OrdersModule } from "./modules/orders/orders.module.js";
@@ -29,6 +30,7 @@ import { MigrationModule } from "./migration/migration.module.js";
     AuthCompatModule,
     MediaModule,
     HealthModule,
+    IdentityModule,
     ProductsModule,
     CategoriesModule,
     CartModule,
