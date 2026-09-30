@@ -384,3 +384,27 @@ Nếu `GOOGLE_CLIENT_ID` sai, cả ID token native và access token Expo Web đ�
 ## Node staff token bị 403 dù role là admin
 
 RBAC cố ý không bypass chỉ vì claim `role=admin`. Quyền được cho phép khi JWT có `user_type=staff` và một trong hai điều kiện đúng: `is_super_admin=true`, hoặc token chứa đúng claim `permission`. Đây là parity với hardening C# hiện tại.
+
+
+## Node Phase 9: realtime Web không kết nối
+
+Phase 9 đổi backend chat từ SignalR sang Socket.IO. Sau cutover cấu hình Web:
+
+```env
+VITE_CHAT_HUB_URL=http://localhost:5300
+VITE_CHAT_HUB_PATH=/chatHub
+```
+
+Chạy `npm install` trong `apps/web` vì dependency realtime đổi sang `socket.io-client`.
+
+## Node Phase 9: image search `ready=false`
+
+Đây là trạng thái hợp lệ nếu repo/local chưa có CLIP ONNX model. Repo không commit model binary. Đặt model tại `IMAGE_SEARCH_MODEL_PATH`, restart Node, rồi chỉ bật `IMAGE_INDEXER_ENABLED=true` khi model load thành công. Không tạo lại DB.
+
+## Node Phase 9: npm install native image dependencies lỗi
+
+Phase 9 dùng `onnxruntime-node` và `sharp`. Không dùng `npm audit fix --force` để chữa lỗi cài đặt. Giữ Node version đáp ứng `engines >=20.19`, xóa/chỉnh dependency chỉ sau khi có log lỗi cụ thể. Image search soft-disable khi thiếu model, nhưng package vẫn phải cài để TypeScript/build resolve module.
+
+## Cutover: có được tắt hết backend C# không?
+
+Chưa. Node 9-phase hiện chốt API.Auth + API.Customer; `API.Admin` còn 23 controller C#. Chỉ cutover Auth/Customer sau parity, giữ API.Admin C# cho tới migration riêng.

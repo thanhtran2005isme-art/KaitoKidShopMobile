@@ -1,6 +1,6 @@
 # AI Handoff — Current State
 
-Last updated: 2026-09-30
+Last updated: 2026-10-01
 
 This file is intentionally concise. It describes the current state needed to continue work quickly. Historical detail belongs in `docs/history/`, and exact code history belongs in Git.
 
@@ -98,7 +98,7 @@ Migration C# → NestJS đang đi theo chuỗi Draft PR riêng, **không thay th
   - #35 auth/email/social/OTP/2FA/staff-RBAC.
 - Phase 8 Node đã mirror source-level Auth + Staff/RBAC và tiếp quản order/payment email side-effect. Chưa cutover Web/Mobile sang Node.
 - Phase 8 gate local cần `npm install` (dependency mới `bcryptjs`), sau đó build/db audit + toàn bộ contract tests tới `test:auth-rbac`.
-- Sau Phase 8, Phase 9 Node mới xử lý chat/realtime/chatbot/image/background workers + final cutover.
+- Phase 9 Node đang triển khai trên `feat/node-realtime-search-cutover`: chat/realtime/chatbot, search/image, remaining API.Customer routes, workers và cutover readiness. Full C# retirement vẫn bị chặn bởi 23 controller `API.Admin` chưa migrate.
 - Chi tiết migration/invariants/gate: `docs/NODE_BACKEND_MIGRATION.md`.
 
 ## Local database credentials

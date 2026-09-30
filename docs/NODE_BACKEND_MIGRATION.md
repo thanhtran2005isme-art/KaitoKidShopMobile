@@ -115,3 +115,18 @@ Không xóa backend C# trong các phase đầu.
 - Không thêm/drop/rename bảng; dùng trực tiếp MariaDB 52 bảng hiện tại, bao gồm auth/RBAC + `PendingRegistration`.
 - Chưa cutover Mobile/Web Auth base URL; C# API.Auth vẫn là backend reference cho tới runtime parity.
 - Gate thêm: `npm install`, `npm run build`, `npm run db:audit`, các gate cũ và `npm run test:auth-rbac`.
+
+
+## Phase 9 — Chat/realtime + search/image + workers + cutover readiness
+
+- Mirror chat REST customer + admin bằng chính `CuocHoiThoai/TinNhan`; ownership guest/user và granular `chat.view/chat.reply/chat.manage`.
+- Realtime chuyển transport từ SignalR C# sang Socket.IO NestJS, giữ logical event names; Web `ChatHubClient` được đổi adapter nhưng giữ public API để không rewrite UI.
+- Rule bot giữ order ownership, stock khả dụng, coupon thật và FAQ; LLM optional dùng OpenAI-compatible endpoint + DB grounding và fail mềm.
+- Node chat idle sweeper có nhưng mặc định `CHAT_IDLE_SWEEPER_ENABLED=false` trong coexistence.
+- Mirror text search/suggestions, recommendations, image-search status/upload, CLIP ONNX embedding store/indexer.
+- Repo không chứa model ONNX; thiếu model => image search soft-disabled, không làm app startup fail. Image indexer mặc định tắt.
+- Đóng nốt API.Customer routes còn thiếu: Attributes, Newsletter, Product Extras (variants/size/Q&A/viewers), Sitemap/robots và Admin Shipping.
+- Không thêm/drop/rename bảng; tiếp tục dùng 52-table MariaDB hiện tại.
+- Cutover Auth + Customer chỉ sau toàn bộ gate + runtime parity. Worker ownership phải chuyển C# → Node theo từng worker, không chạy dual-owner.
+- **Full C# retirement chưa đạt** vì `API.Admin` còn 23 controller C# ngoài scope 9 phase hiện hành. Xem `docs/NODE_CUTOVER_RUNBOOK.md`.
+- Gate mới: `npm run test:realtime-cutover`; helper tổng: `scripts\node-cutover-check.bat`.
