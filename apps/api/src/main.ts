@@ -18,8 +18,19 @@ async function bootstrap(): Promise<void> {
     credentials: true,
   });
 
-  const publicRoot = resolve(process.env.PUBLIC_ROOT ?? join(process.cwd(), "public"));
+  const publicRoot = resolve(
+    process.env.PUBLIC_ROOT ?? join(process.cwd(), "public"),
+  );
   app.useStaticAssets(publicRoot);
+
+  // Parity API.Customer: local/dev media cũ đang nằm trong apps/web/public.
+  const sharedWebPublicRoot = resolve(
+    process.env.SHARED_WEB_PUBLIC_ROOT ??
+      join(process.cwd(), "..", "web", "public"),
+  );
+  if (sharedWebPublicRoot !== publicRoot) {
+    app.useStaticAssets(sharedWebPublicRoot);
+  }
 
   const port = Number(process.env.PORT ?? 5300);
   await app.listen(port, "0.0.0.0");

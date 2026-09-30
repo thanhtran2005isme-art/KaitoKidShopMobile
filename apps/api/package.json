@@ -17,7 +17,8 @@
     "test:customer-aux": "npm run build && node --test test/customer-aux-contract.test.mjs",
     "test:cart-reservation": "npm run build && node --test test/cart-reservation-contract.test.mjs",
     "test:checkout-order": "npm run build && node --test test/checkout-order-contract.test.mjs",
-    "test:auth-rbac": "npm run build && node --test test/auth-rbac-contract.test.mjs"
+    "test:auth-rbac": "npm run build && node --test test/auth-rbac-contract.test.mjs",
+    "test:realtime-cutover": "npm run build && node --test test/realtime-cutover-contract.test.mjs"
   },
   "dependencies": {
     "@nestjs/common": "11.2.5",
@@ -28,7 +29,12 @@
     "dotenv": "^17.2.3",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.2",
-    "bcryptjs": "^3.0.2"
+    "bcryptjs": "^3.0.2",
+    "@nestjs/platform-socket.io": "11.2.5",
+    "@nestjs/websockets": "11.2.5",
+    "onnxruntime-node": "^1.23.2",
+    "sharp": "^0.34.4",
+    "socket.io": "^4.8.1"
   },
   "devDependencies": {
     "@nestjs/cli": "11.0.7",

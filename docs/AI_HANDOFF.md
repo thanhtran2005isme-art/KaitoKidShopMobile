@@ -98,7 +98,7 @@ Migration C# → NestJS đang đi theo chuỗi Draft PR riêng, **không thay th
   - #35 auth/email/social/OTP/2FA/staff-RBAC.
 - Phase 8 Node đã mirror source-level Auth + Staff/RBAC và tiếp quản order/payment email side-effect. Chưa cutover Web/Mobile sang Node.
 - Phase 8 gate local cần `npm install` (dependency mới `bcryptjs`), sau đó build/db audit + toàn bộ contract tests tới `test:auth-rbac`.
-- Sau Phase 8, Phase 9 Node mới xử lý chat/realtime/chatbot/image/background workers + final cutover.
+- Phase 9 Node đã được dựng ở mức source: Search/Image Search + Chat REST/Socket.IO + chatbot + Chat/Shipping/Image workers + shared-media parity + hybrid customer/auth cutover preview. Runtime gate local vẫn chưa được xác nhận. Audit phát hiện API.Admin business controllers chưa nằm trong 9-phase scope, nên full C# removal vẫn bị chặn cho tới migration API.Admin riêng.
 - Chi tiết migration/invariants/gate: `docs/NODE_BACKEND_MIGRATION.md`.
 
 ## Local database credentials

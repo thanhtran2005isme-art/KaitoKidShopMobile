@@ -384,3 +384,20 @@ Nếu `GOOGLE_CLIENT_ID` sai, cả ID token native và access token Expo Web đ�
 ## Node staff token bị 403 dù role là admin
 
 RBAC cố ý không bypass chỉ vì claim `role=admin`. Quyền được cho phép khi JWT có `user_type=staff` và một trong hai điều kiện đúng: `is_super_admin=true`, hoặc token chứa đúng claim `permission`. Đây là parity với hardening C# hiện tại.
+
+
+## Node Phase 9: Socket.IO / Image Search không build hoặc không ready
+
+Sau khi pull Phase 9 phải chạy `npm install` trong cả `apps/api` và `apps/web` vì có dependency mới: Nest WebSocket/Socket.IO, `onnxruntime-node`, `sharp`, `socket.io-client`.
+
+Image Search cố ý fail-soft:
+- thiếu file `IMAGE_SEARCH_MODEL_PATH` → endpoint status trả `ready=false`, API vẫn chạy;
+- model có nhưng chưa có vector → hệ thống báo đang lập chỉ mục;
+- coexistence C# + Node giữ `IMAGE_SEARCH_INDEXER_ENABLED=false` để không có hai writer;
+- chỉ bật indexer Node sau khi C# image indexer đã dừng.
+
+Realtime Node dùng `VITE_CHAT_HUB_URL=http://localhost:5300/hubs/chat`. Đây là Socket.IO namespace, không còn SignalR protocol.
+
+## Cutover Node vẫn cần API.Admin C#
+
+Audit Phase 9 phát hiện `backend/API.Admin` còn nhiều business controller và chưa được mirror trong 9-phase migration. Không xóa thư mục `backend` hoặc tắt API.Admin chỉ vì Customer/Auth đã parity. Dùng `scripts/run-node-customer-cutover.bat` để preview hybrid; full C# removal cần migration API.Admin riêng.

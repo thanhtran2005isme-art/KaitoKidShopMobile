@@ -115,3 +115,25 @@ Không xóa backend C# trong các phase đầu.
 - Không thêm/drop/rename bảng; dùng trực tiếp MariaDB 52 bảng hiện tại, bao gồm auth/RBAC + `PendingRegistration`.
 - Chưa cutover Mobile/Web Auth base URL; C# API.Auth vẫn là backend reference cho tới runtime parity.
 - Gate thêm: `npm install`, `npm run build`, `npm run db:audit`, các gate cũ và `npm run test:auth-rbac`.
+
+
+## Phase 9 — Chat / Realtime + Chatbot + Image Search + Workers + Cutover Readiness
+
+- Mirror `/api/search`: text search, suggestions, multi-select facets, Levenshtein did-you-mean và image search status/upload.
+- Image Search dùng `onnxruntime-node` + `sharp` để chạy CLIP-compatible ONNX offline, đọc/ghi chính bảng `SanPhamEmbedding` hiện có và brute-force cosine in-memory như C#.
+- Image indexer nạp vector DB hiện có ngay cả khi worker tắt. Trong coexistence giữ `IMAGE_SEARCH_INDEXER_ENABLED=false`; chỉ Node được phép self-heal embedding sau khi C# indexer dừng.
+- Mirror customer Chat REST `/api/chat` và staff inbox `/api/admin/chat` trên cùng `CuocHoiThoai/TinNhan`; guest/auth ownership được kiểm tra server-side.
+- Realtime chuyển SignalR transport sang Socket.IO namespace `/hubs/chat`, nhưng giữ event semantics `ReceiveMessage/ConversationUpdated/TypingChanged/ReadReceipt/QueueUpdated/HandoffRequested/ConversationClosed/ClaimFailed` và public API `ChatHubClient` để UI không phải rewrite.
+- Realtime staff dùng granular claims `chat.view/chat.reply` hoặc super-admin; customer join/send/read/end bắt buộc ownership. Bot re-check row lock trước lưu reply để không chen bot sau khi agent vừa claim.
+- Chatbot giữ rule-based skills Order/Stock/Coupon/FAQ trước; LLM OpenAI-compatible chỉ xử lý câu tự do và được grounding bằng DB. LLM config đọc `CauHinhCuaHang` nhóm `chatbot` trước rồi fallback env.
+- Background workers Node: Cart reservation, Payment expiry, Chat idle, Shipping simulator, Image indexer. Mọi worker có thể trùng C# đều mặc định **OFF** trong coexistence.
+- Gate mới: `npm run test:realtime-cutover` sau build/db audit và toàn bộ gate Phase 4–8.
+- Web realtime dependency đổi `@microsoft/signalr` → `socket.io-client`.
+- Node cũng mount `apps/web/public` làm shared static media và giữ fallback SVG `/products/*` + `/lookbook/*` như API.Customer C#, tránh 404 asset legacy khi cutover.
+- Không tạo/drop/reset/seed bảng và không copy MariaDB.
+
+### Final cutover boundary phát hiện khi audit
+
+Chuỗi 9 phase đã cover API.Customer + API.Auth + staff-auth/RBAC + chat/search/workers, nhưng repository vẫn có một `backend/API.Admin` riêng với các business controller quản trị sản phẩm, đơn hàng, kho, marketing, báo cáo, settings... Các controller này **không nằm trong scope module của 9 phase hiện tại và chưa được mirror vào `apps/api`**.
+
+Vì vậy Phase 9 chỉ được đánh dấu **customer/auth cutover-ready** sau runtime parity; chưa được xóa toàn bộ C# backend. `scripts/run-node-customer-cutover.bat` là hybrid preview: Customer/Auth/Chat/Search dùng Node :5300, API.Admin vẫn C# :5089. Muốn loại bỏ C# hoàn toàn phải có task migration API.Admin riêng và parity test trước khi xóa source.
