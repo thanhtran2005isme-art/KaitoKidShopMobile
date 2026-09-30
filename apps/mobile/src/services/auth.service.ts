@@ -57,6 +57,11 @@ export type AuthTokenResponse = {
   token?: string;
 };
 
+export type GoogleLoginCredential = {
+  idToken?: string;
+  accessToken?: string;
+};
+
 async function request<T>(url: string, options: RequestInit): Promise<T> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 15000);
@@ -147,6 +152,12 @@ export function register(data: RegisterRequest) {
   });
 }
 
+export function loginWithGoogle(credential: GoogleLoginCredential) {
+  return request<AuthTokenResponse>('/api/Auth/google', {
+    method: 'POST',
+    body: JSON.stringify(credential),
+  });
+}
 
 export function requestPasswordReset(email: string) {
   return request<{ message?: string }>('/api/Auth/forgot-password', {

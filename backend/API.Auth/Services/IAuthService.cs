@@ -20,7 +20,7 @@ public interface IAuthService
     Task VerifyEmailAsync(string token);
 
     // Social
-    Task<TokenDTO> LoginWithGoogleAsync(string idToken);
+    Task<TokenDTO> LoginWithGoogleAsync(string? idToken, string? accessToken);
     Task<TokenDTO> LoginWithFacebookAsync(string accessToken);
 
     // 2FA

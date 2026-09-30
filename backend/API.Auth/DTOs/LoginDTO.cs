@@ -42,7 +42,8 @@ public class VerifyOtpDTO
 
 public class GoogleLoginDTO
 {
-    public string IdToken { get; set; } = string.Empty;
+    public string? IdToken { get; set; }
+    public string? AccessToken { get; set; }
 }
 
 public class FacebookLoginDTO

@@ -139,7 +139,7 @@ public class AuthController(
     [HttpPost("google")]
     public async Task<ActionResult<TokenDTO>> GoogleLogin([FromBody] GoogleLoginDTO dto)
     {
-        try { return Ok(await authService.LoginWithGoogleAsync(dto.IdToken)); }
+        try { return Ok(await authService.LoginWithGoogleAsync(dto.IdToken, dto.AccessToken)); }
         catch (UnauthorizedAccessException ex) { return Unauthorized(new { message = ex.Message }); }
     }
 

@@ -144,6 +144,7 @@ As of 2026-09-22:
 - API Product Detail trả `variantInventory` từ `TonKhoBienThe` nếu có; nếu chưa có dữ liệu biến thể thì mobile fallback về tồn kho khả dụng cấp sản phẩm.
 - Product Detail cho phép mở cả sản phẩm `active` và `out-of-stock`; Home/Search vẫn chỉ liệt kê sản phẩm đang bán.
 - Login mobile hiện dùng `AuthContext.login(email, password)` để lưu access token/session cho các API được bảo vệ.
+- Google login Mobile/Web đã được nối thật: Android native lấy Google ID token, Expo Web lấy OAuth access token, API.Auth xác minh credential với Google rồi phát JWT/refresh token KaitoKid; Expo Go không hỗ trợ native Google module nên Android cần development/native build.
 - Mobile tự refresh access token bằng refresh token, gom các refresh đồng thời thành một request và retry một lần các request Bearer bị 401; refresh token hỏng/hết hạn sẽ xóa session.
 - Expo Web renders the mobile app successfully at `127.0.0.1:8081`.
 - API.Customer serves shared media from `apps/web/public` so existing banner URLs such as `/slide_1.jpg` resolve on port 5265.
