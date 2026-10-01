@@ -8,7 +8,7 @@ import {
   View,
 } from 'react-native';
 
-import { ProductCard } from '@/components/product/product-card';
+import { HomeProductCard } from '@/components/home/home-product-card';
 import { BRAND_COLORS } from '@/constants/brand';
 import type { Product } from '@/types/shop';
 
@@ -26,10 +26,10 @@ const BADGE_COLORS = {
   sale: { backgroundColor: '#FEF2F2', color: '#B91C1C' },
 } as const;
 
-const CARD_GAP = 12;
-const CARD_PEEK = 72;
-const MIN_SHOWCASE_CARD_WIDTH = 260;
-const MAX_SHOWCASE_CARD_WIDTH = 310;
+const HORIZONTAL_PADDING = 16;
+const CARD_GAP = 10;
+const MIN_CARD_WIDTH = 154;
+const MAX_CARD_WIDTH = 188;
 
 export function ProductSection({
   title,
@@ -44,9 +44,12 @@ export function ProductSection({
   if (!products.length) return null;
 
   const badgeColors = BADGE_COLORS[badgeTone];
+  const twoColumnWidth = Math.floor(
+    (viewportWidth - HORIZONTAL_PADDING * 2 - CARD_GAP) / 2,
+  );
   const cardWidth = Math.min(
-    MAX_SHOWCASE_CARD_WIDTH,
-    Math.max(MIN_SHOWCASE_CARD_WIDTH, viewportWidth - CARD_PEEK),
+    MAX_CARD_WIDTH,
+    Math.max(MIN_CARD_WIDTH, twoColumnWidth),
   );
 
   return (
@@ -79,7 +82,9 @@ export function ProductSection({
         decelerationRate="fast"
         horizontal
         keyExtractor={(item) => String(item.id)}
-        renderItem={({ item }) => <ProductCard product={item} width={cardWidth} />}
+        renderItem={({ item }) => (
+          <HomeProductCard product={item} width={cardWidth} />
+        )}
         showsHorizontalScrollIndicator={false}
         snapToAlignment="start"
         snapToInterval={cardWidth + CARD_GAP}
@@ -91,7 +96,7 @@ export function ProductSection({
 const styles = StyleSheet.create({
   section: { gap: 14 },
   headingRow: {
-    paddingHorizontal: 16,
+    paddingHorizontal: HORIZONTAL_PADDING,
     flexDirection: 'row',
     alignItems: 'flex-end',
     justifyContent: 'space-between',
@@ -129,8 +134,8 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   list: {
-    paddingHorizontal: 16,
-    paddingRight: 30,
+    paddingHorizontal: HORIZONTAL_PADDING,
+    paddingRight: HORIZONTAL_PADDING + 6,
     gap: CARD_GAP,
   },
   pressed: { opacity: 0.72 },
