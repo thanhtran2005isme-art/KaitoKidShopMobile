@@ -1,7 +1,14 @@
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 
 import { AppIcon } from '@/components/ui/app-icon';
 import { useAuth } from '@/context/AuthContext';
@@ -23,8 +30,10 @@ export function HomeProductCard({
 }) {
   const router = useRouter();
   const { token } = useAuth();
-  const { isWishlisted, toggleWishlist } = useShopping();
+  const { addToCart, isWishlisted, toggleWishlist } = useShopping();
   const [wishlistBusy, setWishlistBusy] = useState(false);
+  const [cartBusy, setCartBusy] = useState(false);
+  const [addedToCart, setAddedToCart] = useState(false);
 
   const image = resolveMediaUrl(product.image);
   const availableStock = Math.max(0, product.availableStock ?? product.stock);
@@ -34,9 +43,31 @@ export function HomeProductCard({
     product.oldPrice && product.oldPrice > product.price
       ? Math.round((1 - product.price / product.oldPrice) * 100)
       : 0;
-  const colors = (product.colors || []).filter(Boolean);
+  const colors = Array.from(
+    new Set((product.colors || []).map((item) => item?.trim()).filter(Boolean)),
+  ) as string[];
+  const sizes = Array.from(
+    new Set((product.sizes || []).map((item) => item?.trim()).filter(Boolean)),
+  ) as string[];
   const visibleColors = colors.slice(0, 3);
+  const visibleSizes = sizes.slice(0, 4);
+  const [selectedColor, setSelectedColor] = useState(colors[0] || '');
+  const [selectedSize, setSelectedSize] = useState(
+    sizes.length === 1 ? sizes[0] : '',
+  );
   const wished = isWishlisted(product.id);
+
+  useEffect(() => {
+    setSelectedColor(colors[0] || '');
+    setSelectedSize(sizes.length === 1 ? sizes[0] : '');
+    setAddedToCart(false);
+  }, [product.id]);
+
+  useEffect(() => {
+    if (!addedToCart) return;
+    const timer = setTimeout(() => setAddedToCart(false), 1600);
+    return () => clearTimeout(timer);
+  }, [addedToCart]);
 
   const openProduct = () => {
     router.push({
@@ -75,11 +106,63 @@ export function HomeProductCard({
     }
   };
 
+  const handleAddToCart = async () => {
+    if (cartBusy || addedToCart) return;
+
+    if (!token) {
+      openLoginForProduct();
+      return;
+    }
+
+    if (isOutOfStock) {
+      Alert.alert('Giỏ hàng', 'Sản phẩm hiện đã hết hàng.');
+      return;
+    }
+
+    if (sizes.length > 0 && !selectedSize) {
+      Alert.alert('Chọn kích cỡ', 'Vui lòng chọn kích cỡ trước khi thêm vào giỏ.');
+      return;
+    }
+
+    if (colors.length > 0 && !selectedColor) {
+      Alert.alert('Chọn màu', 'Vui lòng chọn màu trước khi thêm vào giỏ.');
+      return;
+    }
+
+    try {
+      setCartBusy(true);
+      await addToCart({
+        productId: product.id,
+        size: selectedSize,
+        color: selectedColor,
+        quantity: 1,
+      });
+      setAddedToCart(true);
+    } catch (error) {
+      Alert.alert(
+        'Giỏ hàng',
+        error instanceof Error
+          ? error.message
+          : 'Không thể thêm sản phẩm vào giỏ hàng.',
+      );
+    } finally {
+      setCartBusy(false);
+    }
+  };
+
   const stockLabel = isOutOfStock
     ? 'Hết hàng'
     : isLowStock
       ? `Còn ${availableStock}`
       : 'Còn hàng';
+
+  const cartLabel = cartBusy
+    ? 'Đang thêm...'
+    : addedToCart
+      ? 'Đã thêm'
+      : sizes.length > 0 && !selectedSize
+        ? 'Chọn cỡ'
+        : 'Thêm giỏ';
 
   return (
     <View style={[styles.card, { width }]}>
@@ -148,14 +231,16 @@ export function HomeProductCard({
         </Pressable>
       </View>
 
-      <Pressable
-        accessibilityLabel={`Mở ${product.name}`}
-        accessibilityRole="button"
-        onPress={openProduct}
-        style={({ pressed }) => [styles.content, pressed && styles.contentPressed]}>
-        <Text numberOfLines={2} style={styles.name}>
-          {product.name}
-        </Text>
+      <View style={styles.content}>
+        <Pressable
+          accessibilityLabel={`Mở ${product.name}`}
+          accessibilityRole="button"
+          onPress={openProduct}
+          style={({ pressed }) => pressed && styles.contentPressed}>
+          <Text numberOfLines={2} style={styles.name}>
+            {product.name}
+          </Text>
+        </Pressable>
 
         <View style={styles.metaRow}>
           <View style={styles.ratingRow}>
@@ -193,27 +278,100 @@ export function HomeProductCard({
 
         {visibleColors.length > 0 ? (
           <View style={styles.colorRow}>
-            {visibleColors.map((color) => (
-              <View
-                key={color}
-                accessibilityLabel={`Màu ${color}`}
-                style={[
-                  styles.colorDot,
-                  {
-                    backgroundColor: productColorValue(color),
-                    borderColor: color.toLowerCase().includes('trắng')
-                      ? '#D1D5DB'
-                      : 'rgba(255,255,255,0.28)',
-                  },
-                ]}
-              />
-            ))}
+            {visibleColors.map((color) => {
+              const selected = selectedColor === color;
+              return (
+                <Pressable
+                  key={color}
+                  accessibilityLabel={`Chọn màu ${color}`}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected }}
+                  hitSlop={4}
+                  onPress={() => setSelectedColor(color)}
+                  style={({ pressed }) => [
+                    styles.colorButton,
+                    selected && styles.colorButtonSelected,
+                    pressed && styles.pressed,
+                  ]}>
+                  <View
+                    style={[
+                      styles.colorDot,
+                      {
+                        backgroundColor: productColorValue(color),
+                        borderColor: color.toLowerCase().includes('trắng')
+                          ? '#D1D5DB'
+                          : 'rgba(255,255,255,0.28)',
+                      },
+                    ]}
+                  />
+                </Pressable>
+              );
+            })}
             {colors.length > visibleColors.length ? (
               <Text style={styles.moreColors}>+{colors.length - visibleColors.length}</Text>
             ) : null}
           </View>
         ) : null}
-      </Pressable>
+
+        {visibleSizes.length > 0 ? (
+          <View style={styles.sizeRow}>
+            {visibleSizes.map((size) => {
+              const selected = selectedSize === size;
+              return (
+                <Pressable
+                  key={size}
+                  accessibilityLabel={`Chọn kích cỡ ${size}`}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected }}
+                  hitSlop={4}
+                  onPress={() => setSelectedSize(size)}
+                  style={({ pressed }) => [
+                    styles.sizeButton,
+                    selected && styles.sizeButtonSelected,
+                    pressed && styles.pressed,
+                  ]}>
+                  <Text
+                    style={[
+                      styles.sizeText,
+                      selected && styles.sizeTextSelected,
+                    ]}>
+                    {size}
+                  </Text>
+                </Pressable>
+              );
+            })}
+            {sizes.length > visibleSizes.length ? (
+              <Text style={styles.moreSizes}>+{sizes.length - visibleSizes.length}</Text>
+            ) : null}
+          </View>
+        ) : null}
+
+        <Pressable
+          accessibilityLabel={cartLabel}
+          accessibilityRole="button"
+          accessibilityState={{
+            disabled: cartBusy || addedToCart || isOutOfStock,
+          }}
+          disabled={cartBusy || addedToCart || isOutOfStock}
+          hitSlop={{ top: 3, bottom: 3, left: 0, right: 0 }}
+          onPress={() => void handleAddToCart()}
+          style={({ pressed }) => [
+            styles.cartButton,
+            (cartBusy || addedToCart || isOutOfStock) && styles.cartButtonDisabled,
+            pressed && styles.cartButtonPressed,
+          ]}>
+          {cartBusy ? (
+            <ActivityIndicator color="#0B0B0D" size="small" />
+          ) : (
+            <AppIcon
+              color="#0B0B0D"
+              name={addedToCart ? 'check' : 'cart'}
+              size={15}
+            />
+          )}
+          <Text style={styles.cartButtonText}>{cartLabel}</Text>
+        </Pressable>
+      </View>
     </View>
   );
 }
@@ -227,7 +385,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   imageWrap: {
-    aspectRatio: 0.84,
+    aspectRatio: 0.92,
     position: 'relative',
     overflow: 'hidden',
     backgroundColor: '#E5E7EB',
@@ -359,10 +517,22 @@ const styles = StyleSheet.create({
     textDecorationLine: 'line-through',
   },
   colorRow: {
-    minHeight: 20,
+    minHeight: 28,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
+    gap: 3,
+  },
+  colorButton: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    borderWidth: 2,
+    borderColor: 'transparent',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  colorButtonSelected: {
+    borderColor: '#FFFFFF',
   },
   colorDot: {
     width: 16,
@@ -374,6 +544,61 @@ const styles = StyleSheet.create({
     color: '#9CA3AF',
     fontSize: 8,
     fontWeight: '700',
+  },
+  sizeRow: {
+    minHeight: 32,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  sizeButton: {
+    minWidth: 28,
+    height: 30,
+    borderRadius: 7,
+    paddingHorizontal: 5,
+    backgroundColor: '#1C1E22',
+    borderWidth: 1,
+    borderColor: '#2A2D33',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sizeButtonSelected: {
+    backgroundColor: '#F3F4F6',
+    borderColor: '#F3F4F6',
+  },
+  sizeText: {
+    color: '#FFFFFF',
+    fontSize: 8,
+    fontWeight: '900',
+  },
+  sizeTextSelected: {
+    color: '#0B0B0D',
+  },
+  moreSizes: {
+    color: '#9CA3AF',
+    fontSize: 8,
+    fontWeight: '800',
+  },
+  cartButton: {
+    minHeight: 38,
+    borderRadius: 8,
+    backgroundColor: '#F1F2F4',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+    paddingHorizontal: 8,
+  },
+  cartButtonDisabled: {
+    opacity: 0.58,
+  },
+  cartButtonPressed: {
+    opacity: 0.8,
+  },
+  cartButtonText: {
+    color: '#0B0B0D',
+    fontSize: 9,
+    fontWeight: '900',
   },
   pressed: {
     opacity: 0.76,
