@@ -23,11 +23,11 @@ export class LoginActivityService {
   constructor(private readonly prisma: PrismaService) {}
 
   async log(
-    userId: number | null,
-    email: string,
+    userId: number | null | undefined,
+    email: string | undefined,
     provider: string,
     success: boolean,
-    failReason: string | null,
+    failReason: string | null | undefined,
     meta?: LoginRequestMeta,
   ): Promise<void> {
     const parsed = parseUserAgent(meta?.userAgent);
@@ -37,8 +37,8 @@ export class LoginActivityService {
            (UserId, Email, Provider, Ip, UserAgent, DeviceType,
             Browser, Os, Success, FailReason)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        userId,
-        email,
+        userId ?? null,
+        email ?? "",
         provider,
         meta?.ip ?? null,
         meta?.userAgent ?? null,
@@ -46,7 +46,7 @@ export class LoginActivityService {
         parsed.browser,
         parsed.os,
         success ? 1 : 0,
-        failReason,
+        failReason ?? null,
       );
     } catch {
       // Logging không được block auth flow.

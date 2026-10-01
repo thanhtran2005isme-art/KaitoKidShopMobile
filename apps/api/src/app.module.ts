@@ -2,6 +2,7 @@ import { Module } from "@nestjs/common";
 import { AuthCompatModule } from "./auth/auth-compat.module.js";
 import { MediaModule } from "./media/media.module.js";
 import { AccountModule } from "./modules/account/account.module.js";
+import { AdminModule } from "./modules/admin/admin.module.js";
 import { AdminShippingModule } from "./modules/admin-shipping/admin-shipping.module.js";
 import { AddressesModule } from "./modules/addresses/addresses.module.js";
 import { BannersModule } from "./modules/banners/banners.module.js";
@@ -39,6 +40,7 @@ import { MigrationModule } from "./migration/migration.module.js";
     SearchModule,
     PublicExtrasModule,
     AdminShippingModule,
+    AdminModule,
     ProductsModule,
     CategoriesModule,
     CartModule,

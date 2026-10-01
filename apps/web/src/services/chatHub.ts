@@ -37,10 +37,12 @@ export type ChatHubState =
 
 export class ChatHubClient {
   private readonly socket: Socket;
+  private readonly getToken: () => string | null;
   private events: ChatHubEvents = {};
   private connectedOnce = false;
 
-  constructor(private readonly getToken: () => string | null) {
+  constructor(getToken: () => string | null) {
+    this.getToken = getToken;
     this.socket = io(HUB_URL, {
       path: HUB_PATH,
       autoConnect: false,

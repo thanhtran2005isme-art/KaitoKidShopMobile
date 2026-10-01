@@ -2,31 +2,40 @@
 
 ## Phạm vi
 
-Runbook này chốt migration **API.Auth + API.Customer** sang `apps/api` NestJS trên cùng MariaDB `kaitokid`.
+Runbook này chốt migration **API.Auth + API.Customer + API.Admin** sang `apps/api` NestJS trên cùng MariaDB `kaitokid`.
 
-**Không được hiểu là có thể xóa toàn bộ C# ngay.** `API.Admin` hiện vẫn có 23 controller C# chưa nằm trong 9-phase Node migration. Vì vậy:
+Phase 10 đã mirror source của 23 controller/surface `API.Admin`, nhưng **không được hiểu là có thể xóa toàn bộ C# ngay**. Trước full retirement vẫn phải hoàn tất runtime parity, worker/media/realtime ownership, Gateway routing và soak/rollback gate.
 
-- có thể nghiệm thu/cutover traffic Auth + Customer sang Node sau khi gate/runtime parity PASS;
-- `API.Admin` phải tiếp tục chạy cho tới một migration riêng;
-- `API.Gateway` chỉ có thể tắt nếu tất cả client đã trỏ trực tiếp sang Node và luồng Admin đã có đường thay thế.
+Vì vậy:
+
+- có thể nghiệm thu từng nhóm Auth/Customer/Admin sau khi gate + runtime parity tương ứng PASS;
+- C# tiếp tục là rollback reference cho tới final cutover;
+- `API.Gateway` chỉ tắt khi toàn bộ client/routing đã chuyển sang Node và đường rollback đã được xác nhận;
+- không xóa thư mục `backend/` chỉ vì source contract test PASS.
 
 ## 1. Invariants dữ liệu
 
 - dùng nguyên MariaDB hiện tại;
-- schema audit phải vẫn là 52 bảng;
+- schema audit phải vẫn là 52 bảng theo manifest legacy;
 - không `migrate reset`, `migrate dev`, `db push`, drop/reseed/copy DB;
 - backup DB trước cutover thật;
 - C# giữ nguyên để rollback cho tới khi soak test hoàn tất.
 
 ## 2. Gate source/static
 
-Từ repo root:
+Auth + Customer Phase 1–9:
 
 ```bat
 scripts\node-cutover-check.bat
 ```
 
-Gate chạy build, DB audit và toàn bộ contract tests từ catalog đến Phase 9.
+Toàn bộ Phase 1–10, bao gồm API.Admin:
+
+```bat
+scripts\node-admin-migration-check.bat
+```
+
+Gate Phase 10 chạy build, DB audit, toàn bộ regression contract tests Phase 1–9, `test:admin-migration` và Web build.
 
 ## 3. Runtime parity bắt buộc
 
@@ -38,7 +47,7 @@ Gate chạy build, DB audit và toàn bộ contract tests từ catalog đến Ph
 - Google native/Web nếu local OAuth được cấu hình;
 - staff login/me + granular permission.
 
-### Commerce
+### Commerce / Customer
 
 - catalog/search/suggestions/recommendation;
 - wishlist/address/review/notification/account;
@@ -46,6 +55,23 @@ Gate chạy build, DB audit và toàn bộ contract tests từ catalog đến Ph
 - COD + ATM, payment cancel/expiry/paid;
 - shipping quote/tracking;
 - cancel/expiry hoàn product + đúng variant + coupon usage.
+
+### Admin
+
+- staff login và permission denied/allowed theo đúng claim;
+- product/category/banner/collection/coupon/flash-sale/CMS CRUD;
+- customer list/detail/toggle-status;
+- order list/detail/status; đặc biệt cancel phải hoàn product + đúng variant + coupon đúng một lần;
+- inventory import/export/set + history;
+- variant stock adjustment + aggregate stock;
+- supplier CRUD/soft-disable khi đã được dùng;
+- stock receipt create/detail/cancel; kiểm chứng product/variant/history/weighted-average cost;
+- reports/dashboard;
+- review moderation;
+- settings/homepage;
+- public active flash sale.
+
+Không chạy destructive Admin parity trên dữ liệu production nếu chưa có backup/snapshot an toàn.
 
 ### Chat/realtime
 
@@ -90,11 +116,13 @@ CHAT_IDLE_SWEEPER_ENABLED=true
 
 Image indexer là optional và chỉ bật khi model ONNX đã sẵn sàng.
 
+Ngoài bốn cờ trên, final cutover còn phải đối chiếu `ShippingStatusSimulator`/worker vận chuyển để tránh C# và Node cùng cập nhật trạng thái đơn.
+
 ## 5. Client cutover
 
 Không đổi URL production trước runtime parity.
 
-Web/Auth/Customer phải trỏ HTTP API sang Node `PORT=5300` (hoặc reverse proxy production tương ứng).
+Web/Auth/Customer/Admin phải trỏ HTTP API sang Node `PORT=5300` (hoặc reverse proxy production tương ứng).
 
 Realtime Web Phase 9 dùng Socket.IO:
 
@@ -114,12 +142,26 @@ Khi nghiệm thu cutover, cả hai phải trỏ tới Node/reverse proxy Node.
 
 Nếu Node có blocker sau cutover:
 
-1. tắt các sweeper Node để tránh dual-owner;
-2. trỏ Auth/Customer client URL về C# cũ;
+1. tắt các sweeper/worker Node để tránh dual-owner;
+2. trỏ client/reverse proxy về API C# tương ứng;
 3. bật lại C# workers;
 4. không restore DB trừ khi có sự cố dữ liệu thực sự — cả hai backend dùng cùng schema/data;
 5. lưu log/request gây lỗi để sửa parity.
 
-## 7. Blocker cho full C# retirement
+Riêng Admin, rollback phải kiểm tra các transaction vừa chạy (order cancel, inventory, stock receipt) đã commit hay rollback trước khi đổi traffic; không phát lại mutation mù vì cả Node và C# dùng cùng DB.
 
-`backend/API.Admin` còn 23 controller C#. Đây là blocker riêng ngoài scope Phase 9 hiện hành. Không xóa thư mục `backend/`, không tắt API.Admin và không tuyên bố “100% C# removed” cho tới khi Admin được migrate và runtime parity PASS.
+## 7. Blocker còn lại cho full C# retirement
+
+Sau Phase 10, **API.Admin không còn là blocker ở mức source coverage**, nhưng full C# retirement vẫn chưa được tuyên bố PASS cho tới khi các mục sau hoàn tất:
+
+- chạy `scripts\node-admin-migration-check.bat` trên máy có MariaDB thật và toàn bộ gate PASS;
+- runtime parity Web Admin PASS;
+- xử lý/đối chiếu shared media + static fallback của API.Customer;
+- chốt `ShippingStatusSimulator` và toàn bộ background worker ownership;
+- chốt realtime transport/client rollback path;
+- chốt API.Gateway/reverse-proxy routing;
+- chạy full smoke Auth + Customer + Admin + Mobile/Web;
+- soak test và xác nhận rollback;
+- chỉ sau đó mới cân nhắc xóa `backend/` C#.
+
+Chi tiết Phase 10: `docs/NODE_ADMIN_MIGRATION_PHASE10.md`.

@@ -69,7 +69,7 @@ export const lookbookApi = {
     }
   },
 
-  /** Public: l?y danh s�ch season/style d? FE render dropdown filter. */
+  /** Public: lấy danh sách season/style để FE render dropdown filter. */
   async getFilters(): Promise<ApiResponse<{ seasons: string[]; styles: string[] }>> {
     try {
       const response = await adminApiClient.get<{ seasons: string[]; styles: string[] }>('/api/lookbooks/filters');

@@ -18,7 +18,8 @@
     "test:cart-reservation": "npm run build && node --test test/cart-reservation-contract.test.mjs",
     "test:checkout-order": "npm run build && node --test test/checkout-order-contract.test.mjs",
     "test:auth-rbac": "npm run build && node --test test/auth-rbac-contract.test.mjs",
-    "test:realtime-cutover": "npm run build && node --test test/realtime-cutover-contract.test.mjs"
+    "test:realtime-cutover": "npm run build && node --test test/realtime-cutover-contract.test.mjs",
+    "test:admin-migration": "npm run build && node --test test/admin-migration-contract.test.mjs"
   },
   "dependencies": {
     "@nestjs/common": "11.2.5",
@@ -38,6 +39,8 @@
   },
   "devDependencies": {
     "@nestjs/cli": "11.0.7",
+    "@types/express": "^5.0.5",
+    "@types/multer": "^2.0.0",
     "@types/node": "^22.18.0",
     "prisma": "7.10.0",
     "typescript": "~5.9.3"

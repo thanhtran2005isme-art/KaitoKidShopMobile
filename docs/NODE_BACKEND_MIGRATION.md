@@ -24,7 +24,7 @@ Chuyển ASP.NET Core sang NestJS + TypeScript + Prisma nhưng **giữ nguyên t
 7. C# giữ làm reference đến khi module Node parity pass.
 8. Không seed lại hoặc làm mất user, order, cart, stock, points, reviews, staff/RBAC, auth tables.
 
-## 9 phase
+## 10 phase
 
 1. Freeze API/business baseline.
 2. NestJS foundation + database audit.
@@ -34,7 +34,8 @@ Chuyển ASP.NET Core sang NestJS + TypeScript + Prisma nhưng **giữ nguyên t
 6. Cart + Variant Inventory + Reservation + Combo.
 7. Checkout + Order + Coupon + Payment + Shipping.
 8. Auth + Email Verify + Social + OTP/2FA + Staff/RBAC.
-9. Chat/realtime + chatbot + image search + background workers + final cutover.
+9. Chat/realtime + chatbot + image search + background workers + customer/auth cutover readiness.
+10. API.Admin + final Admin parity gate trước full C# retirement.
 
 ## Điều kiện cutover từng module
 
@@ -70,7 +71,6 @@ Không xóa backend C# trong các phase đầu.
 - Các write flow reward/default-address/review/referral dùng transaction và ownership predicate.
 - Chưa cutover Web/Mobile; phải chạy `npm run test:customer-aux` + runtime parity trên MariaDB thật.
 
-
 ## Phase 6 — Cart + Inventory + Reservation + Combo
 
 - Mirror các route `/api/cart`: list, add, update, remove, clear, remove-many, move-to-wishlist, cross-sell, cross-sell-products, combo discount selected và reorder.
@@ -82,7 +82,6 @@ Không xóa backend C# trong các phase đầu.
 - Node sweeper được triển khai nhưng **tắt mặc định trong giai đoạn C#/Node coexistence** để tránh hai process cùng release một reservation. Chỉ bật `CART_SWEEPER_ENABLED=true` sau khi C# sweeper đã dừng ở cutover.
 - Gate: `npm run build`, `npm run db:audit`, `npm run test:catalog`, `npm run test:customer-aux`, `npm run test:cart-reservation`.
 - Không reset/seed/copy MariaDB; Web/Mobile chưa cutover sang Node ở phase này.
-
 
 ## Phase 7 — Checkout + Order + Coupon + Payment + Shipping
 
@@ -98,7 +97,6 @@ Không xóa backend C# trong các phase đầu.
 - Order/payment email side-effect được Phase 8 tiếp quản bằng email provider Node; business transaction vẫn không phụ thuộc email và email failure không rollback order/payment.
 - Không thêm bảng/cột, không reset/seed/copy MariaDB, chưa cutover Web/Mobile.
 - Gate: `npm run build`, `npm run db:audit`, các gate cũ và `npm run test:checkout-order`.
-
 
 ## Phase 8 — Auth + Email Verify + Social + OTP/2FA + Staff/RBAC
 
@@ -116,7 +114,6 @@ Không xóa backend C# trong các phase đầu.
 - Chưa cutover Mobile/Web Auth base URL; C# API.Auth vẫn là backend reference cho tới runtime parity.
 - Gate thêm: `npm install`, `npm run build`, `npm run db:audit`, các gate cũ và `npm run test:auth-rbac`.
 
-
 ## Phase 9 — Chat/realtime + search/image + workers + cutover readiness
 
 - Mirror chat REST customer + admin bằng chính `CuocHoiThoai/TinNhan`; ownership guest/user và granular `chat.view/chat.reply/chat.manage`.
@@ -128,5 +125,19 @@ Không xóa backend C# trong các phase đầu.
 - Đóng nốt API.Customer routes còn thiếu: Attributes, Newsletter, Product Extras (variants/size/Q&A/viewers), Sitemap/robots và Admin Shipping.
 - Không thêm/drop/rename bảng; tiếp tục dùng 52-table MariaDB hiện tại.
 - Cutover Auth + Customer chỉ sau toàn bộ gate + runtime parity. Worker ownership phải chuyển C# → Node theo từng worker, không chạy dual-owner.
-- **Full C# retirement chưa đạt** vì `API.Admin` còn 23 controller C# ngoài scope 9 phase hiện hành. Xem `docs/NODE_CUTOVER_RUNBOOK.md`.
+- **Tại thời điểm Phase 9, full C# retirement chưa đạt** vì `API.Admin` còn 23 controller C# ngoài scope 9 phase. Xem `docs/NODE_CUTOVER_RUNBOOK.md`.
 - Gate mới: `npm run test:realtime-cutover`; helper tổng: `scripts\node-cutover-check.bat`.
+
+## Phase 10 — API.Admin
+
+- Mirror đủ 23 controller/surface của `backend/API.Admin` vào `AdminModule` trong `apps/api`, đồng thời tái sử dụng `AdminShippingModule` đã có từ Phase 9.
+- Giữ route `/api/admin/*` và `/api/flash-sales/active`, response camelCase tương thích ASP.NET Core và cùng bảng MariaDB hiện tại.
+- Tái sử dụng JWT staff/RBAC Phase 8. Permission đang active ở C# giữ nguyên tên; các controller C# từng comment `HasPermission` để test được harden tối thiểu `user_type=staff` để customer JWT không vào Admin.
+- Order admin cancel chạy transaction + row lock và chỉ hoàn product/variant/coupon một lần khi chuyển lần đầu sang `cancelled`.
+- Inventory/variant adjustment ghi `TonKho_LichSu`; export vượt tồn bị reject.
+- Stock receipt create là atomic: header + detail + product stock + variant stock + weighted-average cost + history. Cancel rollback stock và chặn hủy lần hai.
+- Supplier đã dùng trong phiếu nhập được soft-disable thay vì hard-delete; supplier chưa dùng vẫn DELETE 204 như C#.
+- Không thêm/drop/rename bảng/cột, không reset/seed/copy DB.
+- Gate mới: `npm run test:admin-migration`; helper tổng Phase 1–10: `scripts\node-admin-migration-check.bat`.
+- Chi tiết contract/invariant/runtime checklist: `docs/NODE_ADMIN_MIGRATION_PHASE10.md`.
+- **Source migration API.Admin hoàn tất ở Phase 10, nhưng chưa được xóa/tắt C# chỉ dựa vào source/contract test.** Phải chạy DB audit + runtime parity Web Admin trên MariaDB thật và final cutover/soak/rollback gate trước full C# retirement.

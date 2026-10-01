@@ -588,7 +588,7 @@ export class ChatBotService {
   }
 
   private productAttachment(product: {
-    id: number; name: string; image: string; price: number;
+    id: number; name: string; image: string; price: number; category?: string;
   }): ChatAttachment {
     return {
       type: "product",
