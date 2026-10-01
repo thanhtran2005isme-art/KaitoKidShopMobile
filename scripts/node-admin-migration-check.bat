@@ -12,6 +12,8 @@ call npm run build
 if errorlevel 1 exit /b 1
 call node dist/scripts/ensure-rbac-permissions.js
 if errorlevel 1 exit /b 1
+call node dist/scripts/ensure-inventory-history-schema.js
+if errorlevel 1 exit /b 1
 call npm run db:audit
 if errorlevel 1 exit /b 1
 call npm run test:catalog
