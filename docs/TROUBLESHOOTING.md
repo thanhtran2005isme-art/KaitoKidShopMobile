@@ -73,7 +73,7 @@ Confirm table count:
 "C:\xampp\mysql\bin\mysql.exe" -u root -e "SELECT COUNT(*) AS table_count FROM information_schema.tables WHERE table_schema='kaitokid' AND table_type='BASE TABLE';"
 ```
 
-Expected base table count for the current local schema: `51`.
+Expected base table count for the current local schema after email-registration verification migration: `52`.
 
 Confirm the application DB user exists:
 
@@ -301,3 +301,110 @@ Flow mới chỉ tạo `PendingRegistration` khi submit form; `NguoiDung` chỉ 
 5. Link mặc định hết hạn sau 24 giờ. Submit đăng ký lại cùng email sẽ phát token mới và làm link cũ mất hiệu lực.
 
 Không đưa Brevo API key, mật khẩu email hoặc verification token vào Git/log công khai.
+
+## Node migration: Prisma P1000 hoặc test không tìm thấy dist/modules
+
+### Prisma P1000 — Authentication failed
+
+Node migration dùng chính MariaDB `kaitokid` của backend C#. Nếu `npm run db:introspect` báo `P1000`, mật khẩu trong `apps/api/.env -> DATABASE_URL` không khớp user MariaDB hiện tại.
+
+Nguồn credential local là file gitignored `backend/db.local.bat`. Không commit hoặc gửi mật khẩu vào log/chat công khai.
+
+### `Cannot find module dist/scripts/...` hoặc `dist/modules/...`
+
+Build Node dùng `tsc -p tsconfig.build.json` với `rootDir=src` và `outDir=dist`. Output hợp lệ là `dist/main.js`, `dist/scripts/*`, `dist/modules/*`; `dist/src/*` là layout cũ bị sai.
+
+## Node migration: audit báo thiếu đủ 52 bảng dù actualTableCount = 52
+
+### Triệu chứng
+
+`db:audit` có thể báo `missingTables` chứa toàn bộ tên PascalCase như `NguoiDung`, trong khi `extraTables` lại chứa chính các bảng đó ở dạng chữ thường như `nguoidung`.
+
+### Nguyên nhân
+
+MariaDB/MySQL trên Windows thường dùng `lower_case_table_names=1`, nên `information_schema.TABLES` trả tên bảng chữ thường và phép so sánh tên bảng phải theo chế độ case-insensitive của server.
+
+### Cách xử lý hiện hành
+
+Audit đọc `@@lower_case_table_names`: giá trị khác `0` thì so sánh tên bảng không phân biệt hoa/thường; giá trị `0` thì giữ so sánh chính xác để không che lỗi casing trên Linux. Không đổi tên bảng và không sửa dữ liệu.
+
+### Node migration: lỗi `Cannot find module 'jose'`
+
+JWT compatibility không phụ thuộc package `jose`. Node dùng `node:crypto` để xác minh HS256, issuer, audience, exp/nbf và chữ ký tương thích token C# hiện tại.
+
+
+## Node migration: reservation bị release hai lần khi chạy song song C# + Node
+
+Trong migration, C# `CartReservationSweeper` và Node không được cùng làm owner của job hết hạn giỏ. Node mặc định:
+
+```env
+CART_SWEEPER_ENABLED=false
+```
+
+Chỉ đổi thành `true` khi đã dừng sweeper C# tại cutover. Việc gọi các endpoint Cart Node trực tiếp để parity test vẫn hoạt động khi sweeper Node tắt; reservation hết hạn tiếp tục do C# process xử lý trong giai đoạn coexistence.
+
+
+## Node migration: đơn ATM bị auto-cancel hai lần
+
+Trong coexistence, chỉ C# được làm owner của `PaymentExpirySweeper`. Node phải giữ:
+
+```env
+PAYMENT_SWEEPER_ENABLED=false
+```
+
+Chỉ bật Node sweeper sau khi background job C# đã dừng ở cutover. Endpoint `GET /api/payment/status/:orderCode` vẫn tự xử lý expiry có row lock/idempotent khi được gọi trực tiếp.
+
+## Node migration: shipping provider ngoài không trả phí
+
+Node đọc shipping config JSON từ `CauHinhCuaHang` trước, rồi mới fallback env. GHN cần token + shop ID; GHTK cần token. Không commit token thật. Nếu provider ngoài lỗi, service giữ behavior fallback Mock của C#; nếu `MockOnlyServeBranches=true` mà tỉnh không có branch KaitoKid thì Mock có thể trả rỗng theo đúng cấu hình.
+
+
+## Node migration Phase 8: build báo thiếu `bcryptjs`
+
+Phase 8 thêm BCrypt pure-JS để tương thích trực tiếp `MatKhauHash` của C#. Sau khi pull branch Phase 8 cần chạy:
+
+```bat
+cd apps\api
+npm install
+npm run build
+```
+
+Không đổi/reset hash trong DB. Hash BCrypt cũ tiếp tục đăng nhập được; plain-text legacy nếu có chỉ được chấp nhận khi khớp chính xác rồi rehash sau lần đăng nhập hợp lệ.
+
+## Node Auth trả 401 Google/Facebook
+
+Node không dùng token OAuth giả. Cần cấu hình local/deploy, không commit secret:
+
+- `GOOGLE_CLIENT_ID`: phải đúng Web Client ID mà Mobile/Web đang dùng làm audience.
+- `FACEBOOK_APP_ID`: bắt buộc để bật Facebook verification path.
+- Brevo/reCAPTCHA/OAuth secrets chỉ nằm trong `.env` local hoặc secret manager.
+
+Nếu `GOOGLE_CLIENT_ID` sai, cả ID token native và access token Expo Web đều fail closed. Node hỗ trợ các field tokeninfo hiện tại `aud/azp` và legacy `audience/issued_to`.
+
+## Node staff token bị 403 dù role là admin
+
+RBAC cố ý không bypass chỉ vì claim `role=admin`. Quyền được cho phép khi JWT có `user_type=staff` và một trong hai điều kiện đúng: `is_super_admin=true`, hoặc token chứa đúng claim `permission`. Đây là parity với hardening C# hiện tại.
+
+
+## Node Phase 9: realtime Web không kết nối
+
+Phase 9 đổi backend chat từ SignalR sang Socket.IO. Sau cutover cấu hình Web:
+
+```env
+VITE_CHAT_HUB_URL=http://localhost:5300
+VITE_CHAT_HUB_PATH=/chatHub
+```
+
+Chạy `npm install` trong `apps/web` vì dependency realtime đổi sang `socket.io-client`.
+
+## Node Phase 9: image search `ready=false`
+
+Đây là trạng thái hợp lệ nếu repo/local chưa có CLIP ONNX model. Repo không commit model binary. Đặt model tại `IMAGE_SEARCH_MODEL_PATH`, restart Node, rồi chỉ bật `IMAGE_INDEXER_ENABLED=true` khi model load thành công. Không tạo lại DB.
+
+## Node Phase 9: npm install native image dependencies lỗi
+
+Phase 9 dùng `onnxruntime-node` và `sharp`. Không dùng `npm audit fix --force` để chữa lỗi cài đặt. Giữ Node version đáp ứng `engines >=20.19`, xóa/chỉnh dependency chỉ sau khi có log lỗi cụ thể. Image search soft-disable khi thiếu model, nhưng package vẫn phải cài để TypeScript/build resolve module.
+
+## Cutover: có được tắt hết backend C# không?
+
+Chưa. Node 9-phase hiện chốt API.Auth + API.Customer; `API.Admin` còn 23 controller C#. Chỉ cutover Auth/Customer sau parity, giữ API.Admin C# cho tới migration riêng.

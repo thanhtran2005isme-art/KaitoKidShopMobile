@@ -1,0 +1,17 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "mysql"
+}
+
+// Model tối thiểu để Prisma Client generate trước lần introspect đầu tiên.
+// Chạy `npm run db:introspect` với DB kaitokid hiện tại để đọc TOÀN BỘ schema.
+// Không dùng Prisma Migrate/DB Push để tạo lại database trong giai đoạn chuyển C# -> Node.
+model LegacyNguoiDungProbe {
+  Id Int @id @default(autoincrement())
+
+  @@map("NguoiDung")
+}

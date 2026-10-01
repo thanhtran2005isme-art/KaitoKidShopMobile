@@ -5,9 +5,10 @@
 import axios, { type AxiosInstance, type AxiosError, type InternalAxiosRequestConfig } from 'axios';
 import { tokenStorage } from './tokenStorage';
 
-const AUTH_BASE_URL = import.meta.env.VITE_API_AUTH_URL || 'http://localhost:5053';
-const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5265';
-const ADMIN_BASE_URL = import.meta.env.VITE_API_ADMIN_URL || 'http://localhost:5089';
+const NODE_BASE_URL = (import.meta.env.VITE_NODE_API_URL as string | undefined)?.trim().replace(/\/+$/, '') || '';
+const AUTH_BASE_URL = import.meta.env.VITE_API_AUTH_URL || NODE_BASE_URL || 'http://localhost:5053';
+const BASE_URL = import.meta.env.VITE_API_BASE_URL || NODE_BASE_URL || 'http://localhost:5265';
+const ADMIN_BASE_URL = import.meta.env.VITE_API_ADMIN_URL || NODE_BASE_URL || 'http://localhost:5089';
 
 // Khóa lưu token nhân viên (khớp với StaffAuthContext). Để hằng số ở đây tránh circular import.
 const STAFF_ACCESS_TOKEN_KEY = 'staff_access_token';

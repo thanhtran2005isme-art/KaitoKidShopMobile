@@ -21,6 +21,12 @@ expo-env.d.ts
 dist/
 **/dist/
 
+# Generated Prisma Client
+/apps/api/src/generated/prisma/
+
+# Runtime safety backups
+.runtime-backups/
+
 # .NET
 **/bin/
 **/obj/
