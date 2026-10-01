@@ -111,6 +111,74 @@ export const ProductCard = memo(function ProductCard({
     </Pressable>
   );
 
+  const ProductSummary = () => (
+    <>
+      <Text numberOfLines={2} style={styles.name}>
+        {product.name}
+      </Text>
+
+      <View style={styles.metaRow}>
+        <View style={styles.ratingRow}>
+          <AppIcon color="#F59E0B" name="starFilled" size={12} />
+          <Text style={styles.rating}>
+            {product.rating > 0 ? product.rating.toFixed(1) : 'Mới'}
+          </Text>
+          {product.soldCount > 0 ? (
+            <Text numberOfLines={1} style={styles.sold}>
+              · {product.soldCount} đã bán
+            </Text>
+          ) : null}
+        </View>
+        <Text
+          numberOfLines={1}
+          style={[
+            styles.stock,
+            isLowStock && styles.stockLow,
+            isOutOfStock && styles.stockOut,
+          ]}>
+          {stockLabel}
+        </Text>
+      </View>
+    </>
+  );
+
+  const PriceCopy = () => (
+    <View style={styles.priceCopy}>
+      <Text numberOfLines={1} style={styles.price}>
+        {formatPrice(product.price)}
+      </Text>
+      {product.oldPrice && product.oldPrice > product.price ? (
+        <Text numberOfLines={1} style={styles.oldPrice}>
+          {formatPrice(product.oldPrice)}
+        </Text>
+      ) : null}
+    </View>
+  );
+
+  const ColorRow = () =>
+    visibleColors.length > 0 ? (
+      <View style={styles.colorRow}>
+        {visibleColors.map((color) => (
+          <View
+            key={color}
+            accessibilityLabel={`Màu ${color}`}
+            style={[
+              styles.colorDot,
+              {
+                backgroundColor: productColorValue(color),
+                borderColor: color.toLowerCase().includes('trắng')
+                  ? '#D1D5DB'
+                  : 'rgba(255,255,255,0.28)',
+              },
+            ]}
+          />
+        ))}
+        {colors.length > visibleColors.length ? (
+          <Text style={styles.moreColors}>+{colors.length - visibleColors.length}</Text>
+        ) : null}
+      </View>
+    ) : null;
+
   return (
     <View style={[styles.card, { width }]}>
       <View style={styles.imageWrap}>
@@ -157,75 +225,48 @@ export const ProductCard = memo(function ProductCard({
         {wishlistPlacement === 'overlay' ? <WishlistButton /> : null}
       </View>
 
-      <Pressable
-        accessibilityLabel={`Mở ${product.name}`}
-        accessibilityRole="button"
-        onPress={openProduct}
-        style={({ pressed }) => [styles.content, pressed && styles.contentPressed]}>
-        <Text numberOfLines={2} style={styles.name}>
-          {product.name}
-        </Text>
+      {wishlistPlacement === 'inline' ? (
+        <View style={styles.content}>
+          <Pressable
+            accessibilityLabel={`Mở ${product.name}`}
+            accessibilityRole="button"
+            onPress={openProduct}
+            style={({ pressed }) => [styles.contentMain, pressed && styles.contentPressed]}>
+            <ProductSummary />
+          </Pressable>
 
-        <View style={styles.metaRow}>
-          <View style={styles.ratingRow}>
-            <AppIcon color="#F59E0B" name="starFilled" size={12} />
-            <Text style={styles.rating}>
-              {product.rating > 0 ? product.rating.toFixed(1) : 'Mới'}
-            </Text>
-            {product.soldCount > 0 ? (
-              <Text numberOfLines={1} style={styles.sold}>
-                · {product.soldCount} đã bán
-              </Text>
-            ) : null}
+          <View style={styles.priceRow}>
+            <Pressable
+              accessibilityLabel={`Mở ${product.name}`}
+              accessibilityRole="button"
+              onPress={openProduct}
+              style={({ pressed }) => [styles.pricePressable, pressed && styles.contentPressed]}>
+              <PriceCopy />
+            </Pressable>
+            <WishlistButton inline />
           </View>
-          <Text
-            numberOfLines={1}
-            style={[
-              styles.stock,
-              isLowStock && styles.stockLow,
-              isOutOfStock && styles.stockOut,
-            ]}>
-            {stockLabel}
-          </Text>
+
+          <Pressable
+            accessibilityLabel={`Mở ${product.name}`}
+            accessibilityRole="button"
+            onPress={openProduct}
+            style={({ pressed }) => [styles.colorPressable, pressed && styles.contentPressed]}>
+            <ColorRow />
+          </Pressable>
         </View>
-
-        <View style={styles.priceRow}>
-          <View style={styles.priceCopy}>
-            <Text numberOfLines={1} style={styles.price}>
-              {formatPrice(product.price)}
-            </Text>
-            {product.oldPrice && product.oldPrice > product.price ? (
-              <Text numberOfLines={1} style={styles.oldPrice}>
-                {formatPrice(product.oldPrice)}
-              </Text>
-            ) : null}
+      ) : (
+        <Pressable
+          accessibilityLabel={`Mở ${product.name}`}
+          accessibilityRole="button"
+          onPress={openProduct}
+          style={({ pressed }) => [styles.content, pressed && styles.contentPressed]}>
+          <ProductSummary />
+          <View style={styles.priceRow}>
+            <PriceCopy />
           </View>
-          {wishlistPlacement === 'inline' ? <WishlistButton inline /> : null}
-        </View>
-
-        {visibleColors.length > 0 ? (
-          <View style={styles.colorRow}>
-            {visibleColors.map((color) => (
-              <View
-                key={color}
-                accessibilityLabel={`Màu ${color}`}
-                style={[
-                  styles.colorDot,
-                  {
-                    backgroundColor: productColorValue(color),
-                    borderColor: color.toLowerCase().includes('trắng')
-                      ? '#D1D5DB'
-                      : 'rgba(255,255,255,0.28)',
-                  },
-                ]}
-              />
-            ))}
-            {colors.length > visibleColors.length ? (
-              <Text style={styles.moreColors}>+{colors.length - visibleColors.length}</Text>
-            ) : null}
-          </View>
-        ) : null}
-      </Pressable>
+          <ColorRow />
+        </Pressable>
+      )}
     </View>
   );
 });
@@ -301,6 +342,7 @@ const styles = StyleSheet.create({
     borderColor: '#FB7185',
   },
   content: { padding: 10, gap: 6 },
+  contentMain: { gap: 6 },
   contentPressed: { opacity: 0.82 },
   name: {
     minHeight: 32,
@@ -341,6 +383,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: 6,
   },
+  pricePressable: { flex: 1, minWidth: 0, minHeight: 32, justifyContent: 'center' },
   priceCopy: {
     flex: 1,
     minWidth: 0,
@@ -355,6 +398,7 @@ const styles = StyleSheet.create({
     fontSize: 8,
     textDecorationLine: 'line-through',
   },
+  colorPressable: { minHeight: 20, justifyContent: 'center' },
   colorRow: {
     minHeight: 20,
     flexDirection: 'row',
