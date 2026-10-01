@@ -1,17 +1,19 @@
-export type BackgroundWorkerOwner = "csharp" | "node";
+export type BackgroundWorkerOwner = "node";
 
 function normalized(value: string | undefined): string {
   return (value ?? "").trim().toLowerCase();
 }
 
+/**
+ * C# đã retire; Node là runtime owner duy nhất.
+ * Giữ API này để các worker/service cũ không cần đổi call-site.
+ */
 export function backgroundWorkerOwner(): BackgroundWorkerOwner {
-  return normalized(process.env.BACKGROUND_WORKER_OWNER) === "node"
-    ? "node"
-    : "csharp";
+  return "node";
 }
 
 export function nodeOwnsBackgroundWorkers(): boolean {
-  return backgroundWorkerOwner() === "node";
+  return true;
 }
 
 export function envFlag(name: string, ...aliases: string[]): boolean {
@@ -26,5 +28,7 @@ export function nodeWorkerEnabled(
   flagName: string,
   ...aliases: string[]
 ): boolean {
-  return nodeOwnsBackgroundWorkers() && envFlag(flagName, ...aliases);
+  // BACKGROUND_WORKER_OWNER=csharp từ shell cũ không được phép tắt worker Node ngầm.
+  void normalized(process.env.BACKGROUND_WORKER_OWNER);
+  return envFlag(flagName, ...aliases);
 }

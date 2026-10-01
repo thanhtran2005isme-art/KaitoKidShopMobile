@@ -1,130 +1,130 @@
 # KaitoKidShop
 
-Full-stack monorepo của **KaitoKid — thương hiệu thời trang trẻ em 0–12 tuổi**, gồm Mobile, Web và ASP.NET Core backend.
+Full-stack monorepo của **KaitoKid Shop Fashion** gồm Mobile, Web và backend NestJS Node dùng chung MariaDB.
 
-## Cấu trúc
+## Cấu trúc hiện tại
 
 ```text
 KaitoKidShop/
 ├─ apps/
+│  ├─ api/                 # NestJS 11 + Prisma 7, port 5300
 │  ├─ mobile/              # Expo + React Native
-│  └─ web/                 # React + Vite
-├─ backend/
-│  ├─ API.Auth/
-│  ├─ API.Customer/
-│  ├─ API.Customer.Tests/
-│  ├─ API.Admin/
-│  ├─ API.Gateway/
-│  ├─ DbHelper/
-│  ├─ Shared/
-│  ├─ Database/
-│  ├─ db.local.example.bat
-│  └─ KaitoKidShop.slnx
-├─ scripts/
-│  ├─ load-db-local.bat
-│  ├─ run-mobile.bat
-│  ├─ run-web.bat
-│  ├─ run-backend.bat
-│  ├─ run-all.bat
-│  ├─ stop-all.bat
-│  └─ stop-all.ps1
+│  └─ web/                 # React + TypeScript + Vite
+├─ database/               # MariaDB schema + migrations
+├─ scripts/                # Windows launchers + runtime gates
 ├─ docs/
-│  ├─ AI_HANDOFF.md
-│  ├─ BRAND.md
-│  ├─ ROADMAP.md
-│  ├─ ARCHITECTURE.md
-│  ├─ DECISIONS.md
-│  ├─ TROUBLESHOOTING.md
-│  └─ history/
-├─ run.bat                # API.Auth + API.Customer + Expo Mobile
+├─ run.bat                 # Node API + Expo Mobile
 ├─ package.json
-├─ .gitignore
+├─ AGENTS.md
 └─ README.md
 ```
 
-## Tài liệu dự án / AI handoff
+Backend ASP.NET Core C# cũ đã được retire sau khi migration Node và các gate runtime/race/realtime/smoke/rollback được xác nhận PASS. Không còn fallback runtime về các cổng C# 5053/5265/5089/5155.
 
-Khi bắt đầu một phiên làm việc mới, đọc theo thứ tự:
+## Chuẩn bị
 
-1. `AGENTS.md`
-2. `docs/AI_HANDOFF.md`
-3. `docs/BRAND.md`
-4. `docs/ROADMAP.md`
-5. `docs/ARCHITECTURE.md`
-6. Tài liệu liên quan trong `docs/DECISIONS.md` và `docs/TROUBLESHOOTING.md`
-7. Git history/source code liên quan đến task
+Yêu cầu chính:
 
-`AI_HANDOFF.md` chỉ giữ trạng thái hiện tại. Lịch sử cũ được chuyển sang `docs/history/` để file handoff không phình vô hạn.
+- Node.js `>=20.19.0`
+- npm
+- MariaDB/MySQL-compatible server
 
-## Cài dependencies
+Tạo cấu hình backend local:
 
 ```bat
-cd apps\mobile
-npm install
-
-cd ..\web
-npm install
+cd apps\api
+copy .env.example .env
 ```
 
-## MariaDB local
+Điền tối thiểu `DATABASE_URL` và `JWT_KEY` trong `apps/api/.env`. Không commit secret thật.
 
-Backend dùng MariaDB/MySQL qua Pomelo. Cấu hình bí mật local nằm trong:
+Cài dependencies:
+
+```bat
+npm --prefix apps\api install
+npm --prefix apps\web install
+npm --prefix apps\mobile install
+```
+
+## Database
+
+Fresh schema source:
 
 ```text
-backend\db.local.bat
+database/KaitoKid_MariaDB.sql
 ```
 
-File này được `.gitignore` và không được push lên GitHub.
+Migration cho database đã tồn tại nằm trong:
 
-Lần đầu chạy `run.bat`, launcher sẽ tự tạo `backend\db.local.bat` từ file mẫu và mở Notepad. Thay `CHANGE_ME` bằng password local của user MariaDB `kaitokid`, lưu file rồi chạy lại `run.bat`.
+```text
+database/migrations/
+```
 
-Mẫu connection string:
+Database development hiện dùng tên `kaitokid`; health/audit hiện kỳ vọng 52 bảng theo contract hiện tại.
+
+Không dùng `prisma migrate reset`, `prisma migrate dev` hoặc `prisma db push` trên database đang có dữ liệu. Khi cần đồng bộ Prisma với schema hiện hữu, dùng:
 
 ```bat
-set "ConnectionStrings__DefaultConnection=Server=localhost;Port=3306;Database=kaitokid;User=kaitokid;Password=CHANGE_ME;CharSet=utf8mb4;"
+npm --prefix apps\api run db:introspect
 ```
 
 ## Chạy development trên Windows
 
-Mobile + API.Auth + API.Customer:
+Node API + Mobile:
 
 ```bat
 run.bat
 ```
 
-Hoặc chạy từng phần từ root repository:
-
-```bat
-scripts\run-backend.bat
-scripts\run-web.bat
-scripts\run-mobile.bat
-```
-
-Hoặc chạy toàn bộ:
+Toàn bộ Node API + Web + Mobile:
 
 ```bat
 scripts\run-all.bat
 ```
 
-Dừng stack development:
+Chạy riêng backend Node:
+
+```bat
+scripts\run-backend.bat
+```
+
+Dừng các process Node development:
 
 ```bat
 scripts\stop-all.bat
 ```
 
-## npm shortcuts
+## Ports
 
-```bash
-npm run mobile
-npm run web
-npm run web:build
+- NestJS API + REST + Socket.IO: `5300`
+- Socket.IO path: `/chatHub`
+- Expo/Metro: `8081`
+- Vite Web: thường `5173`
+
+Web và Mobile mặc định gọi backend Node `:5300`.
+
+## Final gates
+
+```bat
+scripts\node-final-cutover-check.bat
+scripts\node-final-runtime-smoke.bat
+scripts\node-protected-runtime-parity.bat
+scripts\node-concurrency-race-gate.bat
+scripts\node-realtime-runtime-gate.bat
 ```
 
-## Backend ports
+Các race gate có thể tạo backup dưới `.runtime-backups/`; thư mục này bị gitignore.
 
-- API.Gateway: 5155
-- API.Auth: 5053
-- API.Admin: 5089
-- API.Customer: 5265
+## Tài liệu source of truth
 
-Tài liệu riêng: `apps/mobile/README.md` và `apps/web/README.md`.
+Đọc theo thứ tự:
+
+1. `AGENTS.md`
+2. `docs/AI_HANDOFF.md`
+3. `docs/BRAND.md`
+4. `docs/UI_UX.md`
+5. `docs/ROADMAP.md`
+6. `docs/ARCHITECTURE.md`
+7. `docs/DECISIONS.md` và `docs/decisions/`
+8. `docs/TROUBLESHOOTING.md`
+9. Git history + source liên quan

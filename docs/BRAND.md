@@ -57,7 +57,7 @@ Mobile dùng `BRAND_COLORS` tại `apps/mobile/src/constants/brand.ts`:
 
 ## PHASE 10 — sample đa audience và media
 
-Migration `backend/Database/migrations/20260929_phase10_multiaudience_media.sql` đưa sample catalog về đúng D020:
+Migration `database/migrations/20260929_phase10_multiaudience_media.sql` đưa sample catalog về đúng D020:
 
 - giữ các sản phẩm trẻ em hiện có;
 - bổ sung sample Nữ/Nam người lớn;
