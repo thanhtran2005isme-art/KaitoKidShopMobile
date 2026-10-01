@@ -22,7 +22,7 @@
     "test:admin-migration": "npm run build && node --test test/admin-migration-contract.test.mjs",
     "test:final-cutover": "npm run build && node --test test/final-cutover-contract.test.mjs test/realtime-runtime-contract.test.mjs",
     "smoke:final-cutover": "node --test test/final-runtime-smoke.test.mjs",
-    "test:protected-runtime": "node --test test/protected-runtime-parity.test.mjs",
+    "test:protected-runtime": "npm run build && node --test test/protected-runtime-parity.test.mjs test/auth-runtime-parity.test.mjs",
     "test:concurrency-runtime": "npm run build && node test/run-concurrency-runtime-race.mjs",
     "test:realtime-runtime": "npm run build && node --test test/realtime-runtime-race.test.mjs"
   },

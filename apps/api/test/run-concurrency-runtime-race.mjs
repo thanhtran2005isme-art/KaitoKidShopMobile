@@ -33,7 +33,6 @@ function fixtureConfigFrom(originalValue) {
         config = parsed;
       }
     } catch {
-      // Fixture duoc phep thay tam JSON loi; finally restore dung chuoi goc.
       config = {};
     }
   }
@@ -60,9 +59,7 @@ function fixtureConfigFrom(originalValue) {
 }
 
 function quotedIdentifier(name) {
-  if (!/^[A-Za-z0-9_]+$/.test(name)) {
-    throw new Error(`Unsafe DB column name in metadata: ${name}`);
-  }
+  if (!/^[A-Za-z0-9_]+$/.test(name)) throw new Error(`Unsafe DB column name in metadata: ${name}`);
   return `\`${name}\``;
 }
 
@@ -76,51 +73,31 @@ function firstEnumValue(columnType) {
 function requiredFallback(column) {
   const dataType = String(column.dataType ?? "").toLowerCase();
   const columnType = String(column.columnType ?? "");
-
   if (dataType === "enum") return firstEnumValue(columnType);
-  if (["tinyint", "smallint", "mediumint", "int", "integer", "bigint", "decimal", "numeric", "float", "double", "real", "bit", "year"].includes(dataType)) {
-    return 0;
-  }
+  if (["tinyint", "smallint", "mediumint", "int", "integer", "bigint", "decimal", "numeric", "float", "double", "real", "bit", "year"].includes(dataType)) return 0;
   if (["date", "datetime", "timestamp"].includes(dataType)) return new Date();
   if (dataType === "time") return "00:00:00";
   if (dataType === "json") return "{}";
-  if (["binary", "varbinary", "tinyblob", "blob", "mediumblob", "longblob"].includes(dataType)) {
-    return Buffer.alloc(0);
-  }
+  if (["binary", "varbinary", "tinyblob", "blob", "mediumblob", "longblob"].includes(dataType)) return Buffer.alloc(0);
   return "";
 }
 
 async function insertTemporaryShippingConfig(prisma, fixtureValue) {
   const columns = await prisma.$queryRawUnsafe(
-    `SELECT COLUMN_NAME AS name,
-            DATA_TYPE AS dataType,
-            COLUMN_TYPE AS columnType,
-            IS_NULLABLE AS isNullable,
-            COLUMN_DEFAULT AS defaultValue,
-            EXTRA AS extra
+    `SELECT COLUMN_NAME AS name, DATA_TYPE AS dataType, COLUMN_TYPE AS columnType,
+            IS_NULLABLE AS isNullable, COLUMN_DEFAULT AS defaultValue, EXTRA AS extra
      FROM INFORMATION_SCHEMA.COLUMNS
-     WHERE TABLE_SCHEMA = DATABASE()
-       AND TABLE_NAME = 'CauHinhCuaHang'
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'CauHinhCuaHang'
      ORDER BY ORDINAL_POSITION`,
   );
   assert.ok(columns.length > 0, "Khong doc duoc schema CauHinhCuaHang tu INFORMATION_SCHEMA.");
 
   const valuesByName = new Map([
-    ["nhomcauhinh", "shipping"],
-    ["macauhinh", "config"],
-    ["giatri", fixtureValue],
-    ["tencauhinh", "Phase 11 Race Fixture"],
-    ["mota", "Temporary Phase 11 concurrency fixture"],
-    ["loaidulieu", "json"],
-    ["kieudulieu", "json"],
-    ["trangthai", 1],
-    ["kichhoat", 1],
-    ["danghoatdong", 1],
-    ["hieuluc", 1],
-    ["ngaytao", new Date()],
-    ["createdat", new Date()],
-    ["ngaycapnhat", new Date()],
-    ["updatedat", new Date()],
+    ["nhomcauhinh", "shipping"], ["macauhinh", "config"], ["giatri", fixtureValue],
+    ["tencauhinh", "Phase 11 Race Fixture"], ["mota", "Temporary Phase 11 concurrency fixture"],
+    ["loaidulieu", "json"], ["kieudulieu", "json"], ["trangthai", 1], ["kichhoat", 1],
+    ["danghoatdong", 1], ["hieuluc", 1], ["ngaytao", new Date()], ["createdat", new Date()],
+    ["ngaycapnhat", new Date()], ["updatedat", new Date()],
   ]);
 
   const insertColumns = [];
@@ -130,16 +107,12 @@ async function insertTemporaryShippingConfig(prisma, fixtureValue) {
     const lower = name.toLowerCase();
     const extra = String(column.extra ?? "").toLowerCase();
     if (extra.includes("auto_increment") || extra.includes("generated")) continue;
-
     if (valuesByName.has(lower)) {
       insertColumns.push(name);
       insertValues.push(valuesByName.get(lower));
       continue;
     }
-
-    const required =
-      String(column.isNullable).toUpperCase() === "NO" &&
-      column.defaultValue == null;
+    const required = String(column.isNullable).toUpperCase() === "NO" && column.defaultValue == null;
     if (required) {
       insertColumns.push(name);
       insertValues.push(requiredFallback(column));
@@ -147,12 +120,8 @@ async function insertTemporaryShippingConfig(prisma, fixtureValue) {
   }
 
   for (const requiredName of ["NhomCauHinh", "MaCauHinh", "GiaTri"]) {
-    assert.ok(
-      insertColumns.some((name) => name.toLowerCase() === requiredName.toLowerCase()),
-      `Schema CauHinhCuaHang thieu cot ${requiredName}.`,
-    );
+    assert.ok(insertColumns.some((name) => name.toLowerCase() === requiredName.toLowerCase()), `Schema CauHinhCuaHang thieu cot ${requiredName}.`);
   }
-
   const sql = `INSERT INTO CauHinhCuaHang (${insertColumns.map(quotedIdentifier).join(", ")}) VALUES (${insertColumns.map(() => "?").join(", ")})`;
   const inserted = await prisma.$executeRawUnsafe(sql, ...insertValues);
   assert.equal(inserted, 1, "Khong tao duoc temporary shipping/config fixture row.");
@@ -160,112 +129,82 @@ async function insertTemporaryShippingConfig(prisma, fixtureValue) {
 
 async function installShippingFixture(prisma) {
   const rows = await prisma.$queryRawUnsafe(
-    `SELECT GiaTri AS value
-     FROM CauHinhCuaHang
-     WHERE NhomCauHinh = 'shipping' AND MaCauHinh = 'config'
-     LIMIT 1`,
+    `SELECT GiaTri AS value FROM CauHinhCuaHang
+     WHERE NhomCauHinh = 'shipping' AND MaCauHinh = 'config' LIMIT 1`,
   );
-
   const existed = Boolean(rows[0]);
-  const originalValue = existed
-    ? rows[0].value == null ? "" : String(rows[0].value)
-    : null;
+  const originalValue = existed ? rows[0].value == null ? "" : String(rows[0].value) : null;
   const fixtureValue = fixtureConfigFrom(originalValue ?? "");
-
   if (existed) {
     const changed = await prisma.$executeRawUnsafe(
-      `UPDATE CauHinhCuaHang
-       SET GiaTri = ?
-       WHERE NhomCauHinh = 'shipping' AND MaCauHinh = 'config'`,
-      fixtureValue,
+      `UPDATE CauHinhCuaHang SET GiaTri = ? WHERE NhomCauHinh = 'shipping' AND MaCauHinh = 'config'`, fixtureValue,
     );
     assert.ok(changed >= 1, "Khong cai duoc shipping fixture cho race gate.");
   } else {
     await insertTemporaryShippingConfig(prisma, fixtureValue);
   }
-
   const installed = await prisma.$queryRawUnsafe(
-    `SELECT GiaTri AS value
-     FROM CauHinhCuaHang
-     WHERE NhomCauHinh = 'shipping' AND MaCauHinh = 'config'
-     LIMIT 2`,
+    `SELECT GiaTri AS value FROM CauHinhCuaHang
+     WHERE NhomCauHinh = 'shipping' AND MaCauHinh = 'config' LIMIT 2`,
   );
   assert.equal(installed.length, 1, "Shipping fixture phai co dung mot row shipping/config.");
   assert.equal(String(installed[0].value ?? ""), fixtureValue, "Shipping fixture value khong khop gia tri vua cai.");
-
   return { existed, originalValue };
 }
 
 async function restoreShippingFixture(prisma, snapshot) {
   if (snapshot.existed) {
     const changed = await prisma.$executeRawUnsafe(
-      `UPDATE CauHinhCuaHang
-       SET GiaTri = ?
-       WHERE NhomCauHinh = 'shipping' AND MaCauHinh = 'config'`,
-      snapshot.originalValue,
+      `UPDATE CauHinhCuaHang SET GiaTri = ? WHERE NhomCauHinh = 'shipping' AND MaCauHinh = 'config'`, snapshot.originalValue,
     );
     assert.ok(changed >= 1, "Khong restore duoc shipping config sau race gate.");
-
     const rows = await prisma.$queryRawUnsafe(
-      `SELECT GiaTri AS value
-       FROM CauHinhCuaHang
-       WHERE NhomCauHinh = 'shipping' AND MaCauHinh = 'config'
-       LIMIT 1`,
+      `SELECT GiaTri AS value FROM CauHinhCuaHang
+       WHERE NhomCauHinh = 'shipping' AND MaCauHinh = 'config' LIMIT 1`,
     );
     const restored = rows[0]?.value == null ? "" : String(rows[0].value);
     assert.equal(restored, snapshot.originalValue, "Shipping config sau cleanup khong khop snapshot ban dau.");
     return;
   }
-
   await prisma.$executeRawUnsafe(
-    `DELETE FROM CauHinhCuaHang
-     WHERE NhomCauHinh = 'shipping' AND MaCauHinh = 'config'`,
+    `DELETE FROM CauHinhCuaHang WHERE NhomCauHinh = 'shipping' AND MaCauHinh = 'config'`,
   );
   const rows = await prisma.$queryRawUnsafe(
-    `SELECT 1 AS found
-     FROM CauHinhCuaHang
-     WHERE NhomCauHinh = 'shipping' AND MaCauHinh = 'config'
-     LIMIT 1`,
+    `SELECT 1 AS found FROM CauHinhCuaHang
+     WHERE NhomCauHinh = 'shipping' AND MaCauHinh = 'config' LIMIT 1`,
   );
   assert.equal(rows.length, 0, "Shipping config ban dau khong ton tai; cleanup phai tra DB ve 0 row.");
 }
 
 const prisma = new PrismaService();
 await prisma.$connect();
-
 let snapshot;
 let fixtureInstalled = false;
 let childStatus = 1;
 try {
   snapshot = await installShippingFixture(prisma);
   fixtureInstalled = true;
-  console.log(
-    snapshot.existed
-      ? "[FIXTURE] Installed isolated mock shipping branch over existing config."
-      : "[FIXTURE] Created temporary shipping/config row for isolated mock branch.",
-  );
-
-  const child = spawnSync(
-    process.execPath,
-    ["--test", "test/concurrency-runtime-race.test.mjs"],
-    {
-      cwd: process.cwd(),
-      env: process.env,
-      stdio: "inherit",
-    },
-  );
-  childStatus = child.status ?? 1;
-  if (child.error) throw child.error;
+  console.log(snapshot.existed ? "[FIXTURE] Installed isolated mock shipping branch over existing config." : "[FIXTURE] Created temporary shipping/config row for isolated mock branch.");
+  const testFiles = [
+    "test/concurrency-runtime-race.test.mjs",
+    "test/payment-terminal-runtime-race.test.mjs",
+    "test/admin-concurrency-runtime-race.test.mjs",
+  ];
+  childStatus = 0;
+  for (const testFile of testFiles) {
+    console.log(`[RACE] Running ${testFile}`);
+    const child = spawnSync(process.execPath, ["--test", testFile], {
+      cwd: process.cwd(), env: process.env, stdio: "inherit",
+    });
+    if (child.error) throw child.error;
+    childStatus = child.status ?? 1;
+    if (childStatus !== 0) break;
+  }
 } finally {
   if (fixtureInstalled) {
     await restoreShippingFixture(prisma, snapshot);
-    console.log(
-      snapshot.existed
-        ? "[FIXTURE] Restored original shipping config exactly."
-        : "[FIXTURE] Removed temporary shipping/config row; original absence restored.",
-    );
+    console.log(snapshot.existed ? "[FIXTURE] Restored original shipping config exactly." : "[FIXTURE] Removed temporary shipping/config row; original absence restored.");
   }
   await prisma.$disconnect();
 }
-
 process.exitCode = childStatus;

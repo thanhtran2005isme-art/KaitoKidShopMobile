@@ -17,7 +17,8 @@ function Read-PlainSecret([string]$Prompt) {
 Write-Host '============================================================'
 Write-Host ' KaitoKid Node Phase 11 - protected runtime parity'
 Write-Host '============================================================'
-Write-Host 'Gate nay chi login/refresh/read + RBAC. Khong tao don, khong sua ton kho.'
+Write-Host 'Gate nay test login/refresh/read, full local Auth lifecycle va granular RBAC.'
+Write-Host 'Auth/RBAC fixture la tam thoi va duoc cleanup; gate khong tao don hoac sua ton kho that.'
 Write-Host ''
 
 $customerIdentifier = Read-Host 'Customer email/username test'
@@ -38,6 +39,7 @@ $old = @{
     RUNTIME_CUSTOMER_PASSWORD = $env:RUNTIME_CUSTOMER_PASSWORD
     RUNTIME_STAFF_EMAIL = $env:RUNTIME_STAFF_EMAIL
     RUNTIME_STAFF_PASSWORD = $env:RUNTIME_STAFF_PASSWORD
+    RUNTIME_AUTH_FIXTURE_CONFIRM = $env:RUNTIME_AUTH_FIXTURE_CONFIRM
 }
 
 try {
@@ -48,6 +50,7 @@ try {
     $env:RUNTIME_CUSTOMER_PASSWORD = $customerPassword
     $env:RUNTIME_STAFF_EMAIL = $staffEmail
     $env:RUNTIME_STAFF_PASSWORD = $staffPassword
+    $env:RUNTIME_AUTH_FIXTURE_CONFIRM = 'YES'
 
     Push-Location $api
     try {
@@ -61,7 +64,7 @@ try {
     }
 
     Write-Host ''
-    Write-Host '[PASS] Protected runtime parity customer/staff/RBAC passed.' -ForegroundColor Green
+    Write-Host '[PASS] Protected runtime: login/session + register/verify + OTP/2FA + lockout/reset/change-password + RBAC passed.' -ForegroundColor Green
     Write-Host '[NEXT] Chay concurrency/race gate tren DB da backup truoc khi retire C#.'
 }
 finally {
@@ -70,6 +73,7 @@ finally {
     $env:RUNTIME_CUSTOMER_PASSWORD = $old.RUNTIME_CUSTOMER_PASSWORD
     $env:RUNTIME_STAFF_EMAIL = $old.RUNTIME_STAFF_EMAIL
     $env:RUNTIME_STAFF_PASSWORD = $old.RUNTIME_STAFF_PASSWORD
+    $env:RUNTIME_AUTH_FIXTURE_CONFIRM = $old.RUNTIME_AUTH_FIXTURE_CONFIRM
     $customerPassword = $null
     $staffPassword = $null
 }

@@ -6,7 +6,7 @@ $EnvFile = Join-Path $Api '.env'
 $BaseUrl = if ($env:NODE_BASE_URL) { $env:NODE_BASE_URL.TrimEnd('/') } else { 'http://127.0.0.1:5300' }
 
 Write-Host '============================================================' -ForegroundColor Cyan
-Write-Host ' KaitoKid Node Phase 11 - commerce concurrency/race gate' -ForegroundColor Cyan
+Write-Host ' KaitoKid Node Phase 11 - commerce/payment/admin concurrency gate' -ForegroundColor Cyan
 Write-Host '============================================================' -ForegroundColor Cyan
 Write-Host "NODE_BASE_URL=$BaseUrl"
 Write-Host ''
@@ -95,8 +95,8 @@ if (-not (Test-Path $backupFile) -or (Get-Item $backupFile).Length -lt 1024) {
 }
 
 Write-Host '[BACKUP PASS] Database snapshot created.' -ForegroundColor Green
-Write-Host '[RACE] Test uses only a temporary customer fixture and a product without active cart/reservation.' -ForegroundColor Yellow
-Write-Host '[RACE] finally removes fixture data and restores product/variant snapshot.' -ForegroundColor Yellow
+Write-Host '[RACE] Runs isolated commerce/customer, payment terminal, admin inventory/variant and stock-receipt fixtures.' -ForegroundColor Yellow
+Write-Host '[RACE] Every fixture has finally-cleanup and product/variant/config snapshot restore.' -ForegroundColor Yellow
 
 $env:RUNTIME_RACE_CONFIRM = 'YES'
 $env:NODE_BASE_URL = $BaseUrl
@@ -113,6 +113,6 @@ try {
 }
 
 Write-Host ''
-Write-Host '[PASS] Phase 11 commerce concurrency/race gate passed.' -ForegroundColor Green
+Write-Host '[PASS] Phase 11 commerce + payment + admin inventory/variant/stock-receipt race gate passed.' -ForegroundColor Green
 Write-Host "[BACKUP] $backupFile" -ForegroundColor Green
 Write-Host '[NEXT] Realtime Socket.IO + staff claim race, then rollback/soak gate.' -ForegroundColor Cyan

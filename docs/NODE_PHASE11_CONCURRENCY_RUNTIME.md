@@ -1,32 +1,13 @@
-# Phase 11 — Commerce concurrency/race runtime gate
+# Phase 11 — Commerce + Payment + Admin concurrency/race runtime gate
 
 Gate này chạy sau khi:
 
 1. `scripts\node-final-cutover-check.bat` PASS;
 2. `scripts\node-final-runtime-smoke.bat` PASS;
-3. protected runtime customer/staff/RBAC PASS;
-4. Node API đang chạy trên `http://127.0.0.1:5300`.
+3. `scripts\node-protected-runtime-parity.bat` PASS;
+4. Node API đang chạy Node-only trên `http://127.0.0.1:5300`.
 
-## Mục tiêu
-
-Kiểm tra race thật qua HTTP Node + MariaDB thật, không chỉ contract/unit test:
-
-- 2 request `AddToCart` đồng thời cho cùng customer/product/variant;
-- 2 checkout đồng thời trên cùng cart reservation;
-- 2 request cancel cùng một order;
-- payment expiry và customer cancel chạy gần như cùng lúc.
-
-Sau mỗi race, test đọc trực tiếp DB để xác nhận:
-
-- không tạo duplicate cart/order;
-- `SoLuongDaGiu` không bị double reserve;
-- stock product/variant chỉ giảm một lần khi checkout;
-- cancel/expiry chỉ restore stock/sold đúng một lần;
-- order cuối cùng có state nhất quán.
-
-## Safety
-
-Chạy từ repo root:
+## Chạy
 
 ```bat
 scripts\node-concurrency-race-gate.bat
@@ -34,82 +15,97 @@ scripts\node-concurrency-race-gate.bat
 
 Launcher bắt buộc:
 
-- Node `/health` phải `ok` và DB audit 52/52;
+- Node `/health` phải `ok`, DB audit 52/52;
 - đọc `DATABASE_URL` từ `apps/api/.env`;
-- tìm `mysqldump.exe` hoặc `mariadb-dump.exe` (XAMPP được auto-detect);
-- tạo backup vào `.runtime-backups/` trước mutation;
-- chỉ sau khi backup hợp lệ mới set `RUNTIME_RACE_CONFIRM=YES` và chạy test.
+- tìm `mysqldump.exe` hoặc `mariadb-dump.exe`;
+- tạo snapshot `.runtime-backups/kaitokid-phase11-race-*.sql` trước mutation;
+- chỉ sau backup hợp lệ mới set `RUNTIME_RACE_CONFIRM=YES`.
 
-`.runtime-backups/` đã được git-ignore và không được commit.
+`.runtime-backups/` đã git-ignore và không được commit.
 
-Test tự tạo customer fixture tạm với email `@example.invalid`. Nó chỉ chọn product khi:
+## Orchestrator
 
-- `TrangThai='active'`;
-- stock >= 8;
-- `SoLuongDaGiu=0`;
-- không có row `GioHang` hiện hữu cho product đó;
-- nếu product có variant, variant được chọn phải stock >= 8, reserved=0 và `KichCo`/`MauSac` phải tương thích với `SanPham.DanhSachSize`/`SanPham.DanhSachMau` theo cùng rule JSON-array mà `CartService` dùng;
-- nếu product không có variant, fixture lấy size/màu đầu tiên từ `DanhSachSize`/`DanhSachMau` thay vì luôn gửi chuỗi rỗng.
+`apps/api/test/run-concurrency-runtime-race.mjs` cài một mock shipping branch cô lập `phase11-race` rồi chạy tuần tự:
 
-Race test in rõ product/variant/size/color fixture trước khi gọi API. Nếu API trả lỗi, assertion in cả HTTP status và response body. Các race phụ thuộc chỉ chạy khi race trước đã hoàn tất toàn bộ assertion, tránh tạo chuỗi lỗi giả từ một fixture hỏng.
+```text
+concurrency-runtime-race.test.mjs
+payment-terminal-runtime-race.test.mjs
+admin-concurrency-runtime-race.test.mjs
+```
 
-### Shipping fixture cô lập
+Nếu `shipping/config` đã tồn tại, raw `GiaTri` được snapshot rồi restore chính xác. Nếu chưa tồn tại, gate tạo một row tạm dựa trên `INFORMATION_SCHEMA.COLUMNS` và xóa lại trong `finally`.
 
-Race gate không phụ thuộc cấu hình giao hàng production hiện tại. Trước khi chạy 4 race subtest, orchestrator `apps/api/test/run-concurrency-runtime-race.mjs` xử lý cả hai trạng thái DB:
+Nếu bất kỳ test file nào fail, orchestrator dừng file tiếp theo nhưng vẫn restore shipping fixture.
 
-**Nếu `shipping/config` đã tồn tại:**
+## Coverage
 
-1. giữ nguyên raw `GiaTri` ban đầu;
-2. tạm bật `MockEnabled=true`;
-3. tạm bật `MockOnlyServeBranches=true`;
-4. thêm branch riêng `phase11-race` tại `Phase 11 Race Province`;
-5. chạy race test bằng mock shipping của fixture;
-6. trong `finally`, restore đúng raw `GiaTri` ban đầu;
-7. đọc lại DB và assert cấu hình sau restore khớp snapshot.
+### 1. Customer commerce
 
-**Nếu `shipping/config` không tồn tại:**
+- hai `AddToCart` đồng thời cùng customer/product/variant;
+- hai checkout đồng thời cùng reservation → chỉ một order commit;
+- double order cancel → stock/sold/coupon chỉ restore một lần;
+- payment expiry và customer cancel chạy gần nhau → không double-restock.
 
-1. đọc metadata bảng `CauHinhCuaHang` từ `INFORMATION_SCHEMA.COLUMNS`;
-2. tạo đúng một row `shipping/config` tạm chỉ phục vụ race fixture;
-3. chạy 4 race subtest;
-4. trong `finally`, xóa row fixture đó;
-5. đọc lại DB và assert trạng thái ban đầu được khôi phục: không còn row `shipping/config`.
+Test đọc DB sau mutation, không chỉ HTTP status; product/variant snapshot được restore trong `finally`.
 
-Orchestrator không tạo schema/table và không giữ lại cấu hình shipping production mới sau khi gate kết thúc.
+### 2. Payment terminal race
 
-Vì vậy `provider: "mock"` trong race test là fixture cố ý, không phải provider production được auto-discover. Gate này kiểm tra concurrency của cart/order/payment; parity provider shipping thật được nghiệm thu ở smoke/runtime shipping riêng.
+Gate tạo order tạm rồi ép cùng lúc:
 
-Trong `finally`, race test xóa order/detail/shipping-history/cart/login-activity/customer fixture và restore snapshot product/variant. Orchestrator sau đó restore chính xác trạng thái shipping config ban đầu — kể cả trạng thái ban đầu là “không có row”.
+- `GET /api/payment/status/:orderCode` để kích hoạt expiry path;
+- customer `POST /api/payment/cancel/:orderCode`;
+- admin-role `POST /api/payment/mark-paid/:orderCode`.
+
+Invariant:
+
+- cancel và mark-paid không được cùng commit;
+- final state chỉ `cancelled` hoặc `confirmed`;
+- `cancelled` phải trả stock/sold về snapshot đúng một lần;
+- `confirmed` phải giữ đúng một lần giảm stock/tăng sold và có `NgayThanhToan`;
+- chỉ một terminal shipping-history (`cancelled` hoặc `payment_confirmed`) được ghi.
+
+### 3. Admin inventory / variant / stock receipt
+
+Gate tạo staff/role tạm có `inventory.view` + `inventory.manage`, chọn product không có cart/reservation và ít nhất hai variant rồi snapshot toàn bộ product/variant.
+
+Các race:
+
+1. hai inventory export gần cạn cùng lúc → đúng một request thành công, request còn lại `400`, không tồn âm;
+2. hai variant khác nhau của cùng product update đồng thời → cả hai update tồn tại, `SanPham.TonKho` bằng tổng variant, không lost-update;
+3. một stock receipt bị cancel đồng thời hai lần → đúng một cancel thành công, stock rollback đúng một lần;
+4. hai stock receipt cùng product/variant create đồng thời → ID và `MaPhieu` phải khác nhau, aggregate tăng đúng tổng; cancel hai phiếu độc lập đồng thời → aggregate trở lại baseline.
+
+Gate xóa receipt/detail/history fixture, restore `TonKhoBienThe` gồm stock + average cost, restore product snapshot, rồi xóa staff/role test trong `finally`.
 
 ## PASS
 
 Kết thúc phải có:
 
 ```text
-[PASS] Phase 11 commerce concurrency/race gate passed.
+[PASS] Phase 11 commerce + payment + admin inventory/variant/stock-receipt race gate passed.
 ```
 
-Nếu DB ban đầu không có `shipping/config`, cleanup thành công còn phải in:
+Nếu DB ban đầu không có `shipping/config`, cleanup thành công còn in:
 
 ```text
 [FIXTURE] Removed temporary shipping/config row; original absence restored.
 ```
 
-Backup path được in lại ở cuối. Không xóa backup cho tới khi toàn bộ Phase 11 final gate + rollback drill hoàn tất.
+Giữ backup cho tới khi toàn bộ final cutover + rollback drill hoàn tất.
 
 ## Nếu FAIL
 
-- Không merge `main`.
-- Giữ file `.runtime-backups\kaitokid-phase11-race-*.sql`.
-- Gửi toàn bộ output test để xác định race nào fail.
-- Không restore dump mù nếu fixture cleanup đã thành công; trước tiên đối chiếu các row test, product/variant và shipping config đã được restore.
+- không merge `main`;
+- giữ backup và toàn bộ output;
+- xác định race nào fail và kiểm tra cleanup/snapshot trước khi restore dump;
+- không chạy lại mutation mù trên cùng dữ liệu.
 
-## Chưa bao phủ trong gate này
+## Sau gate này vẫn còn
 
-Gate này chỉ đóng commerce customer race. Trước C# retirement vẫn còn:
+- realtime Socket.IO + staff claim runtime gate;
+- worker ownership Node-only verification;
+- Web + Mobile + Admin smoke;
+- soak;
+- rollback Node → C#.
 
-- inventory/variant concurrent adjustment phía Admin;
-- stock-receipt create/cancel concurrency;
-- 2 staff claim cùng conversation;
-- Socket.IO connect/join/send/reconnect + identity/RBAC;
-- soak + rollback drill.
+Chỉ khi các mục trên cùng protected/concurrency gate đều có bằng chứng PASS mới được tạo retirement PR xóa backend C#.
