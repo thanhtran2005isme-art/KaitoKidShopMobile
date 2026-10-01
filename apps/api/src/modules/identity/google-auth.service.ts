@@ -8,6 +8,13 @@ export interface GoogleUserInfo {
   picture: string | null;
 }
 
+export const DEFAULT_GOOGLE_CLIENT_ID =
+  "609254164052-81mv1bn2kegd4nmic386q1fdv3o5oviq.apps.googleusercontent.com";
+
+export function googleClientId(): string {
+  return process.env.GOOGLE_CLIENT_ID?.trim() || DEFAULT_GOOGLE_CLIENT_ID;
+}
+
 function text(
   source: Record<string, unknown>,
   ...names: string[]
@@ -51,8 +58,8 @@ export class GoogleAuthService {
   private readonly logger = new Logger(GoogleAuthService.name);
 
   async verifyIdToken(idToken: string): Promise<GoogleUserInfo | null> {
-    const clientId = process.env.GOOGLE_CLIENT_ID?.trim();
-    if (!clientId || !idToken.trim()) return null;
+    const clientId = googleClientId();
+    if (!idToken.trim()) return null;
 
     try {
       const response = await fetch(
@@ -89,8 +96,8 @@ export class GoogleAuthService {
   async verifyAccessToken(
     accessToken: string,
   ): Promise<GoogleUserInfo | null> {
-    const clientId = process.env.GOOGLE_CLIENT_ID?.trim();
-    if (!clientId || !accessToken.trim()) return null;
+    const clientId = googleClientId();
+    if (!accessToken.trim()) return null;
 
     try {
       const tokenResponse = await fetch(
