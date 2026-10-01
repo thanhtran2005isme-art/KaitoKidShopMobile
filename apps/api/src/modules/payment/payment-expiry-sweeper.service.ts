@@ -4,6 +4,7 @@ import {
   OnModuleDestroy,
   OnModuleInit,
 } from "@nestjs/common";
+import { backgroundWorkerOwner, nodeWorkerEnabled } from "../../common/worker-owner.js";
 import { PaymentService } from "./payment.service.js";
 
 @Injectable()
@@ -16,9 +17,9 @@ export class PaymentExpirySweeperService
   constructor(private readonly payment: PaymentService) {}
 
   onModuleInit(): void {
-    if (!this.enabled()) {
+    if (!nodeWorkerEnabled("PAYMENT_SWEEPER_ENABLED")) {
       this.logger.log(
-        "Payment expiry sweeper disabled during C#/Node coexistence. Enable only after the C# sweeper is stopped.",
+        `Payment expiry sweeper disabled. Background worker owner=${backgroundWorkerOwner()}.`,
       );
       return;
     }
@@ -32,12 +33,6 @@ export class PaymentExpirySweeperService
 
   onModuleDestroy(): void {
     if (this.timer) clearInterval(this.timer);
-  }
-
-  private enabled(): boolean {
-    return /^(1|true|yes)$/i.test(
-      process.env.PAYMENT_SWEEPER_ENABLED ?? "false",
-    );
   }
 
   private intervalSeconds(): number {

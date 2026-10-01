@@ -4,6 +4,7 @@ import {
   OnModuleDestroy,
   OnModuleInit,
 } from "@nestjs/common";
+import { backgroundWorkerOwner, nodeWorkerEnabled } from "../../common/worker-owner.js";
 import { ImageSearchService } from "./image-search.service.js";
 
 @Injectable()
@@ -16,9 +17,10 @@ export class ImageEmbeddingIndexerService
   constructor(private readonly image: ImageSearchService) {}
 
   onModuleInit() {
-    if (!/^(1|true|yes)$/i.test(
-      process.env.IMAGE_INDEXER_ENABLED ?? "false",
-    )) {
+    if (!nodeWorkerEnabled("IMAGE_INDEXER_ENABLED")) {
+      this.logger.log(
+        `Image indexer disabled. Background worker owner=${backgroundWorkerOwner()}.`,
+      );
       return;
     }
     const seconds = Math.max(

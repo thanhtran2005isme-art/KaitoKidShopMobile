@@ -4,6 +4,7 @@ import {
   OnModuleDestroy,
   OnModuleInit,
 } from "@nestjs/common";
+import { backgroundWorkerOwner, nodeWorkerEnabled } from "../../common/worker-owner.js";
 import { CartService } from "./cart.service.js";
 
 @Injectable()
@@ -16,9 +17,12 @@ export class CartReservationSweeperService
   constructor(private readonly cart: CartService) {}
 
   onModuleInit(): void {
-    if (!this.enabled()) {
+    if (!nodeWorkerEnabled(
+      "CART_SWEEPER_ENABLED",
+      "Cart__SweeperEnabled",
+    )) {
       this.logger.log(
-        "Cart reservation sweeper disabled during C#/Node coexistence. Enable only after C# sweeper is stopped.",
+        `Cart reservation sweeper disabled. Background worker owner=${backgroundWorkerOwner()}.`,
       );
       return;
     }
@@ -34,14 +38,6 @@ export class CartReservationSweeperService
 
   onModuleDestroy(): void {
     if (this.timer) clearInterval(this.timer);
-  }
-
-  private enabled(): boolean {
-    const raw =
-      process.env.CART_SWEEPER_ENABLED ??
-      process.env.Cart__SweeperEnabled ??
-      "false";
-    return /^(1|true|yes)$/i.test(raw);
   }
 
   private intervalSeconds(): number {

@@ -88,9 +88,9 @@ export class ChatGateway {
       guestId?: string | null;
     },
   ) {
-    let who = this.identity(client);
+    const who = this.identity(client);
     if (!who.userId && body.guestId && who.guestId !== body.guestId) {
-      who = { ...who, guestId: body.guestId };
+      throw new Error("Guest identity không khớp handshake.");
     }
     const result = await this.chat.addCustomerMessage(
       who,
@@ -196,13 +196,14 @@ export class ChatGateway {
   ) {
     const conversationId =
       typeof body === "number" ? body : body.conversationId;
-    let who = this.identity(client);
+    const who = this.identity(client);
     if (
       typeof body !== "number" &&
       !who.userId &&
-      body.guestId
+      body.guestId &&
+      who.guestId !== body.guestId
     ) {
-      who = { ...who, guestId: body.guestId };
+      throw new Error("Guest identity không khớp handshake.");
     }
     const ok = await this.chat.closeByCustomer(who, conversationId);
     if (ok) {
@@ -214,7 +215,7 @@ export class ChatGateway {
   }
 
   @SubscribeMessage("Typing")
-  typing(
+  async typing(
     @ConnectedSocket() client: Socket,
     @MessageBody() body: {
       conversationId: number;
@@ -222,9 +223,23 @@ export class ChatGateway {
     },
   ) {
     const who = this.identity(client);
-    client.to(this.conv(body.conversationId)).emit(
+    const conversationId = Number(body.conversationId);
+    if (
+      !who.isStaff &&
+      !(await this.chat.isOwner(conversationId, who))
+    ) {
+      throw new Error("Không có quyền truy cập phiên hội thoại.");
+    }
+    if (
+      who.isStaff &&
+      !canChat(who, "chat.view") &&
+      !canChat(who, "chat.reply")
+    ) {
+      throw new Error("Không có quyền.");
+    }
+    client.to(this.conv(conversationId)).emit(
       "TypingChanged",
-      body.conversationId,
+      conversationId,
       who.isStaff ? "agent" : "customer",
       Boolean(body.isTyping),
     );

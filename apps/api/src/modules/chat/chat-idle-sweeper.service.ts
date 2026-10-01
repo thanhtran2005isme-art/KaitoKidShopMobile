@@ -4,6 +4,7 @@ import {
   OnModuleDestroy,
   OnModuleInit,
 } from "@nestjs/common";
+import { backgroundWorkerOwner, nodeWorkerEnabled } from "../../common/worker-owner.js";
 import { ChatService } from "./chat.service.js";
 
 @Injectable()
@@ -16,9 +17,10 @@ export class ChatIdleSweeperService
   constructor(private readonly chat: ChatService) {}
 
   onModuleInit() {
-    if (!/^(1|true|yes)$/i.test(
-      process.env.CHAT_IDLE_SWEEPER_ENABLED ?? "false",
-    )) {
+    if (!nodeWorkerEnabled("CHAT_IDLE_SWEEPER_ENABLED")) {
+      this.logger.log(
+        `Chat idle sweeper disabled. Background worker owner=${backgroundWorkerOwner()}.`,
+      );
       return;
     }
     const interval = Math.max(

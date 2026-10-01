@@ -37,15 +37,20 @@ function detectLanIpv4() {
 }
 
 module.exports = () => {
+  const backendMode = (process.env.EXPO_PUBLIC_BACKEND_MODE || 'csharp').trim().toLowerCase();
+  const explicitNodeApiUrl = process.env.EXPO_PUBLIC_NODE_API_URL?.trim().replace(/\/+$/, '') || null;
   const explicitApiUrl = process.env.EXPO_PUBLIC_API_URL?.trim().replace(/\/+$/, '') || null;
   const explicitAuthApiUrl = process.env.EXPO_PUBLIC_AUTH_API_URL?.trim().replace(/\/+$/, '') || null;
   const lanIpv4 = process.env.EAS_BUILD === 'true' ? null : detectLanIpv4();
+  const autoNodeApiUrl = backendMode === 'node' && lanIpv4 ? `http://${lanIpv4}:5300` : null;
+  const nodeApiUrl = explicitNodeApiUrl || autoNodeApiUrl;
   const autoApiUrl = lanIpv4 ? `http://${lanIpv4}:5265` : null;
   const autoAuthApiUrl = lanIpv4 ? `http://${lanIpv4}:5053` : null;
-  const apiUrl = explicitApiUrl || autoApiUrl;
-  const authApiUrl = explicitAuthApiUrl || autoAuthApiUrl;
+  const apiUrl = explicitApiUrl || nodeApiUrl || autoApiUrl;
+  const authApiUrl = explicitAuthApiUrl || nodeApiUrl || autoAuthApiUrl;
 
   if (process.env.NODE_ENV !== 'production') {
+    console.log(`[KaitoKid] Backend mode: ${nodeApiUrl ? 'node' : 'csharp'}`);
     console.log(`[KaitoKid] API.Customer: ${apiUrl || 'platform fallback'}`);
     console.log(`[KaitoKid] API.Auth: ${authApiUrl || 'platform fallback'}`);
   }
@@ -67,8 +72,17 @@ module.exports = () => {
       ...(baseConfig.extra || {}),
       apiUrl,
       authApiUrl,
-      apiUrlSource: explicitApiUrl ? 'env' : autoApiUrl ? 'lan-auto' : 'platform-fallback',
-      authApiUrlSource: explicitAuthApiUrl ? 'env' : autoAuthApiUrl ? 'lan-auto' : 'platform-fallback',
+      backendMode: nodeApiUrl ? 'node' : 'csharp',
+      apiUrlSource: explicitApiUrl
+        ? 'env-api'
+        : nodeApiUrl
+          ? explicitNodeApiUrl ? 'env-node' : 'lan-node'
+          : autoApiUrl ? 'lan-auto' : 'platform-fallback',
+      authApiUrlSource: explicitAuthApiUrl
+        ? 'env-auth'
+        : nodeApiUrl
+          ? explicitNodeApiUrl ? 'env-node' : 'lan-node'
+          : autoAuthApiUrl ? 'lan-auto' : 'platform-fallback',
     },
   };
 };
