@@ -63,6 +63,10 @@ For meaningful changes:
 6. Open a PR and merge only when clean.
 7. Update docs when architecture, operations or durable decisions change.
 
+### Fix completion and merge rule
+
+When a bug fix has been verified as correct and its PR is clean/mergeable, merge it into `main` without waiting for another user confirmation. Prefer squash merge so `main` receives one meaningful fix commit. Only leave a verified fix branch/PR unmerged when the user explicitly asks to keep it open or when a required validation/merge gate is still unresolved.
+
 ### Commit granularity
 
 Default: **one task/fix/PHASE = one aggregate commit**.
