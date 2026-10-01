@@ -5,6 +5,7 @@ const SYMBOLS = {
   user: { ios: 'person.crop.circle', android: 'account_circle', web: 'account_circle' },
   heart: { ios: 'heart', android: 'favorite_border', web: 'favorite_border' },
   heartFilled: { ios: 'heart.fill', android: 'favorite', web: 'favorite' },
+  starFilled: { ios: 'star.fill', android: 'star', web: 'star' },
   bag: { ios: 'bag', android: 'shopping_bag', web: 'shopping_bag' },
   cart: { ios: 'cart', android: 'shopping_cart', web: 'shopping_cart' },
   search: { ios: 'magnifyingglass', android: 'search', web: 'search' },
