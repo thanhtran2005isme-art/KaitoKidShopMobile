@@ -3,21 +3,18 @@ import * as Device from 'expo-device';
 import { Platform } from 'react-native';
 
 const fallbackApiUrl = Platform.select({
-  android: 'http://10.0.2.2:5265',
-  ios: 'http://localhost:5265',
-  default: 'http://localhost:5265',
+  android: 'http://10.0.2.2:5300',
+  ios: 'http://localhost:5300',
+  default: 'http://localhost:5300',
 });
 
-const explicitApiUrl = process.env.EXPO_PUBLIC_API_URL?.trim() || '';
-const runtimeApiUrl =
-  typeof Constants.expoConfig?.extra?.apiUrl === 'string'
-    ? Constants.expoConfig.extra.apiUrl.trim()
-    : '';
-
+const explicitApiUrl = (process.env.EXPO_PUBLIC_NODE_API_URL || process.env.EXPO_PUBLIC_API_URL)?.trim() || '';
+const runtimeApiUrl = typeof Constants.expoConfig?.extra?.apiUrl === 'string'
+  ? Constants.expoConfig.extra.apiUrl.trim()
+  : '';
 const shouldPreferAndroidEmulatorFallback = Platform.OS === 'android' && !Device.isDevice && !explicitApiUrl;
 
 type UnauthorizedHandler = () => Promise<string | null>;
-
 let unauthorizedHandler: UnauthorizedHandler | null = null;
 
 export function setUnauthorizedHandler(handler: UnauthorizedHandler | null) {
@@ -30,51 +27,26 @@ export const API_BASE_URL = (
   ''
 ).replace(/\/+$/, '');
 
-if (__DEV__) {
-  const source = explicitApiUrl
-    ? 'EXPO_PUBLIC_API_URL'
-    : shouldPreferAndroidEmulatorFallback
-      ? 'Android emulator fallback'
-      : runtimeApiUrl
-        ? 'Expo LAN auto-detect'
-        : 'platform fallback';
-
-  console.log(`[KaitoKid API] ${API_BASE_URL} (${source})`);
-}
+if (__DEV__) console.log(`[KaitoKid API] ${API_BASE_URL}`);
 
 async function getErrorMessage(response: Response) {
   const text = await response.text().catch(() => '');
   if (!text) return `API trả về HTTP ${response.status}`;
-
   try {
-    const payload = JSON.parse(text) as {
-      detail?: string;
-      error?: string;
-      message?: string;
-      title?: string;
-    };
-
+    const payload = JSON.parse(text) as { detail?: string; error?: string; message?: string; title?: string };
     return payload.message || payload.detail || payload.error || payload.title || text;
   } catch {
     return text;
   }
 }
 
-async function fetchWithTimeout(
-  path: string,
-  init: RequestInit | undefined,
-  timeoutMs: number,
-) {
+async function fetchWithTimeout(path: string, init: RequestInit | undefined, timeoutMs: number) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
-
   try {
     return await fetch(`${API_BASE_URL}${path.startsWith('/') ? path : `/${path}`}`, {
       ...init,
-      headers: {
-        Accept: 'application/json',
-        ...init?.headers,
-      },
+      headers: { Accept: 'application/json', ...init?.headers },
       signal: controller.signal,
     });
   } finally {
@@ -82,67 +54,31 @@ async function fetchWithTimeout(
   }
 }
 
-export async function apiRequest<T>(
-  path: string,
-  init?: RequestInit,
-  timeoutMs = 15000,
-): Promise<T> {
+export async function apiRequest<T>(path: string, init?: RequestInit, timeoutMs = 15000): Promise<T> {
   try {
     let response = await fetchWithTimeout(path, init, timeoutMs);
-
     const requestHeaders = new Headers(init?.headers);
     const authorization = requestHeaders.get('Authorization');
 
-    if (
-      response.status === 401 &&
-      authorization?.toLowerCase().startsWith('bearer ') &&
-      unauthorizedHandler
-    ) {
+    if (response.status === 401 && authorization?.toLowerCase().startsWith('bearer ') && unauthorizedHandler) {
       const refreshedToken = await unauthorizedHandler();
-
       if (refreshedToken) {
         requestHeaders.set('Authorization', `Bearer ${refreshedToken}`);
-        response = await fetchWithTimeout(
-          path,
-          {
-            ...init,
-            headers: requestHeaders,
-          },
-          timeoutMs,
-        );
+        response = await fetchWithTimeout(path, { ...init, headers: requestHeaders }, timeoutMs);
       }
     }
 
     if (!response.ok) {
-      if (response.status === 401 && authorization) {
-        throw new Error('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
-      }
+      if (response.status === 401 && authorization) throw new Error('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
       throw new Error(await getErrorMessage(response));
     }
-
     if (response.status === 204) return undefined as T;
     return (await response.json()) as T;
   } catch (error) {
     const message = error instanceof Error ? error.message.toLowerCase() : '';
-    const wasCanceled =
-      (error instanceof Error && error.name === 'AbortError') ||
-      message.includes('canceled') ||
-      message.includes('cancelled');
-
-    if (wasCanceled) {
-      throw new Error(
-        `Kết nối tới ${API_BASE_URL} bị hủy hoặc quá thời gian. ` +
-          'Hãy kiểm tra API.Customer đang chạy cổng 5265, Windows Firewall và điện thoại có thể truy cập IP LAN của máy tính.',
-      );
-    }
-
-    if (error instanceof TypeError) {
-      throw new Error(
-        `Không thể kết nối tới ${API_BASE_URL}. ` +
-          'Nếu dùng điện thoại thật, hãy đảm bảo máy tính và điện thoại cùng mạng LAN/Wi-Fi và cho phép TCP 5265 qua firewall.',
-      );
-    }
-
+    const wasCanceled = (error instanceof Error && error.name === 'AbortError') || message.includes('canceled') || message.includes('cancelled');
+    if (wasCanceled) throw new Error(`Kết nối tới ${API_BASE_URL} bị hủy hoặc quá thời gian. Kiểm tra Node API cổng 5300.`);
+    if (error instanceof TypeError) throw new Error(`Không thể kết nối tới ${API_BASE_URL}. Nếu dùng điện thoại thật, kiểm tra LAN/Wi-Fi, firewall hoặc ADB reverse cổng 5300.`);
     throw error;
   }
 }

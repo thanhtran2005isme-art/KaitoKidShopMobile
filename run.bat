@@ -1,68 +1,37 @@
 @echo off
 setlocal EnableExtensions
 chcp 65001 >nul
-
-title KaitoKidShop - Launcher
+title KaitoKidShop - Node API + Mobile
 
 set "ROOT=%~dp0"
-set "BACKEND=%ROOT%backend"
+set "API=%ROOT%apps\api"
 set "MOBILE=%ROOT%apps\mobile"
 
-echo ================================================
-echo KaitoKidShop - Mobile + Backend
-echo Root: %ROOT%
-echo ================================================
-echo.
-
-if not exist "%BACKEND%\API.Auth\API.Auth.csproj" (
-    echo [LOI] Khong tim thay backend\API.Auth
-    pause
-    exit /b 1
+if not exist "%API%\package.json" (
+  echo [LOI] Khong tim thay apps\api\package.json
+  pause
+  exit /b 1
 )
-
-if not exist "%BACKEND%\API.Customer\API.Customer.csproj" (
-    echo [LOI] Khong tim thay backend\API.Customer
-    pause
-    exit /b 1
+if not exist "%API%\.env" (
+  echo [LOI] Thieu apps\api\.env. Tao tu .env.example va dien DATABASE_URL/JWT_KEY.
+  pause
+  exit /b 1
 )
-
 if not exist "%MOBILE%\package.json" (
-    echo [LOI] Khong tim thay apps\mobile\package.json
-    pause
-    exit /b 1
+  echo [LOI] Khong tim thay apps\mobile\package.json
+  pause
+  exit /b 1
 )
 
-call "%ROOT%scripts\load-db-local.bat"
-if errorlevel 2 (
-    echo [DB] Hay luu password trong file vua mo, sau do chay lai run.bat.
-    timeout /t 2 /nobreak >nul
-    exit /b 1
-)
-if errorlevel 1 (
-    echo [LOI] Khong nap duoc cau hinh MariaDB local.
-    pause
-    exit /b 1
-)
+set "KAITOKID_BACKEND_MODE=node"
+set "EXPO_PUBLIC_BACKEND_MODE=node"
 
-echo [DB] Local MariaDB configuration loaded.
-echo.
-
-echo [1/3] Starting API.Auth on port 5053...
-start "KaitoKid - API.Auth" cmd /k "cd /d ""%BACKEND%\API.Auth"" && dotnet run --urls http://0.0.0.0:5053"
-
+echo [1/2] Starting Node API on port 5300...
+start "KaitoKid - Node API" cmd /k call "%ROOT%scripts\run-node-api.bat"
 timeout /t 2 /nobreak >nul
 
-echo [2/3] Starting API.Customer on port 5265...
-start "KaitoKid - API.Customer" cmd /k "cd /d ""%BACKEND%\API.Customer"" && dotnet run --urls http://0.0.0.0:5265"
+echo [2/2] Starting Expo Mobile...
+start "KaitoKid - Expo Mobile" cmd /k call "%ROOT%scripts\run-mobile.bat"
 
-timeout /t 2 /nobreak >nul
-
-echo [3/3] Starting Expo Mobile...
-start "KaitoKid - Expo Mobile" "%ROOT%scripts\run-mobile.bat"
-
-echo.
-echo Da mo 3 cua so: API.Auth, API.Customer, Expo Mobile.
-echo Neu Expo loi, cua so Expo se GIU NGUYEN de xem log.
-timeout /t 2 /nobreak >nul
-
+echo Da mo Node API + Expo Mobile.
 endlocal

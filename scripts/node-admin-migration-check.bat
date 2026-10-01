@@ -3,12 +3,16 @@ setlocal
 cd /d "%~dp0..\apps\api"
 
 echo ============================================================
-echo  KaitoKid Node migration - Phase 10 API.Admin gate
+echo  KaitoKid Node backend - source/build/DB/contract gate
 echo ============================================================
 
-call npm install
+call npm install --package-lock=false
 if errorlevel 1 exit /b 1
 call npm run build
+if errorlevel 1 exit /b 1
+call node dist/scripts/ensure-rbac-permissions.js
+if errorlevel 1 exit /b 1
+call node dist/scripts/ensure-inventory-history-schema.js
 if errorlevel 1 exit /b 1
 call npm run db:audit
 if errorlevel 1 exit /b 1
@@ -28,12 +32,11 @@ call npm run test:admin-migration
 if errorlevel 1 exit /b 1
 
 cd /d "..\web"
-call npm install
+call npm install --package-lock=false
 if errorlevel 1 exit /b 1
 call npm run build
 if errorlevel 1 exit /b 1
 
-echo.
-echo [PASS] Phase 10 API.Admin source/build/DB-audit/contract gate passed.
-echo [IMPORTANT] Day CHUA phai final C# retirement gate.
-echo [NEXT] Chay runtime parity Admin tren MariaDB va Phase 11 final cutover truoc khi xoa backend C#.
+echo [PASS] Node backend source/build/DB-audit/RBAC/contracts + Web build passed.
+endlocal
+exit /b 0

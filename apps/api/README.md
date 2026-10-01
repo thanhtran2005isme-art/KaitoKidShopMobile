@@ -1,32 +1,52 @@
 # KaitoKid Node API
 
-Backend Node.js/NestJS mới được dựng **song song** với backend ASP.NET Core để chuyển từng module mà không làm mất dữ liệu hiện có.
+`apps/api` là backend runtime duy nhất của KaitoKidShop sau khi retire ASP.NET Core C#.
 
-## Nguyên tắc dữ liệu
+## Runtime
 
-- MariaDB `kaitokid` hiện tại là source of truth.
-- Không tạo database mới để "copy dữ liệu".
-- Không chạy `prisma migrate reset`, `prisma migrate dev` hoặc `prisma db push` trên database đang chứa dữ liệu C#.
-- Dùng `prisma db pull` để introspect schema hiện tại.
-- Chỉ bỏ C# sau khi API contract + business rule của module Node đã parity pass.
+- NestJS 11 + TypeScript
+- Prisma 7 + `@prisma/adapter-mariadb`
+- MariaDB `kaitokid`
+- REST/Auth/Admin/Customer/media trên cùng origin
+- Socket.IO path `/chatHub`
+- Port mặc định `5300`
 
-## Chuẩn bị
+## Chuẩn bị local
 
 ```bat
 cd apps\api
 copy .env.example .env
 npm install
-npm run db:introspect
 npm run db:audit
 ```
 
-Nếu `compatible: true` thì schema cũ đạt contract 52 bảng. Nếu có `missingTables` thì dừng migration và xử lý DB trước.
+Điền `DATABASE_URL`, `JWT_KEY` và các secret tích hợp cần thiết trong `.env`. Không commit `.env`.
 
-## Chạy song song
+## Database safety
+
+- Fresh schema: `database/KaitoKid_MariaDB.sql`.
+- Existing DB migrations: `database/migrations/`.
+- Không chạy `prisma migrate reset`, `prisma migrate dev` hoặc `prisma db push` trên database đang có dữ liệu.
+- Khi cần introspection: `npm run db:introspect`.
+
+## Chạy
 
 ```bat
 npm run start:dev
 ```
 
-Node mặc định chạy `http://localhost:5300`, tách khỏi C# :5053/:5265/:5089/:5155.
-Trong phase nền này Web/Mobile vẫn gọi C#; chưa cutover traffic.
+Hoặc từ root:
+
+```bat
+scripts\run-backend.bat
+```
+
+## Gate
+
+```bat
+scripts\node-final-cutover-check.bat
+scripts\node-final-runtime-smoke.bat
+scripts\node-protected-runtime-parity.bat
+scripts\node-concurrency-race-gate.bat
+scripts\node-realtime-runtime-gate.bat
+```

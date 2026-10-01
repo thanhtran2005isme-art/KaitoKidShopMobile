@@ -6,137 +6,99 @@ KaitoKidShop is a full-stack monorepo.
 
 Before making non-trivial changes, read:
 
-1. `AGENTS.md` (this file)
-2. `docs/AI_HANDOFF.md` — current project state
-3. `docs/BRAND.md` — KaitoKid brand/data rules
-4. `docs/UI_UX.md` + `skill/.codex/skills/ui-ux-pro-max/SKILL.md` — required for UI/UX work
-5. `docs/ROADMAP.md` — current implementation phase
-6. `docs/PHASES_5_10.md` — detailed implementation spec for remaining PHASE 5–10
-7. `docs/ARCHITECTURE.md` — stable system architecture
-8. The task-relevant sections of `docs/DECISIONS.md` and `docs/TROUBLESHOOTING.md`
-9. Relevant source files and recent Git history for the area being changed
+1. `AGENTS.md`
+2. `docs/AI_HANDOFF.md`
+3. `docs/BRAND.md`
+4. `docs/UI_UX.md` + `skill/.codex/skills/ui-ux-pro-max/SKILL.md` for UI/UX work
+5. `docs/ROADMAP.md`
+6. `docs/PHASES_5_10.md` when relevant
+7. `docs/ARCHITECTURE.md`
+8. Relevant sections of `docs/DECISIONS.md`, `docs/decisions/`, and `docs/TROUBLESHOOTING.md`
+9. Relevant source files and recent Git history
 
-Do not assume an old chat transcript is the source of truth. Git and the repository documentation are the durable project memory.
+Git and repository documentation are the durable source of truth. Do not reconstruct current architecture from old chat memory.
 
-## Repository layout
+## Current repository layout
 
+- Backend: `apps/api` — NestJS 11 + TypeScript + Prisma 7, single backend origin on port `5300`.
 - Mobile: `apps/mobile` — Expo SDK 57 + React Native.
-- Web: `apps/web` — React + TypeScript + Vite.
-- Backend: `backend` — ASP.NET Core services.
-- Development launchers: `scripts`.
-- Root launcher: `run.bat` starts API.Auth + API.Customer + Expo Mobile.
-- Project documentation: `docs`.
+- Web/Admin: `apps/web` — React + TypeScript + Vite.
+- Database assets: `database` — MariaDB fresh schema and SQL migrations.
+- Development/runtime scripts: `scripts`.
+- Root launcher: `run.bat` starts Node API + Expo Mobile.
+- Documentation: `docs`.
 
-Before changing Expo APIs, check the Expo SDK 57 documentation.
+The legacy ASP.NET Core `backend/` tree is retired. Do not reintroduce runtime fallbacks to ports `5053`, `5265`, `5089`, or `5155`.
+
+## Backend invariants
+
+- MariaDB `kaitokid` remains the data source of truth.
+- REST, Auth, Admin, Customer, media and Socket.IO are served by `apps/api`.
+- Realtime path is `/chatHub` on the same Node origin.
+- Background workers are owned by Node. Critical workers remain individually feature-flagged.
+- Do not run `prisma migrate reset`, `prisma migrate dev` or `prisma db push` on an existing data-bearing database.
+- Use `prisma db pull` / `npm run db:introspect` for introspection.
+- Real secrets belong only in `apps/api/.env` or deployment secret storage; never commit them.
 
 ## Mandatory UI/UX workflow
 
-Khi một task/PHASE có **sửa, thêm hoặc thiết kế giao diện**, AI/coding agent phải dùng skill UI của chính repository trước khi viết UI:
+For any UI/UX change:
 
-`skill/.codex/skills/ui-ux-pro-max/SKILL.md`
-
-Quy trình bắt buộc:
-
-1. đọc `SKILL.md`;
-2. generate/search **design system trước** theo hướng dẫn của skill;
-3. đọc guideline stack phù hợp — Mobile dùng `react-native`;
-4. giữ `docs/BRAND.md` và `apps/mobile/src/constants/brand.ts` làm source of truth cho thương hiệu/token hiện có;
-5. mới bắt đầu sửa component/screen;
-6. static-review lại accessibility, touch target, keyboard/form, loading/error/empty state và responsive behavior trước khi commit.
-
-Không bỏ qua `.codex` rồi tự thiết kế UI theo cảm tính. Nếu script của skill không chạy được trong môi trường công cụ, phải đọc dữ liệu/script của skill và áp dụng cùng logic/guideline, đồng thời ghi rõ giới hạn validation.
+1. read `docs/UI_UX.md`;
+2. read `skill/.codex/skills/ui-ux-pro-max/SKILL.md`;
+3. generate/search the design system first;
+4. use the stack guideline appropriate to the surface (`react-native` for Mobile);
+5. preserve brand/data rules from `docs/BRAND.md` and existing tokens;
+6. review accessibility, touch targets, keyboard/form behavior, loading/error/empty states and responsive behavior before commit.
 
 ## Workflow
 
 For meaningful changes:
 
 1. Start from current `main`.
-2. Create a focused branch.
-3. Change only the required files.
-4. Validate the relevant code/configuration.
-5. Commit changes with a Vietnamese commit message.
+2. Create a focused short-lived branch.
+3. Change only required files.
+4. Validate relevant build/tests/runtime gates.
+5. Commit with a Vietnamese description.
 6. Open a PR and merge only when clean.
-7. Update documentation when the project state, architecture, operational procedure, or a durable decision changes.
+7. Update docs when architecture, operations or durable decisions change.
 
-### Số lượng commit cho mỗi task/fix/phase
+### Commit granularity
 
-Mặc định **một yêu cầu sửa, một task hoặc một PHASE = một commit duy nhất**.
+Default: **one task/fix/PHASE = one aggregate commit**.
 
-Quy tắc:
+- Do not commit file-by-file or step-by-step.
+- Batch all changes for the same task, validate, then commit once.
+- Prefer squash merge so `main` receives one meaningful commit.
+- Split only when work items are truly independent and need separate rollback/review.
 
-- Không commit riêng từng file.
-- Không commit từng bước trung gian trong lúc đang triển khai.
-- Gom toàn bộ thay đổi thuộc cùng một task/fix/PHASE, kiểm tra xong rồi mới tạo **một commit tổng hợp**.
-- Nếu một task sửa nhiều file, phải dùng cơ chế batch commit (ví dụ Git tree/commit hoặc tương đương) thay vì API cập nhật file nào commit file đó.
-- Khi merge PR, ưu tiên **squash merge** để `main` chỉ nhận một commit cho task/PHASE đó.
-- Chỉ tách nhiều commit khi thay đổi thực sự là nhiều công việc độc lập, cần rollback riêng, hoặc người dùng yêu cầu rõ ràng.
-- Không gom các task không liên quan vào cùng một commit.
+### Commit language
 
-Ví dụ đúng:
-
-- PHASE 5 sửa 12 file → 1 commit: `feat: hoàn thành phase 5 giỏ hàng mobile`
-- Một lần fix lỗi ảnh 404 sửa 4 file → 1 commit: `fix: sửa toàn bộ đường dẫn ảnh sản phẩm bị 404`
-
-Ví dụ không nên làm:
-
-- `feat: sửa file cart.tsx`
-- `fix: sửa service cart`
-- `docs: cập nhật roadmap`
-- `docs: cập nhật handoff`
-
-nếu tất cả các thay đổi trên cùng thuộc một PHASE/task duy nhất.
-
-### Ngôn ngữ commit
-
-Tất cả commit do AI/GPT tạo cho repository này phải viết bằng **tiếng Việt**.
-
-Có thể giữ tiền tố Conventional Commits bằng tiếng Anh như `feat:`, `fix:`, `docs:`, `chore:`, `refactor:`, nhưng phần mô tả sau tiền tố phải là tiếng Việt, rõ ràng và nói đúng nội dung thay đổi.
-
-Ví dụ:
-
-- `feat: hoàn thiện giỏ hàng trên mobile`
-- `fix: sửa đường dẫn ảnh sản phẩm bị 404`
-- `docs: cập nhật trạng thái dự án cho phiên làm việc mới`
-
-Không dùng commit message chung chung như `update`, `fix stuff`, `changes` hoặc mô tả hoàn toàn bằng tiếng Anh, trừ khi người dùng yêu cầu khác một cách rõ ràng.
-
-Do not use long-lived branches as project memory. Branches are for work in progress; merged history belongs in Git.
+AI/GPT-created commits must use Vietnamese descriptions. Conventional prefixes such as `feat:`, `fix:`, `docs:`, `chore:` are allowed.
 
 ## Documentation maintenance
 
-- Keep `docs/AI_HANDOFF.md` concise and focused on the current state.
-- Put stable system structure in `docs/ARCHITECTURE.md`.
-- Keep brand positioning and catalog rules in `docs/BRAND.md`.
-- Keep durable UI/UX rules and the Codex skill workflow in `docs/UI_UX.md`.
-- Keep phase status and next work in `docs/ROADMAP.md`.
-- Keep detailed remaining PHASE 5–10 implementation scope/checklists in `docs/PHASES_5_10.md`.
-- Record important technical choices in `docs/DECISIONS.md`.
-- Record repeatable fixes in `docs/TROUBLESHOOTING.md`.
-- Move older chronological detail to `docs/history/YYYY-MM.md`.
-- Do not duplicate complete commit diffs in Markdown; reference PR numbers or commit SHAs instead.
+- `docs/AI_HANDOFF.md`: concise current state.
+- `docs/ARCHITECTURE.md`: stable current architecture.
+- `docs/BRAND.md`: brand/catalog rules.
+- `docs/UI_UX.md`: durable UI/UX rules.
+- `docs/ROADMAP.md`: phase status/next work.
+- `docs/DECISIONS.md` and `docs/decisions/`: durable technical decisions.
+- `docs/TROUBLESHOOTING.md`: repeatable operational fixes.
+- `docs/history/`: old chronology.
 
 ## Security
 
-Never commit passwords, tokens, API keys, or machine-specific secrets.
+Never commit passwords, private tokens, API keys, OAuth client secrets, email credentials or machine-specific secrets.
 
-MariaDB local credentials belong in:
+Local backend configuration belongs in:
 
-`backend/db.local.bat`
+```text
+apps/api/.env
+```
 
-That file is gitignored. The committed template is:
+The committed template is:
 
-`backend/db.local.example.bat`
-
-## Repository conventions
-
-Keep app-specific configuration inside its app directory. Do not place mobile or web source trees back at repository root.
-
-Preserve the monorepo top-level structure:
-
-- `apps/mobile`
-- `apps/web`
-- `backend`
-- `scripts`
-- `docs`
-
-When a path changes, update launchers and documentation together.
+```text
+apps/api/.env.example
+```

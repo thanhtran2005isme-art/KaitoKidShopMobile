@@ -2,245 +2,134 @@
 
 ## Overview
 
-KaitoKidShop is a full-stack monorepo with separate mobile and web clients backed by ASP.NET Core services and a shared MariaDB database.
+KaitoKidShop là full-stack monorepo với **một backend NestJS Node** phục vụ Mobile, Web/Admin và MariaDB.
 
 ```text
-                 ┌─────────────────┐
-                 │  apps/mobile    │
-                 │ Expo / RN       │
-                 └────────┬────────┘
-                          │
-                 Auth :5053 / Customer :5265
-                          │
-                 ┌────────▼────────┐
-                 │ ASP.NET Core    │
-                 │ backend APIs    │
-                 └────────┬────────┘
-                          │ Pomelo / EF Core
-                 ┌────────▼────────┐
-                 │ MariaDB 10.4.32 │
-                 │ kaitokid        │
-                 └─────────────────┘
-
-                 ┌─────────────────┐
-                 │   apps/web      │
-                 │ React + Vite    │
-                 └────────┬────────┘
-                          │
-                       APIs
+ apps/mobile (Expo/RN) ─┐
+                        ├── HTTP :5300 ── apps/api (NestJS)
+ apps/web (React/Vite) ─┘                  ├─ REST/Auth/Admin/Customer
+                                           ├─ Socket.IO /chatHub
+                                           ├─ static/media
+                                           └─ background workers
+                                                      │
+                                                      ▼
+                                             MariaDB kaitokid
 ```
+
+Legacy ASP.NET Core services đã retire. Không có gateway/service C# song song và không có fallback runtime về `5053`, `5265`, `5089`, `5155`.
 
 ## Top-level layout
 
-### `apps/mobile`
+```text
+apps/api       NestJS + Prisma backend
+apps/mobile    Expo + React Native
+apps/web       React + TypeScript + Vite; customer + admin surfaces
+database       MariaDB fresh schema + migrations
+scripts        Windows launchers/runtime gates
+docs           durable project context
+```
 
-Expo/React Native application.
+## Backend
 
-Important paths:
+`apps/api` chạy mặc định ở port `5300` và chứa các module Auth, Staff/RBAC, catalog, cart/reservation, checkout/order, coupon, payment, shipping, account, addresses, wishlist, reviews, notifications, referral, search/recommendation, chat/realtime, admin/CMS/inventory/stock receipts và media/static.
 
-- `src/app` — Expo Router screens/routes
-- `src/services/api-client.ts` — API.Customer HTTP client
-- `src/services/auth.service.ts` — API.Auth client
-- `src/services/orders.api.ts` — Orders/Tracking/Cancel/Reorder client
-- `src/app/orders` — order list/detail/tracking routes
-- `app.config.js` — runtime Expo configuration and LAN API auto-detection
-- `package.json` — mobile dependencies/scripts
+Realtime dùng Socket.IO trên cùng origin với path:
 
-API.Customer URL resolution:
+```text
+/chatHub
+```
 
-1. `EXPO_PUBLIC_API_URL`, when explicitly set
-2. Android emulator fallback when applicable
-3. Expo runtime `extra.apiUrl`, normally populated by LAN auto-detection
-4. platform fallback
+Node là owner duy nhất của background workers. Các worker quan trọng vẫn có feature flag riêng:
 
-API.Auth currently reads `EXPO_PUBLIC_AUTH_API_URL`, with localhost fallback.
-
-For USB-connected Android development, `scripts/run-mobile.bat` attempts ADB reverse for ports 8081, 5053 and 5265.
-
-### `apps/web`
-
-Independent React + TypeScript + Vite client.
-
-This is not the same thing as Expo Web. A browser on port 8081 is rendering the mobile Expo application; the Vite application normally runs separately.
-
-### `backend`
-
-ASP.NET Core backend.
-
-Services:
-
-- `API.Auth` — authentication service, port 5053
-- `API.Customer` — customer/shop API, port 5265
-- `API.Admin` — admin API, port 5089
-- `API.Gateway` — API gateway, port 5155
-- `API.Customer.Tests` — tests
-- `DbHelper` — shared database registration/interceptors
-- `Shared` — shared backend functionality
-- `Database` — schema/migration/bootstrap assets
-
-Solution file:
-
-`backend/KaitoKidShop.slnx`
+- `CART_SWEEPER_ENABLED`
+- `PAYMENT_SWEEPER_ENABLED`
+- `CHAT_IDLE_SWEEPER_ENABLED`
+- `SHIPPING_SIMULATOR_ENABLED`
+- `IMAGE_INDEXER_ENABLED`
 
 ## Persistence
 
-Current runtime database is MariaDB/MySQL-compatible.
+Runtime database là MariaDB/MySQL-compatible, database `kaitokid`.
 
-`DbHelper/DbExtensions.cs` registers DbContexts using:
-
-- Pomelo
-- `UseMySql`
-- `MariaDbServerVersion(10.4.32)`
-
-The consolidated MariaDB schema is:
-
-`backend/Database/KaitoKid_MariaDB.sql`
-
-Legacy SQL Server/T-SQL files and old EF migrations remain for history. They are not the source for a fresh MariaDB setup.
-
-## Local secret flow
-
-Committed code must not contain real database passwords.
+Fresh schema source:
 
 ```text
-backend/db.local.example.bat
-            │ copy on first run
-            ▼
-backend/db.local.bat       (gitignored)
-            │
-            ▼
-scripts/load-db-local.bat
-            │
-            ▼
-ConnectionStrings__DefaultConnection
-            │ inherited by child processes
-            ▼
-ASP.NET Core APIs
+database/KaitoKid_MariaDB.sql
 ```
+
+Migrations cho database tồn tại:
+
+```text
+database/migrations/
+```
+
+Prisma được dùng để kết nối/introspect nhưng migration retirement không dùng Prisma Migrate để rewrite database hiện hữu. Trên DB có dữ liệu, không chạy `prisma migrate reset`, `prisma migrate dev` hoặc `prisma db push`.
+
+## Client backend resolution
+
+### Web
+
+Web dùng một backend origin duy nhất:
+
+1. `VITE_NODE_API_URL`
+2. `VITE_API_BASE_URL`
+3. fallback `http://localhost:5300`
+
+Customer/Auth/Admin đều đi qua origin này.
+
+### Mobile
+
+Mobile dùng một Node API origin cho cả Auth và Customer:
+
+1. `EXPO_PUBLIC_NODE_API_URL`
+2. `EXPO_PUBLIC_API_URL`
+3. LAN auto-detect `http://<LAN-IP>:5300`
+4. Android emulator `http://10.0.2.2:5300`
+5. localhost fallback trên iOS/Web
+
+USB launcher reverse `8081` và `5300` khi có đúng một thiết bị ADB authorized.
+
+## Media
+
+Node phục vụ upload/public assets và mount shared `apps/web/public`. Fallback `/products/*` và `/lookbook/*` vẫn giữ để dữ liệu legacy không tạo 404.
+
+## Source-of-truth business boundaries
+
+- Pricing, coupon, combo, shipping fee, payment method và order totals: backend authoritative.
+- Cart reservation: product + exact variant khi có.
+- Partial checkout: chỉ selected `CartItemIds`; unselected cart items giữ reservation.
+- Order tracking/cancel/reorder: owner-only và server-authoritative.
+- Review: exact completed order + purchased variant.
+- Delete account: release cart reservation trước khi xóa/anonymize dữ liệu.
+- Registration: `PendingRegistration` -> verify email -> `NguoiDung`.
+- Google/social: backend validates provider credential before issuing KaitoKid JWT.
+- Admin/RBAC: JWT + staff permission guards.
+- Payment/order/inventory terminal transitions phải giữ idempotency/concurrency invariants đã được runtime race gate kiểm tra.
 
 ## Development launch flow
 
-Root `run.bat` is optimized for mobile development:
+`run.bat`:
 
 ```text
-run.bat
-  ├─ load local MariaDB configuration
-  ├─ API.Auth :5053
-  ├─ API.Customer :5265
-  └─ Expo Mobile :8081
+Node API :5300
+Expo Mobile :8081
 ```
 
-`scripts/run-backend.bat` starts all four backend services.
+`scripts/run-all.bat`:
 
-`scripts/run-all.bat` is the broader full-stack launcher.
+```text
+Node API :5300
+Web/Vite :5173 (typical)
+Expo Mobile :8081
+```
+
+`scripts/run-backend.bat` là compatibility alias cho Node API launcher.
 
 ## Source-of-truth rules
 
 - Current code/configuration: Git `main`
 - Current operational state: `docs/AI_HANDOFF.md`
 - Stable architecture: this file
-- Technical rationale: `docs/DECISIONS.md`
-- Durable UI/UX rules: `docs/UI_UX.md`
+- Durable decisions: `docs/DECISIONS.md` + `docs/decisions/`
 - Repeatable fixes: `docs/TROUBLESHOOTING.md`
-- Older chronology: `docs/history/`
-
-
-## Mobile state layering
-
-Protected shopping/checkout state is layered under auth:
-
-```text
-AuthProvider
-  └─ NotificationsProvider
-       └─ ShoppingProvider
-            └─ CheckoutProvider
-                 └─ Expo Router screens
-```
-
-- `NotificationsContext` owns only global unread-notification count/badge state.
-- `ShoppingContext` owns wishlist/cart data and prepared checkout cart-item IDs.
-- `CheckoutContext` owns checkout-scoped address, shipping option, coupon/combo, payment method, note and pending order.
-- Full checkout state is not serialized into route query parameters. Order code may be used as a navigation identifier for payment/success recovery.
-
-## Checkout source-of-truth boundary
-
-For order creation, API.Customer is authoritative for:
-
-- cart item ownership;
-- product prices and selected subtotal;
-- coupon validity;
-- combo discount;
-- stock/reservation;
-- shipping quote;
-- enabled payment methods.
-
-`CreateOrderDTO.CartItemIds` enables partial checkout. Selected items are converted into the order and removed from Cart; unselected items remain reserved in Cart.
-
-Payment account/QR data comes from `CauHinhCuaHang`. Mobile does not embed bank credentials or a VietQR gateway URL.
-
-
-## Orders/Tracking security boundary
-
-PHASE 7 keeps order history private to the authenticated customer:
-
-- `GET /api/orders` and `GET /api/orders/{id}` filter by JWT user ID;
-- `PUT /api/orders/{id}/cancel` checks ownership and server-side cancellation rules;
-- `GET /api/shipping/track/{orderCode}` requires authorization and filters by both order code + JWT user ID;
-- `POST /api/cart/reorder/{orderId}` checks order ownership before adding any item;
-- `OrderDTO.CanCancel` is computed by API.Customer; Mobile does not duplicate cancellation eligibility rules.
-
-Mobile order pages keep data screen-local rather than adding a global Orders context. Reorder refreshes `ShoppingContext` because Cart/badge is global shopping state.
-
-
-## Reviews/Notifications/Account boundary
-
-PHASE 8 keeps post-purchase/account rules server-authoritative:
-
-- Review create requires an authenticated user, an owned `completed` order, the requested product and a purchased size/color variant from that exact order.
-- `OrderDTO.HasReviewed` is variant-aware (`order + product + size + color`) while preserving wildcard compatibility for legacy reviews without variant metadata.
-- Newly submitted reviews remain `pending`; Product Detail continues to expose only approved reviews, while Order Detail treats the submitted variant as already reviewed.
-- Review/avatar media is selected with Expo Image Picker and uploaded as multipart to API.Customer; upload requests use a longer 45-second timeout without changing normal API timeouts.
-- Notification read/delete endpoints remain owner-scoped. Mobile uses backend `link` only when it is an explicit internal path.
-- Account delete must call `CartService.ClearCartAsync` before removing Cart rows so product/variant reservations are released. Notifications, wishlist and addresses are removed; review display names are anonymized; order history remains per the existing backend retention contract.
-- Profile, points and vouchers are screen-local data. Only unread notification count is global because the Account tab badge needs cross-screen state.
-
-
-## Collections/Lookbook/Recommendation boundary
-
-PHASE 9 giữ discovery data ở API.Customer và không tạo global context mới:
-
-- Collection metadata vẫn do `/api/collections` quản lý; sản phẩm của Collection được query server-side qua `GET /api/products?CollectionId=...`, dùng chung paging/sort/ProductDTO.
-- Lookbook hotspot lưu `ToaDoX/ToaDoY` theo phần trăm `0..100`. Mobile chuyển phần trăm sang pixel dựa trên kích thước image stage thực tế và clamp touch target trong ảnh; không lưu pixel thiết bị.
-- `GET /api/recommendations/for-me` là endpoint optional-auth. Khi JWT có user signal, backend dùng category từ Wishlist + completed Orders; nếu không có signal thì trả fallback best seller/new/general active.
-- Recommendation response ghi rõ `IsPersonalized`; client không tự suy hoặc quảng bá guest fallback là cá nhân hóa.
-- Completed-purchase product IDs được loại khỏi candidate personalized trong implementation hiện tại.
-- Home tải Collections/Lookbooks/Recommendation theo cùng chiến lược resilient của dữ liệu Home khác: một endpoint discovery lỗi không được làm trắng toàn bộ Home.
-- Collection/Lookbook screens giữ state local; wishlist/cart tiếp tục dùng `ShoppingContext`.
-
-Seed Lookbook cho local development được bổ sung bằng migration idempotent:
-
-`backend/Database/migrations/20260924_phase9_discovery_seed.sql`
-
-Migration chỉ cập nhật metadata/hotspot seed, không tạo bảng mới.
-
-
-## Local registration / email-verification trust boundary
-
-Đăng ký email/password không tạo `NguoiDung` ngay khi client submit form.
-
-```text
-Mobile/Web register
-  -> POST /api/Auth/register
-  -> PendingRegistration
-       - BCrypt password hash
-       - SHA-256 verification-token hash
-       - expires
-  -> email verification link
-  -> GET /api/Auth/verify-email?token=...
-  -> validate one-time token + expiry
-  -> create NguoiDung (EmailDaXacThuc = 1)
-  -> delete PendingRegistration
-  -> user can login
-```
-
-Client không nhận JWT/refresh token từ register và không được coi request đăng ký là một session. Google/social login giữ flow riêng vì API.Auth đã xác minh credential và email-verified với provider trước khi upsert user.
+- Older chronology/migration docs: `docs/history/` và các `NODE_*` migration runbook lịch sử

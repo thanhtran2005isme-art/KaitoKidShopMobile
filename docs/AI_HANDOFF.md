@@ -2,219 +2,132 @@
 
 Last updated: 2026-10-01
 
-This file is intentionally concise. It describes the current state needed to continue work quickly. Historical detail belongs in `docs/history/`, and exact code history belongs in Git.
-
 ## Repository
 
 - GitHub: `thanhtran2005isme-art/KaitoKidShopMobile`
-- Local repo path (máy Windows hiện tại): `C:\Users\Admin\Videos\KaitoKidShop`
 - Default branch: `main`
-- Project name used in docs/UI: KaitoKidShop
-- Brand: **KaitoKid Shop Fashion = thời trang + phụ kiện cho Nam/Nữ/Trẻ em, nhiều lứa tuổi; D020 supersede D009 kids-only**
-- Brand rules: `docs/BRAND.md`
-- UI/UX durable rules: `docs/UI_UX.md`; source skill: `skill/.codex/skills/ui-ux-pro-max/SKILL.md`
-- Current roadmap: PHASE 1–9 hoàn tất ở mức code; PHASE 10 đang triển khai và chỉ hoàn tất sau runtime test matrix
-- PHASE 5–10 đã có acceptance criteria, API dependencies, UI/state scope và ranh giới chi tiết trong `docs/PHASES_5_10.md`.
-- Roadmap source: `docs/ROADMAP.md`
-- Detailed remaining PHASE 5–10 spec: `docs/PHASES_5_10.md`
-- PHASE 10 static/build gate: `npm run phase10:check` hoặc `scripts\phase10-check.bat`; vẫn cần manual Android/Expo Web E2E trước khi đánh dấu hoàn tất.
-- PHASE 10 đã bắt đầu đồng bộ Mobile với D020: copy kids-only ở Home/common states được loại bỏ và icon Unicode/emoji chính được thay bằng `expo-symbols` cross-platform.
-- Structure: full-stack monorepo
-- Git convention: mọi commit do AI/GPT tạo phải có phần mô tả bằng **tiếng Việt**; có thể giữ tiền tố Conventional Commits như `feat:`, `fix:`, `docs:`.
-- Commit granularity: mặc định **một task/fix/PHASE = một commit duy nhất**; không commit từng file/từng bước. Với PR, ưu tiên squash merge để `main` chỉ có một commit cho công việc đó.
-- UI workflow: mọi thay đổi giao diện phải đọc `docs/UI_UX.md` + `skill/.codex/skills/ui-ux-pro-max/SKILL.md`, generate design system trước và dùng guideline `react-native` cho Mobile.
+- Project: KaitoKidShop
+- Brand: KaitoKid Shop Fashion — Nam/Nữ/Trẻ em/nhiều lứa tuổi theo D020
+- Commit Node migration đã merge vào `main`: `2cad95ed5c9f959dffa206260b3325950a6e2dee`
+- Runtime/source migration C# -> NestJS đã được project owner xác nhận PASS cho source/build, protected Auth/RBAC, commerce/admin race, payment terminal race, Socket.IO realtime, Web/Mobile/Admin smoke, soak và rollback trước khi merge PR #40.
 
 ## Current structure
 
 ```text
 KaitoKidShop/
 ├─ apps/
+│  ├─ api/          NestJS 11 + Prisma 7
 │  ├─ mobile/       Expo + React Native
-│  ├─ web/          React + TypeScript + Vite
-│  └─ api/          NestJS + Prisma (Node migration, chưa cutover)
-├─ backend/         ASP.NET Core services + database assets
-├─ scripts/         Windows development launchers
-├─ docs/            durable project/AI context
-├─ run.bat          API.Auth + API.Customer + Expo Mobile
+│  └─ web/          React + TypeScript + Vite
+├─ database/        MariaDB schema + migrations
+├─ scripts/
+├─ docs/
+├─ run.bat
 ├─ AGENTS.md
 └─ README.md
 ```
 
-## Development stack
+Legacy ASP.NET Core `backend/` đã retire trong retirement change. SQL/schema assets được giữ nguyên và chuyển sang `database/`.
+
+## Runtime
+
+### Node backend
+
+- Origin mặc định: `http://localhost:5300`
+- REST/Auth/Admin/Customer/media: same origin
+- Socket.IO path: `/chatHub`
+- MariaDB: `kaitokid`
+- Expected current base-table contract: 52 tables
+- Secrets: `apps/api/.env` (gitignored)
+- Template: `apps/api/.env.example`
+
+Node là background worker owner duy nhất; critical workers vẫn điều khiển bằng feature flags.
 
 ### Mobile
 
-- Expo SDK 57
-- React Native
-- Metro/Expo development port: `8081`
-- `http://127.0.0.1:8081` is Expo Web for the mobile app, not the separate Vite web app.
-- Customer API environment variable: `EXPO_PUBLIC_API_URL`
-- Auth API environment variable: `EXPO_PUBLIC_AUTH_API_URL`
-- `apps/mobile/app.config.js` auto-detects a LAN IPv4 cho cả API.Customer và API.Auth khi không có URL explicit; Android emulator ưu tiên `10.0.2.2`, còn launcher chỉ ép `127.0.0.1` khi có đúng 1 ADB device để reverse port an toàn.
+- Expo/Metro: `8081`
+- API/Auth cùng dùng Node `:5300`
+- Android emulator fallback: `10.0.2.2:5300`
+- Physical device: LAN auto-detect hoặc ADB reverse `5300`
+- Google native login cần development/native build; Expo Go không chứa native Google module.
 
-### Web
+### Web/Admin
 
-- React + TypeScript + Vite
-- Typical development port: `5173`
-- Source lives in `apps/web`
+- React + Vite, thường `5173`
+- Customer + Staff/Admin cùng gọi Node `:5300`
+- Chat realtime gọi Socket.IO Node `/chatHub`
 
-### Backend
+## Database
 
-- ASP.NET Core / .NET 10 projects
-- API.Auth: `5053`
-- API.Customer: `5265`
-- API.Admin: `5089`
-- API.Gateway: `5155`
+Fresh schema:
 
-### Database
+```text
+database/KaitoKid_MariaDB.sql
+```
 
-- Local server used during development: MariaDB `10.4.32` from XAMPP
-- EF provider: `Pomelo.EntityFrameworkCore.MySql 8.0.3`
-- Database: `kaitokid`
-- Verified base table count trước migration đăng ký-email: `51`; sau `20260930_registration_email_verification.sql`: `52`
-- Backend DbContexts register through `AddMariaDb<TContext>()`
-- Legacy SQL Server migrations remain as history and are excluded from compilation.
-- Initial/fresh MariaDB schema source: `backend/Database/KaitoKid_MariaDB.sql`
-- PHASE 1 từng chuẩn hóa sample Mobile sang trẻ em; PHASE 10 bổ sung migration đa audience để sample hiện có Nam/Nữ/Trẻ em theo D020.
-- `20260922_phase1_kids_branding.sql` là migration lịch sử của PHASE 1. Trên branch PHASE 10, **không chạy lại migration này sau PHASE 10** vì nó sẽ đưa sample về kids-only; migration hiện hành để chốt sample là `20260929_phase10_multiaudience_media.sql`.
-- PHASE 4 thêm migration idempotent `backend/Database/migrations/20260922_phase4_cart_reservation.sql` để bảo đảm các cột reservation của giỏ hàng tồn tại.
-- PHASE 9 thêm migration idempotent `backend/Database/migrations/20260924_phase9_discovery_seed.sql` để bổ sung discovery seed.
-- PHASE 10 thêm migration idempotent `backend/Database/migrations/20260929_phase10_multiaudience_media.sql`; migration tự bảo đảm cột `Lookbook.Season/Style`, nên có thể dùng để chốt sample hiện tại sau các migration cũ.
+Migrations:
 
-## Node backend migration — current stacked state
+```text
+database/migrations/
+```
 
-Migration C# → NestJS đang đi theo chuỗi Draft PR riêng, **không thay thế roadmap Mobile PHASE 1–10** ở trên.
+Các migration quan trọng hiện có gồm cart reservation, discovery seed, multi-audience/media và registration email verification.
 
-- Node app: `apps/api`, NestJS 11 + TypeScript + Prisma 7 + `@prisma/adapter-mariadb`, port mặc định `5300`.
-- Dùng **chính MariaDB `kaitokid` hiện tại**; không reset/drop/reseed/copy dữ liệu.
-- Cấm trên DB đang dùng: `prisma migrate reset`, `prisma migrate dev`, `prisma db push`; introspection dùng `prisma db pull`.
-- C# tiếp tục là reference/oracle và backend phục vụ cho tới khi parity runtime + cutover hoàn tất.
-- Draft PR stack hiện tại:
-  - #30 foundation;
-  - #31 catalog read-only;
-  - #32 customer auxiliary;
-  - #33 cart/inventory/reservation;
-  - #34 checkout/order/coupon/payment/shipping;
-  - #35 auth/email/social/OTP/2FA/staff-RBAC.
-- Phase 8 Node đã mirror source-level Auth + Staff/RBAC và tiếp quản order/payment email side-effect. Chưa cutover Web/Mobile sang Node.
-- Phase 8 gate local cần `npm install` (dependency mới `bcryptjs`), sau đó build/db audit + toàn bộ contract tests tới `test:auth-rbac`.
-- Phase 9 Node đang triển khai trên `feat/node-realtime-search-cutover`: chat/realtime/chatbot, search/image, remaining API.Customer routes, workers và cutover readiness. Full C# retirement vẫn bị chặn bởi 23 controller `API.Admin` chưa migrate.
-- Chi tiết migration/invariants/gate: `docs/NODE_BACKEND_MIGRATION.md`.
+Không chạy Prisma reset/dev/db push trên DB có dữ liệu.
 
-## Local database credentials
+## Main launchers
 
-Secrets are not stored in Git.
-
-- Template: `backend/db.local.example.bat`
-- Local secret file: `backend/db.local.bat`
-- `backend/db.local.bat` is gitignored.
-- `scripts/load-db-local.bat` loads `ConnectionStrings__DefaultConnection`.
-- On first launch, the helper creates the local file from the template and asks the developer to replace `CHANGE_ME`.
-
-## Main development launchers
-
-### Mobile + main APIs
-
-Run from repository root:
+Node API + Mobile:
 
 ```bat
 run.bat
 ```
 
-It loads local DB configuration, then starts:
+All Node API + Web + Mobile:
 
-1. API.Auth
-2. API.Customer
-3. Expo Mobile
+```bat
+scripts\run-all.bat
+```
 
-### Backend services
+Backend only:
 
 ```bat
 scripts\run-backend.bat
 ```
 
-Starts API.Auth, API.Customer, API.Admin and API.Gateway after loading local DB configuration.
+## Required validation after retirement checkout
 
-### Other launchers
+Retirement PR phải được nghiệm thu lại trên máy dev trước khi merge:
 
-- `scripts/run-mobile.bat`
-- `scripts/run-web.bat`
-- `scripts/run-all.bat`
-- `scripts/stop-all.bat`
+```bat
+scripts\node-final-cutover-check.bat
+scripts\run-all.bat
+scripts\node-final-runtime-smoke.bat
+scripts\node-protected-runtime-parity.bat
+scripts\node-concurrency-race-gate.bat
+scripts\node-realtime-runtime-gate.bat
+```
 
-## Verified working state
+Sau đó smoke Web customer + Admin + Mobile bằng **Node-only**. Không khởi động/khôi phục C# vì source runtime đã retire.
 
-As of 2026-09-22:
+## Important business invariants
 
-- MariaDB is reachable locally.
-- Database `kaitokid` exists with 51 base tables.
-- API.Auth starts on port 5053.
-- API.Customer starts on port 5265 with correct local DB credentials.
-- Expo/Metro starts on port 8081.
-- The mobile home screen loads categories and product data from API.Customer.
-- PHASE 2 Home UI đã được nâng cấp: header, cart badge có token, hero auto-slide + dots, promo strip, root categories, discovery tiles, product cards và skeleton loading.
-- PHASE 3 Product Detail đã hoàn chỉnh phần xem/chọn: gallery, màu, size, size guide, số lượng, tồn kho, specs, review read-only, share và related products.
-- PHASE 4 đã nối Wishlist + Add to Cart thật. Mobile dùng `ShoppingContext` để đồng bộ wishlist và cart badge toàn app.
-- PHASE 5 đã hoàn thiện Cart thật: danh sách item, select all/bulk actions, quantity, remove, move-to-wishlist, subtotal selected, reservation countdown, combo discount và cross-sell.
-- PHASE 6 đã hoàn thiện Checkout Mobile: partial checkout theo selected CartItemIds, Address CRUD/default, shipping quote backend, coupon + combo selected, COD, ATM/bank transfer, payment polling/cancel và order success.
-- PHASE 7 đã hoàn thiện Orders + Tracking Mobile: list/filter, order detail, server-authoritative cancel, owner-only tracking timeline, reorder + cart refresh và Account entry.
-- PHASE 8 đã hoàn thiện Reviews + Notifications + Account Mobile: review từ completed order/variant hợp lệ, ảnh review, Helpful/verified/admin reply, notification unread/pagination/read/delete, profile/avatar, loyalty points/redeem/voucher/birthday và delete-account an toàn reservation.
-- PHASE 9 đã hoàn thiện code Collections + Lookbook + Recommendation: Collection query server-side qua `ProductFilterDTO.CollectionId`, Mobile list/detail + sorting, Lookbook filter/detail với hotspot phần trăm responsive, recommendation rule-based theo Wishlist/Order và fallback guest, cùng các section discovery trên Home.
-- Có màn `/wishlist`; ProductCard/Product Detail đều toggle wishlist qua API.Customer.
-- Product Detail gửi Add to Cart đúng size/màu/số lượng; cart badge Home/tab cập nhật ngay sau khi thêm.
-- API Product Detail trả `variantInventory` từ `TonKhoBienThe` nếu có; nếu chưa có dữ liệu biến thể thì mobile fallback về tồn kho khả dụng cấp sản phẩm.
-- Product Detail cho phép mở cả sản phẩm `active` và `out-of-stock`; Home/Search vẫn chỉ liệt kê sản phẩm đang bán.
-- Login mobile hiện dùng `AuthContext.login(email, password)` để lưu access token/session cho các API được bảo vệ.
-- Google login Mobile/Web đã được nối thật: Android native lấy Google ID token, Expo Web lấy OAuth access token, API.Auth xác minh credential với Google rồi phát JWT/refresh token KaitoKid; Expo Go không hỗ trợ native Google module nên Android cần development/native build.
-- Đăng ký local bằng email dùng pending-registration: `POST /api/Auth/register` chỉ lưu dữ liệu tạm (password đã BCrypt, token chỉ lưu SHA-256 hash) và gửi link xác nhận; chỉ `GET /api/Auth/verify-email?token=...` hợp lệ mới tạo `NguoiDung` với `EmailDaXacThuc=1`. Mobile/Web không auto-login trước bước xác nhận.
-- Mobile tự refresh access token bằng refresh token, gom các refresh đồng thời thành một request và retry một lần các request Bearer bị 401; refresh token hỏng/hết hạn sẽ xóa session.
-- Expo Web renders the mobile app successfully at `127.0.0.1:8081`.
-- API.Customer serves shared media from `apps/web/public` so existing banner URLs such as `/slide_1.jpg` resolve on port 5265.
-- PHASE 10 thêm `backend/Database/migrations/20260929_phase10_multiaudience_media.sql`: các seed product chuẩn được đổi sang HTTPS photo URL lưu trực tiếp trong `SanPham.HinhAnh`, đồng thời bổ sung sample Nam/Nữ người lớn. `/products/*` fallback vẫn giữ cho dữ liệu cũ hoặc media lỗi. Ảnh HTTPS này là **demo media**, chưa thay thế pipeline upload/storage production.
-- PHASE 10 cập nhật 2 Lookbook seed hiện có sang HTTPS photo URL và bổ sung 2 Lookbook Nam/Nữ; `/lookbook/*` fallback vẫn giữ cho record legacy.
+- Cart reserve product + variant; available = stock - reserved.
+- Partial checkout theo selected `CartItemIds`.
+- Pricing/coupon/combo/shipping/payment authoritative ở backend.
+- Payment/order cancellation/restock idempotent dưới race.
+- Tracking/cancel/reorder owner-only.
+- Review exact completed order + purchased variant.
+- Delete account releases reservations first.
+- Pending registration + email verification before creating local account.
+- Staff RBAC permissions remain enforced.
+- Socket.IO guest identity is handshake-bound; staff chat permissions enforced.
 
-## Known non-blocking item
-
-- PHASE 2 đã static-review nhưng chưa chạy được `npm/tsc` trong môi trường công cụ do không có DNS/network tới GitHub. Cần xác nhận runtime trên máy local sau khi pull.
-- PHASE 6 có regression tests cho partial checkout + Web legacy fallback, nhưng chưa chạy được `dotnet test`/Expo runtime trong connector; cần xác nhận trên máy development.
-- PHASE 7 có regression tests cho `canCancel`, tracking ownership và reorder ownership; chưa chạy được `dotnet test`/Expo runtime trong connector.
-- PHASE 8 có regression tests cho review ownership/variant, HasReviewed theo biến thể, notification ownership và delete-account release reservation; chưa chạy được `dotnet test`/Expo runtime trong connector.
-- PHASE 9 có regression tests cho Collection filter server-side và recommendation personalized/fallback; connector chưa chạy được `dotnet test`/Expo runtime nên cần xác nhận trên máy development sau khi pull.
-- Sau khi pull PHASE 10, database local cần chạy `backend/Database/migrations/20260929_phase10_multiaudience_media.sql` trước khi nghiệm thu Home/Category/media; migration idempotent và chỉ sửa các seed SKU/row chuẩn.
-- Wishlist/Add-to-cart, Cart, Checkout, Orders/Tracking, Reviews/Notifications/Account và Discovery PHASE 9 đã được nối ở mức code. PHASE 10 còn polish/performance/test matrix toàn hệ thống.
-- Seed hiện chưa có ảnh phụ hoặc `TonKhoBienThe` mẫu; Add to Cart dùng product-level reservation fallback qua `SanPham.SoLuongDaGiu`.
-- Sau khi pull PHASE 4 cần chạy migration reservation và restart API.Customer trước khi test Add to Cart.
-- Sau commit đăng ký xác nhận-email, cần chạy `backend/Database/migrations/20260930_registration_email_verification.sql` và restart API.Auth. Muốn email đi thật phải cấu hình Brevo; nếu ApiKey trống backend dùng ConsoleEmailService mock.
-- A NuGet warning about a known vulnerability in `Microsoft.OpenApi 2.0.0` has been observed during API.Auth build. It did not block startup, but dependency remediation should be handled separately rather than mixed into unrelated changes.
-
-## How a new AI/chat should resume
+## Resume rules for future AI/chat
 
 1. Read `AGENTS.md`.
 2. Read this file.
-3. Read `docs/BRAND.md`.
-4. Read `docs/ROADMAP.md`.
-5. Read `docs/PHASES_5_10.md` trước khi làm PHASE 10 hoặc sửa các flow PHASE 5–9.
-6. Read `docs/ARCHITECTURE.md`.
-7. Read task-relevant decisions/troubleshooting.
-8. Nếu task có thay đổi UI/UX, đọc `docs/UI_UX.md` + `skill/.codex/skills/ui-ux-pro-max/SKILL.md` và generate design system trước khi code.
-9. Inspect the relevant current files.
-10. Check recent Git history/PRs when the reason for existing code matters.
-11. Khi tạo commit mới, viết commit message bằng tiếng Việt theo quy tắc trong `AGENTS.md`.
-12. Gom toàn bộ thay đổi của cùng một task/fix/PHASE vào một commit; không tạo chuỗi commit nhỏ theo từng file.
-13. Trước PHASE 10, xác nhận runtime PHASE 9 trên máy development: migration discovery, Collection list/detail, Lookbook filter/hotspot, recommendation guest/login và Home sections.
-
-For exact historical changes, use Git rather than relying on this file.
-
-
-## PHASE 10 Auth UI update (2026-09-29)
-
-Guest Account + Login + Register được redesign theo `docs/UI_UX.md` và `ui-ux-pro-max`:
-
-- fashion hero lấy media từ Lookbook/Banner backend, có gradient fallback;
-- shared components: `components/auth/auth-fashion-hero.tsx`, `auth-field.tsx`, `auth-primary-button.tsx`, `guest-account-experience.tsx`;
-- Login dùng identifier email/phone + password, inline error, forgot-password;
-- Register validation khớp API.Auth `RegisterDTO`;
-- Forgot Password gọi endpoint backend thật;
-- Reanimated motion ngắn + reduced-motion support.
-
-Chưa được ghi nhận PASS runtime cho tới khi chạy local gate và test Android/Expo Web.
+3. Read `docs/ARCHITECTURE.md`, `docs/BRAND.md`, relevant decisions/troubleshooting.
+4. Inspect current `main` + recent Git history.
+5. Do not infer a C# fallback from old migration docs; `apps/api` is the current backend source of truth.
+6. One task/fix/phase = one aggregate commit by default; AI commit descriptions in Vietnamese.

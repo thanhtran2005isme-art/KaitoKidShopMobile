@@ -17,7 +17,7 @@ expo-env.d.ts
 *.mobileprovision
 .metro-health-check*
 
-# Web builds
+# Builds
 dist/
 **/dist/
 
@@ -27,18 +27,6 @@ dist/
 # Runtime safety backups
 .runtime-backups/
 
-# .NET
-**/bin/
-**/obj/
-.vs/
-*.user
-*.suo
-
-# Debug
-npm-debug.*
-yarn-debug.*
-yarn-error.*
-
 # Environment / secrets
 .env
 .env.*
@@ -46,14 +34,15 @@ yarn-error.*
 **/.env
 **/.env.*
 !**/.env.example
-**/appsettings.Development.json
-/backend/db.local.bat
 
 # Generated large models
 *.onnx
 
 # TypeScript
 *.tsbuildinfo
+
+# Runtime gate npm artifacts
+/apps/api/package-lock.json
 
 # OS/editor
 .DS_Store

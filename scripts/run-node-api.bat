@@ -11,20 +11,25 @@ if not exist "%API%\package.json" (
   pause
   exit /b 1
 )
-
 if not exist "%API%\.env" (
   echo [LOI] Thieu apps\api\.env.
-  echo Tao file tu apps\api\.env.example va dien DATABASE_URL/JWT local truoc khi cutover.
+  echo Tao tu apps\api\.env.example va dien DATABASE_URL/JWT_KEY.
   pause
   exit /b 1
 )
-
 where npm >nul 2>&1
 if errorlevel 1 (
   echo [LOI] Khong tim thay npm trong PATH.
   pause
   exit /b 1
 )
+
+set "BACKGROUND_WORKER_OWNER=node"
+if not defined CART_SWEEPER_ENABLED set "CART_SWEEPER_ENABLED=true"
+if not defined PAYMENT_SWEEPER_ENABLED set "PAYMENT_SWEEPER_ENABLED=true"
+if not defined CHAT_IDLE_SWEEPER_ENABLED set "CHAT_IDLE_SWEEPER_ENABLED=true"
+if not defined SHIPPING_SIMULATOR_ENABLED set "SHIPPING_SIMULATOR_ENABLED=true"
+if not defined IMAGE_INDEXER_ENABLED set "IMAGE_INDEXER_ENABLED=false"
 
 pushd "%API%"
 if not exist "node_modules\.bin\nest.cmd" (
@@ -36,14 +41,12 @@ if not exist "node_modules\.bin\nest.cmd" (
 echo [NODE] Starting NestJS API on PORT from .env ^(default 5300^)...
 call npm run start:dev
 if errorlevel 1 goto :error
-
 popd
 endlocal
 exit /b 0
 
 :error
 set "EXIT_CODE=%ERRORLEVEL%"
-echo.
 echo [LOI] Node API dung voi ma loi %EXIT_CODE%.
 popd
 pause
