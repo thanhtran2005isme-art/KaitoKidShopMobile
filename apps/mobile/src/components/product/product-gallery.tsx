@@ -5,7 +5,6 @@ import {
   NativeScrollEvent,
   NativeSyntheticEvent,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   useWindowDimensions,
@@ -24,7 +23,8 @@ export function ProductGallery({ images }: ProductGalleryProps) {
   const { width } = useWindowDimensions();
   const listRef = useRef<FlatList<string>>(null);
   const [activeIndex, setActiveIndex] = useState(0);
-  const galleryWidth = Math.min(width, 680);
+  const galleryWidth = Math.min(width - 16, 680);
+  const galleryHeight = Math.min(Math.round(galleryWidth * 1.2), 520);
 
   const sources = Array.from(
     new Set(
@@ -33,24 +33,24 @@ export function ProductGallery({ images }: ProductGalleryProps) {
         .filter((item): item is string => Boolean(item)),
     ),
   );
-
   const visibleSources = sources.length ? sources : [''];
+
+  const selectImage = (index: number) => {
+    const next = Math.max(0, Math.min(index, visibleSources.length - 1));
+    setActiveIndex(next);
+    listRef.current?.scrollToOffset({
+      animated: true,
+      offset: next * galleryWidth,
+    });
+  };
 
   const handleMomentumEnd = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
     const next = Math.round(event.nativeEvent.contentOffset.x / galleryWidth);
     setActiveIndex(Math.max(0, Math.min(next, visibleSources.length - 1)));
   };
 
-  const selectImage = (index: number) => {
-    setActiveIndex(index);
-    listRef.current?.scrollToOffset({
-      animated: true,
-      offset: index * galleryWidth,
-    });
-  };
-
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { width: galleryWidth }]}>
       <FlatList
         ref={listRef}
         data={visibleSources}
@@ -63,10 +63,12 @@ export function ProductGallery({ images }: ProductGalleryProps) {
         keyExtractor={(item, index) => item || `fallback-${index}`}
         onMomentumScrollEnd={handleMomentumEnd}
         pagingEnabled
-        renderItem={({ item, index }) => (
-          <View style={[styles.hero, { width: galleryWidth }]}>
+        renderItem={({ item }) => (
+          <View style={[styles.hero, { width: galleryWidth, height: galleryHeight }]}>
             {item ? (
               <Image
+                accessibilityLabel="Ảnh sản phẩm"
+                cachePolicy="memory-disk"
                 contentFit="cover"
                 source={{ uri: item }}
                 style={styles.heroImage}
@@ -78,57 +80,52 @@ export function ProductGallery({ images }: ProductGalleryProps) {
                 <Text style={styles.fallbackText}>Ảnh sản phẩm đang cập nhật</Text>
               </View>
             )}
-
-            {visibleSources.length > 1 ? (
-              <View style={styles.counter}>
-                <Text style={styles.counterText}>
-                  {index + 1}/{visibleSources.length}
-                </Text>
-              </View>
-            ) : null}
           </View>
         )}
         showsHorizontalScrollIndicator={false}
       />
 
       {visibleSources.length > 1 ? (
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.thumbnails}>
-          {visibleSources.map((source, index) => (
-            <Pressable
-              accessibilityLabel={`Xem ảnh ${index + 1}`}
-              key={`${source}-${index}`}
-              onPress={() => selectImage(index)}
-              style={[
-                styles.thumbnail,
-                index === activeIndex && styles.thumbnailActive,
-              ]}>
-              {source ? (
-                <Image
-                  contentFit="cover"
-                  source={{ uri: source }}
-                  style={styles.thumbnailImage}
-                  transition={120}
-                />
-              ) : (
-                <AppIcon color={BRAND_COLORS.primary} name="image" size={24} />
-              )}
-            </Pressable>
-          ))}
-        </ScrollView>
-      ) : null}
+        <>
+          <Pressable
+            accessibilityLabel="Ảnh trước"
+            accessibilityRole="button"
+            disabled={activeIndex === 0}
+            hitSlop={8}
+            onPress={() => selectImage(activeIndex - 1)}
+            style={({ pressed }) => [
+              styles.arrow,
+              styles.arrowLeft,
+              activeIndex === 0 && styles.arrowDisabled,
+              pressed && styles.pressed,
+            ]}>
+            <AppIcon color="#FFFFFF" name="arrowLeft" size={18} />
+          </Pressable>
 
-      {visibleSources.length > 1 ? (
-        <View style={styles.dots}>
-          {visibleSources.map((source, index) => (
-            <View
-              key={`dot-${source}-${index}`}
-              style={[styles.dot, index === activeIndex && styles.dotActive]}
-            />
-          ))}
-        </View>
+          <Pressable
+            accessibilityLabel="Ảnh tiếp theo"
+            accessibilityRole="button"
+            disabled={activeIndex === visibleSources.length - 1}
+            hitSlop={8}
+            onPress={() => selectImage(activeIndex + 1)}
+            style={({ pressed }) => [
+              styles.arrow,
+              styles.arrowRight,
+              activeIndex === visibleSources.length - 1 && styles.arrowDisabled,
+              pressed && styles.pressed,
+            ]}>
+            <AppIcon color="#FFFFFF" name="arrowRight" size={18} />
+          </Pressable>
+
+          <View pointerEvents="none" style={styles.dots}>
+            {visibleSources.map((source, index) => (
+              <View
+                key={`dot-${source}-${index}`}
+                style={[styles.dot, index === activeIndex && styles.dotActive]}
+              />
+            ))}
+          </View>
+        </>
       ) : null}
     </View>
   );
@@ -136,13 +133,15 @@ export function ProductGallery({ images }: ProductGalleryProps) {
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: '#F3F4F6',
-    alignItems: 'center',
+    alignSelf: 'center',
+    position: 'relative',
+    overflow: 'hidden',
+    borderTopLeftRadius: 12,
+    borderTopRightRadius: 12,
+    backgroundColor: '#D9DADD',
   },
   hero: {
-    height: 430,
-    backgroundColor: '#F3F4F6',
-    position: 'relative',
+    backgroundColor: '#D9DADD',
   },
   heroImage: {
     width: '100%',
@@ -152,66 +151,48 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: BRAND_COLORS.primarySoft,
     gap: 10,
+    backgroundColor: '#EDE9FE',
   },
-  fallbackIcon: { fontSize: 58 },
   fallbackText: {
     color: BRAND_COLORS.primaryDark,
     fontSize: 12,
     fontWeight: '800',
   },
-  counter: {
+  arrow: {
     position: 'absolute',
-    right: 16,
-    bottom: 14,
-    borderRadius: 999,
-    backgroundColor: 'rgba(17,24,39,0.58)',
-    paddingHorizontal: 9,
-    paddingVertical: 5,
-  },
-  counterText: {
-    color: '#FFFFFF',
-    fontSize: 10,
-    fontWeight: '900',
-  },
-  thumbnails: {
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    gap: 8,
-  },
-  thumbnail: {
-    width: 58,
-    height: 70,
-    borderRadius: 13,
-    overflow: 'hidden',
-    borderWidth: 2,
-    borderColor: 'transparent',
-    backgroundColor: '#E5E7EB',
+    top: '48%',
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: 'rgba(12,13,15,0.72)',
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(255,255,255,0.22)',
   },
-  thumbnailActive: {
-    borderColor: BRAND_COLORS.primary,
-  },
-  thumbnailImage: {
-    width: '100%',
-    height: '100%',
-  },
-  thumbnailFallback: { fontSize: 24 },
+  arrowLeft: { left: 10 },
+  arrowRight: { right: 10 },
+  arrowDisabled: { opacity: 0.25 },
   dots: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 12,
     flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
     gap: 5,
-    paddingVertical: 10,
   },
   dot: {
     width: 5,
     height: 5,
-    borderRadius: 3,
-    backgroundColor: '#D1D5DB',
+    borderRadius: 999,
+    backgroundColor: 'rgba(255,255,255,0.35)',
   },
   dotActive: {
-    width: 18,
-    backgroundColor: BRAND_COLORS.primary,
+    width: 17,
+    backgroundColor: '#FFFFFF',
   },
+  pressed: { opacity: 0.74 },
 });
