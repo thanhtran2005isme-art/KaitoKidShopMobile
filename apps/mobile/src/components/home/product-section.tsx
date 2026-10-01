@@ -1,5 +1,12 @@
 import { useRouter } from 'expo-router';
-import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import {
+  FlatList,
+  Pressable,
+  StyleSheet,
+  Text,
+  useWindowDimensions,
+  View,
+} from 'react-native';
 
 import { ProductCard } from '@/components/product/product-card';
 import { BRAND_COLORS } from '@/constants/brand';
@@ -19,6 +26,11 @@ const BADGE_COLORS = {
   sale: { backgroundColor: '#FEF2F2', color: '#B91C1C' },
 } as const;
 
+const CARD_GAP = 12;
+const CARD_PEEK = 72;
+const MIN_SHOWCASE_CARD_WIDTH = 260;
+const MAX_SHOWCASE_CARD_WIDTH = 310;
+
 export function ProductSection({
   title,
   subtitle,
@@ -27,9 +39,15 @@ export function ProductSection({
   badgeTone = 'primary',
 }: ProductSectionProps) {
   const router = useRouter();
+  const { width: viewportWidth } = useWindowDimensions();
+
   if (!products.length) return null;
 
   const badgeColors = BADGE_COLORS[badgeTone];
+  const cardWidth = Math.min(
+    MAX_SHOWCASE_CARD_WIDTH,
+    Math.max(MIN_SHOWCASE_CARD_WIDTH, viewportWidth - CARD_PEEK),
+  );
 
   return (
     <View style={styles.section}>
@@ -46,7 +64,11 @@ export function ProductSection({
           {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
         </View>
 
-        <Pressable onPress={() => router.push('/categories')}>
+        <Pressable
+          accessibilityLabel={`Xem tất cả ${title}`}
+          accessibilityRole="button"
+          onPress={() => router.push('/categories')}
+          style={({ pressed }) => pressed && styles.pressed}>
           <Text style={styles.more}>Xem tất cả</Text>
         </Pressable>
       </View>
@@ -54,10 +76,13 @@ export function ProductSection({
       <FlatList
         contentContainerStyle={styles.list}
         data={products.slice(0, 8)}
+        decelerationRate="fast"
         horizontal
         keyExtractor={(item) => String(item.id)}
-        renderItem={({ item }) => <ProductCard product={item} width={174} />}
+        renderItem={({ item }) => <ProductCard product={item} width={cardWidth} />}
         showsHorizontalScrollIndicator={false}
+        snapToAlignment="start"
+        snapToInterval={cardWidth + CARD_GAP}
       />
     </View>
   );
@@ -103,5 +128,10 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '800',
   },
-  list: { paddingHorizontal: 16, gap: 12 },
+  list: {
+    paddingHorizontal: 16,
+    paddingRight: 30,
+    gap: CARD_GAP,
+  },
+  pressed: { opacity: 0.72 },
 });
