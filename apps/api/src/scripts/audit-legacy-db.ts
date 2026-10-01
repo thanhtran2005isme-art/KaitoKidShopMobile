@@ -14,7 +14,9 @@ async function main(): Promise<void> {
     console.log(JSON.stringify(audit, null, 2));
 
     if (!audit.compatible) {
-      console.error("DB thiếu bảng thuộc contract C# cũ. Dừng migration Node và xử lý schema trước.");
+      console.error(
+        "DB chưa đạt contract backend Node: thiếu bảng hoặc canonical RBAC permission. Dừng cutover và xử lý migration trước.",
+      );
       process.exitCode = 1;
     }
   } finally {

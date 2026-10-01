@@ -1,6 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { PrismaService } from "../database/prisma.service.js";
 import { LEGACY_TABLES, LEGACY_TABLE_COUNT } from "./legacy-table-manifest.js";
+import { RBAC_PERMISSION_CODES } from "./rbac-permission-manifest.js";
 
 interface TableNameRow {
   TABLE_NAME: string;
@@ -10,11 +11,18 @@ interface LowerCaseTableNamesRow {
   LOWER_CASE_TABLE_NAMES: number | bigint | string;
 }
 
+interface PermissionCodeRow {
+  code: string;
+}
+
 export interface LegacyDatabaseAudit {
   expectedTableCount: number;
   actualTableCount: number;
   missingTables: string[];
   extraTables: string[];
+  expectedPermissionCount: number;
+  actualPermissionCount: number;
+  missingPermissions: string[];
   compatible: boolean;
   lowerCaseTableNames: number;
   tableNameComparison: "case-sensitive" | "case-insensitive";
@@ -54,12 +62,31 @@ export class LegacyDatabaseAuditService {
       .filter((table) => !expectedNormalized.has(normalize(table)))
       .sort();
 
+    let permissionRows: PermissionCodeRow[] = [];
+    if (existingByNormalized.has(normalize("QuyenHan"))) {
+      permissionRows = await this.prisma.$queryRawUnsafe<PermissionCodeRow[]>(
+        "SELECT MaQuyen AS code FROM QuyenHan ORDER BY MaQuyen",
+      );
+    }
+
+    const permissionCodes = new Set(
+      permissionRows.map((row) => String(row.code)),
+    );
+    const missingPermissions = RBAC_PERMISSION_CODES.filter(
+      (code) => !permissionCodes.has(code),
+    );
+
     return {
       expectedTableCount: LEGACY_TABLE_COUNT,
       actualTableCount: rows.length,
       missingTables,
       extraTables,
-      compatible: missingTables.length === 0,
+      expectedPermissionCount: RBAC_PERMISSION_CODES.length,
+      actualPermissionCount:
+        RBAC_PERMISSION_CODES.length - missingPermissions.length,
+      missingPermissions,
+      compatible:
+        missingTables.length === 0 && missingPermissions.length === 0,
       lowerCaseTableNames,
       tableNameComparison: caseInsensitive ? "case-insensitive" : "case-sensitive",
     };

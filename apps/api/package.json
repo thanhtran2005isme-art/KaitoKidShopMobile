@@ -12,6 +12,7 @@
     "start:dev": "prisma generate && nest start --watch",
     "db:introspect": "prisma db pull && prisma generate",
     "db:generate": "prisma generate",
+    "db:ensure-rbac": "npm run build && node dist/scripts/ensure-rbac-permissions.js",
     "db:audit": "npm run build && node dist/scripts/audit-legacy-db.js",
     "test:catalog": "npm run build && node --test test/catalog-contract.test.mjs",
     "test:customer-aux": "npm run build && node --test test/customer-aux-contract.test.mjs",

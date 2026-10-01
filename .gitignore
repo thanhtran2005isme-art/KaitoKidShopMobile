@@ -41,6 +41,9 @@ dist/
 # TypeScript
 *.tsbuildinfo
 
+# Runtime gate npm artifacts
+/apps/api/package-lock.json
+
 # OS/editor
 .DS_Store
 *.pem
