@@ -110,12 +110,13 @@ export default function CartScreen() {
       return;
     }
 
+    const activeToken = token;
     let active = true;
 
     async function loadExtras() {
       const [crossSellResult, comboResult] = await Promise.allSettled([
-        shoppingApi.getCartCrossSell(token, 4),
-        shoppingApi.getComboDiscount(token),
+        shoppingApi.getCartCrossSell(activeToken, 4),
+        shoppingApi.getComboDiscount(activeToken),
       ]);
 
       if (!active) return;
