@@ -101,6 +101,7 @@ export default function CheckoutScreen() {
       return;
     }
 
+    const activeToken = token;
     let active = true;
 
     async function loadInitial() {
@@ -109,11 +110,11 @@ export default function CheckoutScreen() {
 
       const [addressesResult, configResult, providersResult, comboResult] =
         await Promise.allSettled([
-          checkoutApi.getAddresses(token),
+          checkoutApi.getAddresses(activeToken),
           checkoutApi.getPaymentConfig(),
           checkoutApi.getShippingProviders(),
           selectedCartItemIds.length
-            ? checkoutApi.getSelectedCombo(token, selectedCartItemIds)
+            ? checkoutApi.getSelectedCombo(activeToken, selectedCartItemIds)
             : Promise.resolve(null),
         ]);
 
@@ -182,6 +183,7 @@ export default function CheckoutScreen() {
       return;
     }
 
+    const shippingAddress = selectedAddress;
     let active = true;
 
     async function quote() {
@@ -189,10 +191,10 @@ export default function CheckoutScreen() {
       try {
         const response = await checkoutApi.quoteShipping({
           provider: 'all',
-          toProvince: selectedAddress.province,
-          toDistrict: selectedAddress.district,
-          toWard: selectedAddress.ward || undefined,
-          toAddress: selectedAddress.street || undefined,
+          toProvince: shippingAddress.province,
+          toDistrict: shippingAddress.district,
+          toWard: shippingAddress.ward || undefined,
+          toAddress: shippingAddress.street || undefined,
           weightGram: Math.max(
             300,
             selectedItems.reduce(
@@ -249,19 +251,21 @@ export default function CheckoutScreen() {
   useEffect(() => {
     if (!token || !couponCode || subtotal <= 0) return;
 
+    const activeToken = token;
+    const activeCouponCode = couponCode;
     let active = true;
 
     async function revalidate() {
       try {
         const result = await checkoutApi.validateCoupon(
-          token,
-          couponCode,
+          activeToken,
+          activeCouponCode,
           subtotal,
         );
         if (!active) return;
 
         if (result.isValid) {
-          setCoupon(couponCode, result);
+          setCoupon(activeCouponCode, result);
         } else {
           setCoupon(null, null);
           setCouponInput('');
