@@ -120,7 +120,7 @@ function AudienceTabs({
 
 function CategoriesSkeleton() {
   return (
-    <View style={styles.categorySkeletonRow}>
+    <View accessibilityLabel="Đang tải danh mục" style={styles.categorySkeletonRow}>
       {[0, 1, 2, 3].map((item) => (
         <View key={item} style={styles.categorySkeletonCard}>
           <View style={styles.categorySkeletonImage} />
@@ -141,7 +141,7 @@ function ProductSkeletonGrid({
   const count = Math.max(4, columns * 2);
 
   return (
-    <View style={styles.productSkeletonGrid}>
+    <View accessibilityLabel="Đang tải sản phẩm" style={styles.productSkeletonGrid}>
       {Array.from({ length: count }).map((_, index) => (
         <View key={index} style={[styles.productSkeletonCard, { width: cardWidth }]}>
           <View style={styles.productSkeletonImage} />
@@ -422,6 +422,7 @@ export default function CategoriesScreen() {
 
       return (
         <Pressable
+          accessibilityHint={active ? 'Chạm để bỏ lọc danh mục này' : 'Chạm để lọc sản phẩm theo danh mục này'}
           accessibilityLabel={`Danh mục ${item.name}`}
           accessibilityRole="button"
           accessibilityState={{ selected: active }}
@@ -611,6 +612,7 @@ export default function CategoriesScreen() {
       </View>
 
       <Animated.FlatList
+        accessibilityLabel="Danh sách sản phẩm theo danh mục"
         key={`categories-grid-${columns}`}
         ListEmptyComponent={
           loadingProducts ? (
@@ -666,7 +668,7 @@ const styles = StyleSheet.create({
   headerInner: {
     width: '100%',
     maxWidth: 1040,
-    minHeight: 72,
+    minHeight: 74,
     alignSelf: 'center',
     paddingHorizontal: 16,
     flexDirection: 'row',
@@ -681,14 +683,14 @@ const styles = StyleSheet.create({
   headerTitle: {
     color: BRAND_COLORS.ink,
     fontSize: 26,
-    lineHeight: 31,
+    lineHeight: 32,
     fontWeight: '900',
     letterSpacing: -0.5,
   },
   headerSubtitle: {
     color: BRAND_COLORS.muted,
-    fontSize: 11,
-    lineHeight: 16,
+    fontSize: 12,
+    lineHeight: 17,
     fontWeight: '600',
   },
   searchButton: {
@@ -715,12 +717,12 @@ const styles = StyleSheet.create({
   },
   introSection: {
     paddingHorizontal: 16,
-    gap: 4,
+    gap: 5,
   },
   eyebrow: {
     color: BRAND_COLORS.primary,
-    fontSize: 9,
-    lineHeight: 13,
+    fontSize: 10,
+    lineHeight: 14,
     fontWeight: '900',
     letterSpacing: 1.15,
   },
@@ -734,8 +736,8 @@ const styles = StyleSheet.create({
   introDescription: {
     maxWidth: 560,
     color: BRAND_COLORS.muted,
-    fontSize: 12,
-    lineHeight: 18,
+    fontSize: 13,
+    lineHeight: 19,
     fontWeight: '500',
   },
   audienceSection: {
@@ -763,7 +765,8 @@ const styles = StyleSheet.create({
   },
   audienceTabText: {
     color: BRAND_COLORS.ink,
-    fontSize: 12,
+    fontSize: 13,
+    lineHeight: 18,
     fontWeight: '800',
   },
   audienceTabTextActive: {
@@ -785,16 +788,16 @@ const styles = StyleSheet.create({
   controlLabel: {
     paddingHorizontal: 16,
     color: BRAND_COLORS.muted,
-    fontSize: 10,
-    lineHeight: 14,
+    fontSize: 11,
+    lineHeight: 15,
     fontWeight: '800',
     letterSpacing: 0.35,
     textTransform: 'uppercase',
   },
   sectionTitle: {
     color: BRAND_COLORS.ink,
-    fontSize: 19,
-    lineHeight: 24,
+    fontSize: 20,
+    lineHeight: 25,
     fontWeight: '900',
     letterSpacing: -0.25,
   },
@@ -806,7 +809,8 @@ const styles = StyleSheet.create({
   },
   clearCategoryText: {
     color: BRAND_COLORS.primary,
-    fontSize: 12,
+    fontSize: 13,
+    lineHeight: 18,
     fontWeight: '800',
   },
   categoryList: {
@@ -815,8 +819,8 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   categoryCard: {
-    width: 112,
-    minHeight: 128,
+    width: 116,
+    minHeight: 134,
     borderRadius: 16,
     backgroundColor: BRAND_COLORS.surface,
     borderWidth: 1,
@@ -829,7 +833,7 @@ const styles = StyleSheet.create({
   },
   categoryMedia: {
     width: '100%',
-    height: 82,
+    height: 86,
     backgroundColor: '#F1F5F9',
     overflow: 'hidden',
   },
@@ -844,8 +848,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 9,
     color: BRAND_COLORS.ink,
-    fontSize: 11,
-    lineHeight: 15,
+    fontSize: 12,
+    lineHeight: 17,
     fontWeight: '800',
     textAlign: 'center',
   },
@@ -858,8 +862,8 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   categorySkeletonCard: {
-    width: 112,
-    minHeight: 128,
+    width: 116,
+    minHeight: 134,
     borderRadius: 16,
     backgroundColor: BRAND_COLORS.surface,
     borderWidth: 1,
@@ -870,12 +874,12 @@ const styles = StyleSheet.create({
   },
   categorySkeletonImage: {
     width: '100%',
-    height: 82,
+    height: 86,
     backgroundColor: '#E2E8F0',
   },
   categorySkeletonLine: {
-    width: 64,
-    height: 9,
+    width: 68,
+    height: 10,
     borderRadius: 5,
     backgroundColor: '#E2E8F0',
   },
@@ -904,7 +908,8 @@ const styles = StyleSheet.create({
   },
   subcategoryChipText: {
     color: BRAND_COLORS.ink,
-    fontSize: 11,
+    fontSize: 12,
+    lineHeight: 17,
     fontWeight: '800',
   },
   subcategoryChipTextActive: {
@@ -923,7 +928,8 @@ const styles = StyleSheet.create({
   },
   productCount: {
     color: BRAND_COLORS.muted,
-    fontSize: 11,
+    fontSize: 12,
+    lineHeight: 17,
     fontWeight: '700',
     paddingBottom: 3,
   },
@@ -1004,19 +1010,20 @@ const styles = StyleSheet.create({
   },
   inlineStateTitle: {
     color: BRAND_COLORS.ink,
-    fontSize: 16,
+    fontSize: 18,
+    lineHeight: 23,
     fontWeight: '900',
     textAlign: 'center',
   },
   inlineStateDescription: {
     maxWidth: 380,
     color: BRAND_COLORS.muted,
-    fontSize: 12,
-    lineHeight: 18,
+    fontSize: 13,
+    lineHeight: 19,
     textAlign: 'center',
   },
   inlineStateAction: {
-    minHeight: 46,
+    minHeight: 48,
     marginTop: 5,
     borderRadius: 12,
     paddingHorizontal: 16,
@@ -1028,7 +1035,8 @@ const styles = StyleSheet.create({
   },
   inlineStateActionText: {
     color: BRAND_COLORS.surface,
-    fontSize: 12,
+    fontSize: 14,
+    lineHeight: 19,
     fontWeight: '900',
   },
   pressed: { opacity: 0.72 },
