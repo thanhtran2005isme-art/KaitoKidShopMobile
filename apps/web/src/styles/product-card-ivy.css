@@ -1,219 +1,318 @@
-/* ============================================
-   PRODUCT CARD - IVY MODA STYLE
-   Clean, minimal, elegant
-   ============================================ */
+/* Product Card — KaitoKid Fashion Commerce × Minimal Swiss */
 
-/* New IVY card */
 .ivy-product-card {
   display: flex;
+  min-width: 0;
   flex-direction: column;
-  background: #fff;
+  overflow: hidden;
   position: relative;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+  transition: border-color 180ms ease, box-shadow 180ms ease;
 }
 
-/* Image container */
+@media (hover: hover) {
+  .ivy-product-card:hover {
+    border-color: #d8d0f7;
+    box-shadow: 0 10px 26px rgba(17, 24, 39, 0.07);
+  }
+}
+
 .ivy-card-image {
   position: relative;
   overflow: hidden;
-  aspect-ratio: 3 / 4;
-  background: #f5f5f5;
+  aspect-ratio: 4 / 5;
+  background: #f1f5f9;
 }
 
-.ivy-card-image a {
+.ivy-card-image-link {
   display: block;
   width: 100%;
   height: 100%;
+  text-decoration: none;
 }
 
 .ivy-card-image img {
+  display: block;
   width: 100%;
   height: 100%;
   object-fit: cover;
-  transition: transform 0.5s ease;
+  object-position: center;
+  transition: opacity 180ms ease;
 }
 
-.ivy-product-card:hover .ivy-card-image img {
-  transform: scale(1.04);
+@media (hover: hover) {
+  .ivy-card-image-link:hover img {
+    opacity: 0.94;
+  }
 }
 
-/* Badges */
-.ivy-badge {
+.ivy-card-image-fallback {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  color: #6b7280;
+  background: #f1f5f9;
+  font-size: 12px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.ivy-card-badges {
   position: absolute;
-  top: 12px;
-  left: 12px;
-  padding: 5px 14px;
-  font-size: 11px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  color: #fff;
-  border-radius: 20px;
   z-index: 2;
-  line-height: 1.3;
+  top: 10px;
+  left: 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 5px;
+  pointer-events: none;
+}
+
+.ivy-badge {
+  display: inline-flex;
+  min-height: 23px;
+  align-items: center;
+  justify-content: center;
+  padding: 3px 8px;
+  border-radius: 9px;
+  font-size: 10px;
+  line-height: 1.2;
+  font-weight: 800;
+  letter-spacing: 0.15px;
 }
 
 .ivy-badge-new {
-  background: #f5a623;
+  color: #5b21b6;
+  background: #ede9fe;
 }
 
 .ivy-badge-sale {
-  background: #e53935;
+  color: #b91c1c;
+  background: #fef2f2;
 }
 
 .ivy-badge-hot {
-  background: #1a1a1a;
+  color: #c2410c;
+  background: #fff7ed;
 }
 
-/* Actions row: color dots + wishlist */
-.ivy-card-actions {
-  display: flex;
+.ivy-wishlist-btn {
+  position: absolute;
+  z-index: 3;
+  top: 8px;
+  right: 8px;
+  display: inline-flex;
+  width: 44px;
+  height: 44px;
   align-items: center;
-  justify-content: space-between;
-  padding: 10px 0 4px;
+  justify-content: center;
+  padding: 0;
+  border: 1px solid rgba(229, 231, 235, 0.95);
+  border-radius: 999px;
+  color: #111827;
+  background: rgba(255, 255, 255, 0.94);
+  cursor: pointer;
+  transition: color 160ms ease, border-color 160ms ease, background 160ms ease;
+}
+
+.ivy-wishlist-btn svg {
+  width: 20px;
+  height: 20px;
+}
+
+.ivy-wishlist-btn:hover,
+.ivy-wishlist-btn.active {
+  color: #e11d48;
+  border-color: #fda4af;
+  background: #fff1f2;
+}
+
+.ivy-wishlist-btn:focus-visible,
+.ivy-cart-btn:focus-visible,
+.ivy-card-image-link:focus-visible,
+.ivy-card-name:focus-visible {
+  outline: 3px solid rgba(124, 58, 237, 0.28);
+  outline-offset: 2px;
+}
+
+.ivy-card-content {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 7px;
+  padding: 11px;
 }
 
 .ivy-color-dots {
   display: flex;
-  gap: 5px;
+  min-height: 20px;
   align-items: center;
+  gap: 6px;
 }
 
 .ivy-color-dot {
-  width: 16px;
-  height: 16px;
+  width: 17px;
+  height: 17px;
+  flex: 0 0 auto;
+  border: 1px solid #cbd5e1;
   border-radius: 50%;
-  border: 1.5px solid #e0e0e0;
-  cursor: pointer;
-  transition: transform 0.2s ease;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.75) inset;
 }
 
-.ivy-color-dot:hover {
-  transform: scale(1.15);
+.ivy-more-colors {
+  color: #6b7280;
+  font-size: 11px;
+  font-weight: 700;
 }
 
-.ivy-wishlist-btn {
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: 2px;
-  font-size: 18px;
-  color: #bbb;
-  transition: color 0.25s ease;
-  display: flex;
-  align-items: center;
-}
-
-.ivy-wishlist-btn svg {
-  width: 18px;
-  height: 18px;
-}
-
-.ivy-wishlist-btn:hover {
-  color: #e53935;
-}
-
-.ivy-wishlist-btn.active {
-  color: #e53935;
-}
-
-/* Product name */
 .ivy-card-name {
-  font-size: 13px;
-  font-weight: 400;
-  color: #333;
-  text-decoration: none;
-  line-height: 1.4;
-  padding: 2px 0 6px;
-  display: block;
-  transition: color 0.2s ease;
+  display: -webkit-box;
+  min-height: 39px;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  color: #111827;
+  text-decoration: none;
+  font-size: 14px;
+  line-height: 1.4;
+  font-weight: 700;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .ivy-card-name:hover {
-  color: #1a1a1a;
+  color: #5b21b6;
 }
 
-/* Bottom row: price + cart button */
+.ivy-card-meta {
+  display: flex;
+  min-height: 18px;
+  align-items: center;
+  gap: 8px;
+  color: #6b7280;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.ivy-card-rating {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: #111827;
+  font-weight: 700;
+}
+
+.ivy-card-rating svg {
+  color: #d97706;
+}
+
 .ivy-card-bottom {
   display: flex;
+  min-height: 44px;
   align-items: center;
   justify-content: space-between;
+  gap: 8px;
+  margin-top: auto;
 }
 
 .ivy-card-price {
   display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-wrap: wrap;
   align-items: baseline;
-  gap: 8px;
+  gap: 4px 7px;
 }
 
 .ivy-price-current {
-  font-size: 14px;
-  font-weight: 700;
-  color: #1a1a1a;
+  color: #111827;
+  font-size: 15px;
+  font-weight: 800;
 }
 
 .ivy-price-old {
+  color: #94a3b8;
   font-size: 12px;
-  color: #aaa;
+  font-weight: 500;
   text-decoration: line-through;
-  font-weight: 400;
 }
 
 .ivy-cart-btn {
-  width: 32px;
-  height: 32px;
-  border-radius: 6px;
-  background: #1a1a1a;
-  color: #fff;
-  border: none;
-  cursor: pointer;
-  display: flex;
+  display: inline-flex;
+  width: 44px;
+  height: 44px;
+  flex: 0 0 44px;
   align-items: center;
   justify-content: center;
-  font-size: 13px;
-  transition: background 0.25s ease, transform 0.2s ease;
+  padding: 0;
+  border: 1px solid #7c3aed;
+  border-radius: 12px;
+  color: #ffffff;
+  background: #7c3aed;
+  cursor: pointer;
+  transition: background 160ms ease, border-color 160ms ease, opacity 160ms ease;
 }
 
 .ivy-cart-btn svg {
-  width: 16px;
-  height: 16px;
+  width: 19px;
+  height: 19px;
 }
 
 .ivy-cart-btn:hover {
-  background: #333;
-  transform: scale(1.08);
+  border-color: #5b21b6;
+  background: #5b21b6;
 }
 
-/* ---- Grid override for product grids ---- */
+.ivy-cart-btn:active,
+.ivy-wishlist-btn:active {
+  opacity: 0.72;
+}
+
 .products-grid,
 .product-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 24px 18px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 22px 16px;
 }
 
 @media (max-width: 1024px) {
   .products-grid,
   .product-grid {
-    grid-template-columns: repeat(3, 1fr);
-    gap: 20px 14px;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 
 @media (max-width: 768px) {
   .products-grid,
   .product-grid {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 16px 10px;
   }
-  
-  .ivy-price-current {
+
+  .ivy-card-content {
+    padding: 9px;
+  }
+
+  .ivy-card-name {
+    min-height: 36px;
     font-size: 13px;
   }
-  
-  .ivy-card-name {
-    font-size: 12px;
+
+  .ivy-price-current {
+    font-size: 14px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ivy-product-card,
+  .ivy-card-image img,
+  .ivy-wishlist-btn,
+  .ivy-cart-btn {
+    transition: none !important;
   }
 }
