@@ -9,6 +9,7 @@ const SYMBOLS = {
   bag: { ios: 'bag', android: 'shopping_bag', web: 'shopping_bag' },
   cart: { ios: 'cart', android: 'shopping_cart', web: 'shopping_cart' },
   search: { ios: 'magnifyingglass', android: 'search', web: 'search' },
+  filter: { ios: 'line.3.horizontal.decrease', android: 'filter_alt', web: 'filter_alt' },
   close: { ios: 'xmark', android: 'close', web: 'close' },
   arrowRight: { ios: 'arrow.right', android: 'arrow_forward', web: 'arrow_forward' },
   arrowLeft: { ios: 'chevron.left', android: 'arrow_back', web: 'arrow_back' },
