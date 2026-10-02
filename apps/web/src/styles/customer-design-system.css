@@ -1,0 +1,92 @@
+.customer-shell {
+  --kk-primary: #7c3aed;
+  --kk-primary-dark: #5b21b6;
+  --kk-primary-soft: #ede9fe;
+  --kk-accent: #f97316;
+  --kk-accent-soft: #fff7ed;
+  --kk-canvas: #f8fafc;
+  --kk-surface: #ffffff;
+  --kk-ink: #111827;
+  --kk-muted: #6b7280;
+  --kk-line: #e5e7eb;
+  --kk-success: #047857;
+  --kk-danger: #dc2626;
+  min-width: 0;
+  min-height: 100vh;
+  color: var(--kk-ink);
+  background: var(--kk-canvas);
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+.customer-main {
+  min-width: 0;
+  min-height: 50vh;
+}
+
+.customer-shell img,
+.customer-shell video {
+  max-width: 100%;
+}
+
+.customer-shell button,
+.customer-shell input,
+.customer-shell select,
+.customer-shell textarea {
+  font: inherit;
+}
+
+.customer-shell button,
+.customer-shell a,
+.customer-shell input,
+.customer-shell select,
+.customer-shell textarea {
+  -webkit-tap-highlight-color: transparent;
+}
+
+.customer-shell button:focus-visible,
+.customer-shell a:focus-visible,
+.customer-shell input:focus-visible,
+.customer-shell select:focus-visible,
+.customer-shell textarea:focus-visible,
+.customer-shell [tabindex]:focus-visible {
+  outline: 3px solid rgba(124, 58, 237, .28);
+  outline-offset: 2px;
+}
+
+.customer-shell input:not([type='checkbox']):not([type='radio']):not([type='range']),
+.customer-shell select,
+.customer-shell textarea {
+  min-height: 44px;
+}
+
+.customer-shell button:disabled,
+.customer-shell input:disabled,
+.customer-shell select:disabled,
+.customer-shell textarea:disabled {
+  cursor: not-allowed;
+  opacity: .58;
+}
+
+.customer-shell ::selection {
+  color: #fff;
+  background: var(--kk-primary);
+}
+
+@media (max-width: 768px) {
+  .customer-shell {
+    overflow-x: clip;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .customer-shell *,
+  .customer-shell *::before,
+  .customer-shell *::after {
+    scroll-behavior: auto !important;
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
+}
