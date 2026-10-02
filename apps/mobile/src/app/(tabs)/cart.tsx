@@ -298,6 +298,8 @@ export default function CartScreen() {
             Đăng nhập để giữ sản phẩm trong giỏ và đồng bộ với tài khoản KaitoKid.
           </Text>
           <Pressable
+            accessibilityLabel="Đăng nhập để xem giỏ hàng"
+            accessibilityRole="button"
             onPress={() =>
               router.push({
                 pathname: '/auth/login',
@@ -333,7 +335,11 @@ export default function CartScreen() {
           <Text style={styles.errorMark}>!</Text>
           <Text style={styles.loadingTitle}>Không tải được giỏ hàng</Text>
           <Text style={styles.loadingText}>{cartError}</Text>
-          <Pressable onPress={() => void refreshCart()} style={styles.primaryButton}>
+          <Pressable
+            accessibilityLabel="Thử tải lại giỏ hàng"
+            accessibilityRole="button"
+            onPress={() => void refreshCart()}
+            style={styles.primaryButton}>
             <Text style={styles.primaryButtonText}>Thử lại</Text>
           </Pressable>
         </View>
@@ -365,6 +371,7 @@ export default function CartScreen() {
 
           <Pressable
             accessibilityLabel="Làm mới giỏ hàng"
+            accessibilityRole="button"
             onPress={() => void refreshCart()}
             style={({ pressed }) => [
               styles.refreshButton,
@@ -376,6 +383,7 @@ export default function CartScreen() {
 
         {feedback ? (
           <View
+            accessibilityRole="alert"
             style={[
               styles.feedback,
               feedback.type === 'success'
@@ -395,7 +403,7 @@ export default function CartScreen() {
         ) : null}
 
         {cartError && cartItems.length > 0 ? (
-          <View style={styles.inlineError}>
+          <View accessibilityRole="alert" style={styles.inlineError}>
             <Text style={styles.inlineErrorText}>{cartError}</Text>
           </View>
         ) : null}
@@ -406,6 +414,9 @@ export default function CartScreen() {
           <>
             <View style={styles.selectionBar}>
               <Pressable
+                accessibilityLabel={allSelected ? 'Bỏ chọn tất cả sản phẩm' : 'Chọn tất cả sản phẩm'}
+                accessibilityRole="checkbox"
+                accessibilityState={{ checked: allSelected }}
                 onPress={toggleAll}
                 style={({ pressed }) => [
                   styles.selectAll,
@@ -425,22 +436,31 @@ export default function CartScreen() {
                 </Text>
               </Pressable>
 
-              <Text style={styles.selectedCount}>
+              <Text accessibilityLiveRegion="polite" style={styles.selectedCount}>
                 {selectedIds.size + '/' + cartItems.length + ' dòng'}
               </Text>
             </View>
 
             <View style={styles.bulkActions}>
               <Pressable
+                accessibilityLabel="Chuyển sản phẩm đã chọn sang yêu thích"
+                accessibilityRole="button"
+                accessibilityState={{ disabled: selectedIds.size === 0 }}
                 disabled={selectedIds.size === 0}
                 onPress={() => void moveSelectedToWishlist()}
                 style={[
                   styles.bulkButton,
                   selectedIds.size === 0 && styles.bulkDisabled,
                 ]}>
-                <View style={styles.bulkContent}><AppIcon color={BRAND_COLORS.primaryDark} name="heart" size={17} /><Text style={styles.bulkText}>Chuyển sang yêu thích</Text></View>
+                <View style={styles.bulkContent}>
+                  <AppIcon color={BRAND_COLORS.primaryDark} name="heart" size={17} />
+                  <Text style={styles.bulkText}>Chuyển sang yêu thích</Text>
+                </View>
               </Pressable>
               <Pressable
+                accessibilityLabel="Xóa các sản phẩm đã chọn"
+                accessibilityRole="button"
+                accessibilityState={{ disabled: selectedIds.size === 0 }}
                 disabled={selectedIds.size === 0}
                 onPress={() => void removeSelected()}
                 style={[
@@ -509,26 +529,29 @@ const styles = StyleSheet.create({
   },
   eyebrow: {
     color: BRAND_COLORS.primary,
-    fontSize: 8,
+    fontSize: 10,
+    lineHeight: 14,
     fontWeight: '900',
     letterSpacing: 1.2,
   },
   title: {
     color: BRAND_COLORS.ink,
     fontSize: 28,
+    lineHeight: 34,
     fontWeight: '900',
     letterSpacing: -0.5,
   },
   subtitle: {
     marginTop: 2,
     color: BRAND_COLORS.muted,
-    fontSize: 10,
+    fontSize: 12,
+    lineHeight: 17,
     fontWeight: '700',
   },
   refreshButton: {
-    width: 42,
-    height: 42,
-    borderRadius: 15,
+    width: 44,
+    height: 44,
+    borderRadius: 14,
     borderWidth: 1,
     borderColor: BRAND_COLORS.line,
     backgroundColor: BRAND_COLORS.surface,
@@ -550,8 +573,8 @@ const styles = StyleSheet.create({
     borderColor: '#FECACA',
   },
   feedbackText: {
-    fontSize: 10,
-    lineHeight: 15,
+    fontSize: 12,
+    lineHeight: 18,
     fontWeight: '800',
   },
   feedbackTextSuccess: { color: '#047857' },
@@ -559,12 +582,12 @@ const styles = StyleSheet.create({
   inlineError: {
     borderRadius: 14,
     backgroundColor: '#FEF2F2',
-    padding: 10,
+    padding: 11,
   },
   inlineErrorText: {
     color: '#B91C1C',
-    fontSize: 9,
-    lineHeight: 14,
+    fontSize: 12,
+    lineHeight: 18,
   },
   selectionBar: {
     borderRadius: 16,
@@ -578,13 +601,14 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   selectAll: {
+    minHeight: 44,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
   },
   selectAllBox: {
-    width: 23,
-    height: 23,
+    width: 24,
+    height: 24,
     borderRadius: 8,
     borderWidth: 1.5,
     borderColor: '#CBD5E1',
@@ -602,12 +626,14 @@ const styles = StyleSheet.create({
   },
   selectAllText: {
     color: BRAND_COLORS.ink,
-    fontSize: 10,
+    fontSize: 13,
+    lineHeight: 18,
     fontWeight: '900',
   },
   selectedCount: {
     color: BRAND_COLORS.muted,
-    fontSize: 9,
+    fontSize: 12,
+    lineHeight: 17,
     fontWeight: '800',
   },
   bulkActions: {
@@ -616,7 +642,7 @@ const styles = StyleSheet.create({
   },
   bulkButton: {
     flex: 1,
-    minHeight: 42,
+    minHeight: 44,
     borderRadius: 14,
     borderWidth: 1,
     borderColor: '#DDD6FE',
@@ -626,7 +652,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
   },
   bulkButtonDanger: {
-    minHeight: 42,
+    minHeight: 44,
     borderRadius: 14,
     borderWidth: 1,
     borderColor: '#FECACA',
@@ -643,13 +669,15 @@ const styles = StyleSheet.create({
   },
   bulkText: {
     color: BRAND_COLORS.primaryDark,
-    fontSize: 9,
+    fontSize: 12,
+    lineHeight: 17,
     fontWeight: '900',
     textAlign: 'center',
   },
   bulkDangerText: {
     color: BRAND_COLORS.danger,
-    fontSize: 9,
+    fontSize: 12,
+    lineHeight: 17,
     fontWeight: '900',
   },
   bulkDisabled: { opacity: 0.42 },
@@ -664,7 +692,7 @@ const styles = StyleSheet.create({
   guestIconWrap: {
     width: 82,
     height: 82,
-    borderRadius: 28,
+    borderRadius: 24,
     backgroundColor: BRAND_COLORS.primarySoft,
     alignItems: 'center',
     justifyContent: 'center',
@@ -672,18 +700,19 @@ const styles = StyleSheet.create({
   guestTitle: {
     color: BRAND_COLORS.ink,
     fontSize: 26,
+    lineHeight: 32,
     fontWeight: '900',
   },
   guestDescription: {
     color: BRAND_COLORS.muted,
-    fontSize: 12,
+    fontSize: 13,
     lineHeight: 19,
     textAlign: 'center',
     maxWidth: 360,
   },
   primaryButton: {
-    minHeight: 46,
-    borderRadius: 15,
+    minHeight: 48,
+    borderRadius: 14,
     backgroundColor: BRAND_COLORS.primary,
     paddingHorizontal: 18,
     alignItems: 'center',
@@ -691,7 +720,8 @@ const styles = StyleSheet.create({
   },
   primaryButtonText: {
     color: '#FFFFFF',
-    fontSize: 12,
+    fontSize: 14,
+    lineHeight: 19,
     fontWeight: '900',
   },
   loading: {
@@ -703,14 +733,15 @@ const styles = StyleSheet.create({
   },
   loadingTitle: {
     color: BRAND_COLORS.ink,
-    fontSize: 18,
+    fontSize: 19,
+    lineHeight: 25,
     fontWeight: '900',
     textAlign: 'center',
   },
   loadingText: {
     color: BRAND_COLORS.muted,
-    fontSize: 11,
-    lineHeight: 18,
+    fontSize: 13,
+    lineHeight: 19,
     textAlign: 'center',
     maxWidth: 360,
   },
@@ -725,6 +756,6 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: '900',
   },
-  pressed: { opacity: 0.78 },
+  pressed: { opacity: 0.72 },
   bottomSpace: { height: 26 },
 });
