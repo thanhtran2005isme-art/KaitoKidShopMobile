@@ -297,17 +297,15 @@ export default function CategoriesScreen() {
       }
 
       setSelectedSubcategory('');
-      setSelectedRoot(nextAudience === 'all' ? rootCategories[0]?.name || '' : '');
+      setSelectedRoot('');
     });
 
     return () => {
       active = false;
     };
-  }, [categories, params.ageGroup, params.category, params.gender, rootCategories]);
+  }, [categories, params.ageGroup, params.category, params.gender]);
 
   useEffect(() => {
-    if (audience === 'all' && !selectedRoot) return;
-
     let active = true;
     void Promise.resolve().then(async () => {
       if (!active) return;
@@ -364,15 +362,14 @@ export default function CategoriesScreen() {
       startProductTransition();
       setAudience(key);
       setSelectedSubcategory('');
-      setSelectedRoot(key === 'all' ? rootCategories[0]?.name || '' : '');
+      setSelectedRoot('');
     },
-    [audience, rootCategories, startProductTransition],
+    [audience, startProductTransition],
   );
 
   const handleRootSelect = useCallback(
     (item: Category) => {
       const active = item.name === selectedRoot;
-      if (active && audience === 'all') return;
 
       startProductTransition();
       if (active) {
@@ -384,7 +381,7 @@ export default function CategoriesScreen() {
       setSelectedRoot(item.name);
       setSelectedSubcategory('');
     },
-    [audience, selectedRoot, startProductTransition],
+    [selectedRoot, startProductTransition],
   );
 
   const handleSubcategorySelect = useCallback(
@@ -399,8 +396,8 @@ export default function CategoriesScreen() {
   const clearCategory = useCallback(() => {
     startProductTransition();
     setSelectedSubcategory('');
-    setSelectedRoot(audience === 'all' ? rootCategories[0]?.name || '' : '');
-  }, [audience, rootCategories, startProductTransition]);
+    setSelectedRoot('');
+  }, [startProductTransition]);
 
   const retryCategories = useCallback(() => {
     setLoadingCategories(true);
@@ -416,9 +413,7 @@ export default function CategoriesScreen() {
     .filter(Boolean)
     .join(' · ');
 
-  const hasCategoryFilter =
-    Boolean(selectedSubcategory) ||
-    (audience !== 'all' && Boolean(selectedRoot));
+  const hasCategoryFilter = Boolean(selectedSubcategory) || Boolean(selectedRoot);
 
   const renderCategory = useCallback(
     ({ item }: { item: Category }) => {
