@@ -42,6 +42,7 @@ module.exports = () => {
     ...baseConfig,
     plugins: [
       ...(baseConfig.plugins || []),
+      'expo-web-browser',
       [
         'expo-image-picker',
         {
