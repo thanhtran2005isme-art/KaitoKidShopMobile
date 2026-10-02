@@ -8,7 +8,7 @@ import {
   View,
 } from 'react-native';
 
-import { HomeProductCard } from '@/components/home/home-product-card';
+import { ProductCard } from '@/components/product/product-card';
 import { BRAND_COLORS } from '@/constants/brand';
 import type { Product } from '@/types/shop';
 
@@ -21,9 +21,9 @@ type ProductSectionProps = {
 };
 
 const BADGE_COLORS = {
-  primary: { backgroundColor: '#EDE9FE', color: '#6D28D9' },
-  hot: { backgroundColor: '#FFF7ED', color: '#C2410C' },
-  sale: { backgroundColor: '#FEF2F2', color: '#B91C1C' },
+  primary: { backgroundColor: BRAND_COLORS.primarySoft, color: BRAND_COLORS.primaryDark },
+  hot: { backgroundColor: BRAND_COLORS.accentSoft, color: '#C2410C' },
+  sale: { backgroundColor: '#FEF2F2', color: BRAND_COLORS.danger },
 } as const;
 
 const HORIZONTAL_PADDING = 16;
@@ -71,7 +71,7 @@ export function ProductSection({
           accessibilityLabel={`Xem tất cả ${title}`}
           accessibilityRole="button"
           onPress={() => router.push('/categories')}
-          style={({ pressed }) => pressed && styles.pressed}>
+          style={({ pressed }) => [styles.moreButton, pressed && styles.pressed]}>
           <Text style={styles.more}>Xem tất cả</Text>
         </Pressable>
       </View>
@@ -82,9 +82,7 @@ export function ProductSection({
         decelerationRate="fast"
         horizontal
         keyExtractor={(item) => String(item.id)}
-        renderItem={({ item }) => (
-          <HomeProductCard product={item} width={cardWidth} />
-        )}
+        renderItem={({ item }) => <ProductCard product={item} width={cardWidth} />}
         showsHorizontalScrollIndicator={false}
         snapToAlignment="start"
         snapToInterval={cardWidth + CARD_GAP}
@@ -112,21 +110,31 @@ const styles = StyleSheet.create({
   heading: {
     color: BRAND_COLORS.ink,
     fontSize: 20,
+    lineHeight: 25,
     fontWeight: '900',
+    letterSpacing: -0.25,
   },
   badge: {
-    borderRadius: 999,
+    minHeight: 22,
+    borderRadius: 9,
     paddingHorizontal: 8,
-    paddingVertical: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   badgeText: {
     fontSize: 9,
     fontWeight: '900',
-    letterSpacing: 0.7,
+    letterSpacing: 0.35,
   },
   subtitle: {
     color: BRAND_COLORS.muted,
     fontSize: 11,
+    lineHeight: 16,
+  },
+  moreButton: {
+    minHeight: 44,
+    paddingHorizontal: 4,
+    justifyContent: 'center',
   },
   more: {
     color: BRAND_COLORS.primary,
@@ -138,5 +146,5 @@ const styles = StyleSheet.create({
     paddingRight: HORIZONTAL_PADDING + 6,
     gap: CARD_GAP,
   },
-  pressed: { opacity: 0.72 },
+  pressed: { opacity: 0.7 },
 });
