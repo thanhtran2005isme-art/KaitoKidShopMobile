@@ -1,33 +1,16 @@
 import { Image } from 'expo-image';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import type { ReactNode } from 'react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   FlatList,
   Pressable,
   ScrollView,
-  type StyleProp,
   StyleSheet,
   Text,
   View,
-  type ViewStyle,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import Animated, {
-  Extrapolation,
-  FadeIn,
-  FadeInDown,
-  FadeInUp,
-  FadeOut,
-  interpolate,
-  LinearTransition,
-  useAnimatedScrollHandler,
-  useAnimatedStyle,
-  useReducedMotion,
-  useSharedValue,
-  withTiming,
-} from 'react-native-reanimated';
+import Animated, { FadeIn, FadeOut, useReducedMotion } from 'react-native-reanimated';
 
 import { ProductCard } from '@/components/product/product-card';
 import { AppIcon } from '@/components/ui/app-icon';
@@ -94,59 +77,6 @@ function audienceFromParams(gender?: string, ageGroup?: string): AudienceKey {
   return 'all';
 }
 
-function MotionPressable({
-  children,
-  label,
-  onPress,
-  selected,
-  style,
-}: {
-  children: ReactNode;
-  label: string;
-  onPress: () => void;
-  selected?: boolean;
-  style?: StyleProp<ViewStyle>;
-}) {
-  const reducedMotion = useReducedMotion();
-  const [pressed, setPressed] = useState(false);
-  const animatedStyle = useAnimatedStyle(
-    () => ({
-      opacity: reducedMotion
-        ? pressed
-          ? 0.82
-          : 1
-        : withTiming(pressed ? 0.82 : 1, {
-            duration: pressed ? 120 : 160,
-          }),
-      transform: [
-        {
-          scale: reducedMotion
-            ? 1
-            : withTiming(pressed ? 0.985 : 1, {
-                duration: pressed ? 120 : 160,
-              }),
-        },
-      ],
-    }),
-    [pressed, reducedMotion],
-  );
-
-  return (
-    <Animated.View style={[style, animatedStyle]}>
-      <Pressable
-        accessibilityLabel={label}
-        accessibilityRole="button"
-        accessibilityState={{ selected }}
-        onPress={onPress}
-        onPressIn={() => setPressed(true)}
-        onPressOut={() => setPressed(false)}
-        style={styles.motionPressableInner}>
-        {children}
-      </Pressable>
-    </Animated.View>
-  );
-}
-
 function AudienceTabs({
   onSelect,
   selected,
@@ -154,10 +84,11 @@ function AudienceTabs({
   onSelect: (key: AudienceKey) => void;
   selected: AudienceKey;
 }) {
-  const reducedMotion = useReducedMotion();
-
   return (
-    <View style={styles.audienceTabs}>
+    <ScrollView
+      contentContainerStyle={styles.audienceTabs}
+      horizontal
+      showsHorizontalScrollIndicator={false}>
       {AUDIENCES.map((item) => {
         const active = item.key === selected;
         return (
@@ -169,16 +100,9 @@ function AudienceTabs({
             onPress={() => onSelect(item.key)}
             style={({ pressed }) => [
               styles.audienceTab,
-              pressed && styles.audienceTabPressed,
+              active && styles.audienceTabActive,
+              pressed && styles.pressed,
             ]}>
-            {active ? (
-              <Animated.View
-                entering={reducedMotion ? undefined : FadeIn.duration(180)}
-                exiting={reducedMotion ? undefined : FadeOut.duration(120)}
-                pointerEvents="none"
-                style={styles.audienceIndicator}
-              />
-            ) : null}
             <Text
               numberOfLines={1}
               style={[
@@ -190,25 +114,20 @@ function AudienceTabs({
           </Pressable>
         );
       })}
-    </View>
+    </ScrollView>
   );
 }
 
 function CategoriesSkeleton() {
-  const reducedMotion = useReducedMotion();
-
   return (
-    <Animated.View
-      entering={reducedMotion ? undefined : FadeIn.duration(180)}
-      exiting={reducedMotion ? undefined : FadeOut.duration(120)}
-      style={styles.categorySkeletonRow}>
+    <View style={styles.categorySkeletonRow}>
       {[0, 1, 2, 3].map((item) => (
         <View key={item} style={styles.categorySkeletonCard}>
           <View style={styles.categorySkeletonImage} />
           <View style={styles.categorySkeletonLine} />
         </View>
       ))}
-    </Animated.View>
+    </View>
   );
 }
 
@@ -219,25 +138,21 @@ function ProductSkeletonGrid({
   cardWidth: number;
   columns: number;
 }) {
-  const reducedMotion = useReducedMotion();
   const count = Math.max(4, columns * 2);
 
   return (
-    <Animated.View
-      entering={reducedMotion ? undefined : FadeIn.duration(170)}
-      exiting={reducedMotion ? undefined : FadeOut.duration(120)}
-      style={styles.productSkeletonGrid}>
+    <View style={styles.productSkeletonGrid}>
       {Array.from({ length: count }).map((_, index) => (
         <View key={index} style={[styles.productSkeletonCard, { width: cardWidth }]}>
           <View style={styles.productSkeletonImage} />
           <View style={styles.productSkeletonCopy}>
-            <View style={styles.productSkeletonKicker} />
             <View style={styles.productSkeletonName} />
+            <View style={styles.productSkeletonMeta} />
             <View style={styles.productSkeletonPrice} />
           </View>
         </View>
       ))}
-    </Animated.View>
+    </View>
   );
 }
 
@@ -260,15 +175,17 @@ function InlineState({
       <Text style={styles.inlineStateTitle}>{title}</Text>
       <Text style={styles.inlineStateDescription}>{description}</Text>
       {actionLabel && onAction ? (
-        <MotionPressable
-          label={actionLabel}
+        <Pressable
+          accessibilityLabel={actionLabel}
+          accessibilityRole="button"
           onPress={onAction}
-          style={styles.inlineStateAction}>
-          <View style={styles.inlineStateActionContent}>
-            <AppIcon color={BRAND_COLORS.surface} name="refresh" size={18} />
-            <Text style={styles.inlineStateActionText}>{actionLabel}</Text>
-          </View>
-        </MotionPressable>
+          style={({ pressed }) => [
+            styles.inlineStateAction,
+            pressed && styles.pressed,
+          ]}>
+          <AppIcon color={BRAND_COLORS.surface} name="refresh" size={18} />
+          <Text style={styles.inlineStateActionText}>{actionLabel}</Text>
+        </Pressable>
       ) : null}
     </View>
   );
@@ -299,8 +216,6 @@ export default function CategoriesScreen() {
   const [categoryRetryKey, setCategoryRetryKey] = useState(0);
   const [productRetryKey, setProductRetryKey] = useState(0);
 
-  const scrollY = useSharedValue(0);
-
   const rootCategories = useMemo(
     () =>
       categories
@@ -321,12 +236,6 @@ export default function CategoriesScreen() {
         : [],
     [activeRoot, categories],
   );
-  const activeSubcategory = useMemo(
-    () =>
-      childCategories.find((item) => item.name === selectedSubcategory) ||
-      null,
-    [childCategories, selectedSubcategory],
-  );
   const audienceOption = useMemo(
     () => AUDIENCES.find((item) => item.key === audience) || AUDIENCES[0],
     [audience],
@@ -334,6 +243,7 @@ export default function CategoriesScreen() {
 
   useEffect(() => {
     let active = true;
+    setCategoryError(false);
 
     void shopApi
       .getCategories()
@@ -441,92 +351,6 @@ export default function CategoriesScreen() {
     selectedSubcategory,
   ]);
 
-  const scrollHandler = useAnimatedScrollHandler({
-    onScroll: (event) => {
-      scrollY.value = event.contentOffset.y;
-    },
-  });
-
-  const headerTitleStyle = useAnimatedStyle(() => ({
-    opacity: reducedMotion ? 1 : 1,
-    transform: [
-      {
-        translateY: reducedMotion
-          ? 0
-          : interpolate(
-          scrollY.value,
-          [0, 70],
-          [0, -3],
-          Extrapolation.CLAMP,
-        ),
-      },
-      {
-        scale: reducedMotion
-          ? 1
-          : interpolate(
-          scrollY.value,
-          [0, 70],
-          [1, 0.92],
-          Extrapolation.CLAMP,
-        ),
-      },
-    ],
-  }));
-
-  const headerSubtitleStyle = useAnimatedStyle(() => ({
-    opacity: reducedMotion
-      ? 1
-      : interpolate(
-      scrollY.value,
-      [0, 44],
-      [1, 0],
-      Extrapolation.CLAMP,
-    ),
-    transform: [
-      {
-        translateY: reducedMotion
-          ? 0
-          : interpolate(
-          scrollY.value,
-          [0, 44],
-          [0, -4],
-          Extrapolation.CLAMP,
-        ),
-      },
-    ],
-  }));
-
-  const heroParallaxStyle = useAnimatedStyle(() => ({
-    transform: [
-      {
-        translateY: reducedMotion
-          ? 0
-          : interpolate(
-          scrollY.value,
-          [0, 190],
-          [0, 10],
-          Extrapolation.CLAMP,
-        ),
-      },
-      {
-        scale: reducedMotion
-          ? 1
-          : interpolate(
-          scrollY.value,
-          [0, 190],
-          [1.02, 1.07],
-          Extrapolation.CLAMP,
-        ),
-      },
-    ],
-  }));
-
-  const retryCategories = useCallback(() => {
-    setLoadingCategories(true);
-    setCategoryError(false);
-    setCategoryRetryKey((value) => value + 1);
-  }, []);
-
   const startProductTransition = useCallback(() => {
     setLoadingProducts(true);
     setProductError(false);
@@ -536,19 +360,22 @@ export default function CategoriesScreen() {
 
   const handleAudienceSelect = useCallback(
     (key: AudienceKey) => {
+      if (key === audience) return;
       startProductTransition();
       setAudience(key);
       setSelectedSubcategory('');
       setSelectedRoot(key === 'all' ? rootCategories[0]?.name || '' : '');
     },
-    [rootCategories, startProductTransition],
+    [audience, rootCategories, startProductTransition],
   );
 
   const handleRootSelect = useCallback(
     (item: Category) => {
-      startProductTransition();
       const active = item.name === selectedRoot;
-      if (active && audience !== 'all') {
+      if (active && audience === 'all') return;
+
+      startProductTransition();
+      if (active) {
         setSelectedRoot('');
         setSelectedSubcategory('');
         return;
@@ -562,28 +389,25 @@ export default function CategoriesScreen() {
 
   const handleSubcategorySelect = useCallback(
     (name: string) => {
+      if (name === selectedSubcategory) return;
       startProductTransition();
       setSelectedSubcategory(name);
     },
-    [startProductTransition],
+    [selectedSubcategory, startProductTransition],
   );
 
   const clearCategory = useCallback(() => {
     startProductTransition();
-    setSelectedRoot('');
     setSelectedSubcategory('');
-  }, [startProductTransition]);
+    setSelectedRoot(audience === 'all' ? rootCategories[0]?.name || '' : '');
+  }, [audience, rootCategories, startProductTransition]);
 
-  const heroProduct = products.find((item) => Boolean(item.image?.trim()));
-  const heroImage = resolveMediaUrl(
-    activeSubcategory?.image || activeRoot?.image || heroProduct?.image,
-  );
-  const heroTitle =
-    activeSubcategory?.name || activeRoot?.name || audienceOption.title;
-  const heroDescription =
-    activeSubcategory?.description ||
-    activeRoot?.description ||
-    audienceOption.description;
+  const retryCategories = useCallback(() => {
+    setLoadingCategories(true);
+    setCategoryError(false);
+    setCategoryRetryKey((value) => value + 1);
+  }, []);
+
   const productFilterLabel = [
     audienceOption.key === 'all' ? null : audienceOption.label,
     selectedRoot || null,
@@ -592,63 +416,55 @@ export default function CategoriesScreen() {
     .filter(Boolean)
     .join(' · ');
 
+  const hasCategoryFilter =
+    Boolean(selectedSubcategory) ||
+    (audience !== 'all' && Boolean(selectedRoot));
+
   const renderCategory = useCallback(
-    ({ item, index }: { item: Category; index: number }) => {
+    ({ item }: { item: Category }) => {
       const active = item.name === selectedRoot;
       const image = resolveMediaUrl(item.image);
 
       return (
-        <Animated.View
-          entering={
-            reducedMotion
-              ? undefined
-              : FadeInDown.duration(240).delay(Math.min(index * 34, 180))
-          }
-          layout={reducedMotion ? undefined : LinearTransition.duration(180)}>
-          <MotionPressable
-            label={`Danh mục ${item.name}`}
-            onPress={() => handleRootSelect(item)}
-            selected={active}
+        <Pressable
+          accessibilityLabel={`Danh mục ${item.name}`}
+          accessibilityRole="button"
+          accessibilityState={{ selected: active }}
+          onPress={() => handleRootSelect(item)}
+          style={({ pressed }) => [
+            styles.categoryCard,
+            active && styles.categoryCardActive,
+            pressed && styles.pressed,
+          ]}>
+          <View style={styles.categoryMedia}>
+            {image ? (
+              <Image
+                accessibilityLabel={item.name}
+                cachePolicy="memory-disk"
+                contentFit="cover"
+                source={{ uri: image }}
+                style={StyleSheet.absoluteFill}
+                transition={reducedMotion ? 0 : 160}
+              />
+            ) : (
+              <View style={styles.categoryFallback}>
+                <AppIcon
+                  color={active ? BRAND_COLORS.primaryDark : BRAND_COLORS.primary}
+                  name="clothing"
+                  size={26}
+                />
+              </View>
+            )}
+          </View>
+          <Text
+            numberOfLines={2}
             style={[
-              styles.categoryCard,
-              active && styles.categoryCardActive,
+              styles.categoryCardLabel,
+              active && styles.categoryCardLabelActive,
             ]}>
-            <View style={styles.categoryMedia}>
-              {image ? (
-                <Animated.View
-                  entering={reducedMotion ? undefined : FadeIn.duration(220)}
-                  style={StyleSheet.absoluteFill}>
-                  <Image
-                    accessibilityLabel={item.name}
-                    cachePolicy="memory-disk"
-                    contentFit="cover"
-                    source={{ uri: image }}
-                    style={StyleSheet.absoluteFill}
-                    transition={reducedMotion ? 0 : 180}
-                  />
-                </Animated.View>
-              ) : (
-                <View style={styles.categoryFallback}>
-                  <AppIcon
-                    color={active ? BRAND_COLORS.primaryDark : BRAND_COLORS.primary}
-                    name="clothing"
-                    size={28}
-                  />
-                </View>
-              )}
-              {active ? <View style={styles.categorySelectedWash} /> : null}
-            </View>
-            <Text
-              numberOfLines={1}
-              style={[
-                styles.categoryCardLabel,
-                active && styles.categoryCardLabelActive,
-              ]}>
-              {item.name}
-            </Text>
-            {active ? <View style={styles.categoryActiveLine} /> : null}
-          </MotionPressable>
-        </Animated.View>
+            {item.name}
+          </Text>
+        </Pressable>
       );
     },
     [handleRootSelect, reducedMotion, selectedRoot],
@@ -656,88 +472,31 @@ export default function CategoriesScreen() {
 
   const listHeader = (
     <View style={styles.listHeader}>
-      <Animated.View
-        entering={reducedMotion ? undefined : FadeInUp.duration(250)}
-        style={styles.audienceSection}>
-        <View style={styles.sectionHeading}>
-          <Text style={styles.eyebrow}>CHỌN PHONG CÁCH</Text>
-          <Text style={styles.sectionTitle}>Dành cho bạn</Text>
-        </View>
+      <View style={styles.introSection}>
+        <Text style={styles.eyebrow}>KHÁM PHÁ</Text>
+        <Text style={styles.introTitle}>{audienceOption.title}</Text>
+        <Text style={styles.introDescription}>{audienceOption.description}</Text>
+      </View>
+
+      <View style={styles.audienceSection}>
+        <Text style={styles.controlLabel}>Đối tượng</Text>
         <AudienceTabs onSelect={handleAudienceSelect} selected={audience} />
-      </Animated.View>
+      </View>
 
-      <Animated.View
-        entering={
-          reducedMotion ? undefined : FadeInUp.duration(270).delay(45)
-        }
-        style={styles.editorialCard}>
-        {heroImage ? (
-          <Animated.View
-            key={heroImage}
-            entering={reducedMotion ? undefined : FadeIn.duration(260)}
-            style={[StyleSheet.absoluteFill, heroParallaxStyle]}>
-            <Image
-              accessibilityLabel={`Ảnh ${heroTitle}`}
-              cachePolicy="memory-disk"
-              contentFit="cover"
-              source={{ uri: heroImage }}
-              style={StyleSheet.absoluteFill}
-              transition={reducedMotion ? 0 : 220}
-            />
-          </Animated.View>
-        ) : (
-          <LinearGradient
-            colors={[
-              BRAND_COLORS.primaryDark,
-              BRAND_COLORS.primary,
-              BRAND_COLORS.ink,
-            ]}
-            end={{ x: 1, y: 1 }}
-            start={{ x: 0, y: 0 }}
-            style={StyleSheet.absoluteFill}
-          />
-        )}
-        <LinearGradient
-          colors={[
-            'rgba(17,24,39,0.08)',
-            'rgba(17,24,39,0.30)',
-            'rgba(17,24,39,0.84)',
-          ]}
-          locations={[0, 0.5, 1]}
-          style={StyleSheet.absoluteFill}
-        />
-        <View style={styles.editorialCopy}>
-          <View style={styles.editorialEyebrowRow}>
-            <View style={styles.editorialDot} />
-            <Text style={styles.editorialEyebrow}>{audienceOption.label}</Text>
-          </View>
-          <Text numberOfLines={2} style={styles.editorialTitle}>
-            {heroTitle}
-          </Text>
-          <Text numberOfLines={2} style={styles.editorialDescription}>
-            {heroDescription}
-          </Text>
-        </View>
-      </Animated.View>
-
-      <Animated.View
-        entering={
-          reducedMotion ? undefined : FadeInUp.duration(270).delay(85)
-        }
-        style={styles.categorySection}>
+      <View style={styles.categorySection}>
         <View style={styles.sectionHeadingRow}>
           <View style={styles.sectionHeading}>
-            <Text style={styles.eyebrow}>DANH MỤC</Text>
+            <Text style={styles.controlLabel}>Danh mục</Text>
             <Text style={styles.sectionTitle}>Chọn kiểu sản phẩm</Text>
           </View>
-          {selectedRoot && audience !== 'all' ? (
+          {hasCategoryFilter ? (
             <Pressable
               accessibilityLabel="Bỏ lọc danh mục"
               accessibilityRole="button"
               onPress={clearCategory}
               style={({ pressed }) => [
                 styles.clearCategory,
-                pressed && styles.clearCategoryPressed,
+                pressed && styles.pressed,
               ]}>
               <Text style={styles.clearCategoryText}>Bỏ lọc</Text>
             </Pressable>
@@ -765,23 +524,21 @@ export default function CategoriesScreen() {
         )}
 
         {childCategories.length ? (
-          <Animated.View
-            entering={
-              reducedMotion ? undefined : FadeInDown.duration(220).delay(35)
-            }
-            style={styles.subcategorySection}>
-            <Text style={styles.subcategoryLabel}>Danh mục con</Text>
+          <View style={styles.subcategorySection}>
+            <Text style={styles.controlLabel}>Danh mục con</Text>
             <ScrollView
               contentContainerStyle={styles.subcategoryList}
               horizontal
               showsHorizontalScrollIndicator={false}>
-              <MotionPressable
-                label={`Xem tất cả ${activeRoot?.name || ''}`}
+              <Pressable
+                accessibilityLabel={`Xem tất cả ${activeRoot?.name || ''}`}
+                accessibilityRole="button"
+                accessibilityState={{ selected: !selectedSubcategory }}
                 onPress={() => handleSubcategorySelect('')}
-                selected={!selectedSubcategory}
-                style={[
+                style={({ pressed }) => [
                   styles.subcategoryChip,
                   !selectedSubcategory && styles.subcategoryChipActive,
+                  pressed && styles.pressed,
                 ]}>
                 <Text
                   style={[
@@ -790,19 +547,21 @@ export default function CategoriesScreen() {
                   ]}>
                   Tất cả
                 </Text>
-              </MotionPressable>
+              </Pressable>
 
               {childCategories.map((item) => {
                 const active = item.name === selectedSubcategory;
                 return (
-                  <MotionPressable
+                  <Pressable
                     key={item.id}
-                    label={`Danh mục con ${item.name}`}
+                    accessibilityLabel={`Danh mục con ${item.name}`}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: active }}
                     onPress={() => handleSubcategorySelect(item.name)}
-                    selected={active}
-                    style={[
+                    style={({ pressed }) => [
                       styles.subcategoryChip,
                       active && styles.subcategoryChipActive,
+                      pressed && styles.pressed,
                     ]}>
                     <Text
                       style={[
@@ -811,53 +570,48 @@ export default function CategoriesScreen() {
                       ]}>
                       {item.name}
                     </Text>
-                  </MotionPressable>
+                  </Pressable>
                 );
               })}
             </ScrollView>
-          </Animated.View>
+          </View>
         ) : null}
-      </Animated.View>
+      </View>
 
-      <Animated.View
-        entering={
-          reducedMotion ? undefined : FadeInUp.duration(270).delay(120)
-        }
-        style={styles.productsHeading}>
+      <View style={styles.productsHeading}>
         <View style={styles.productsHeadingCopy}>
-          <Text style={styles.eyebrow}>SẢN PHẨM</Text>
-          <Text style={styles.sectionTitle}>
+          <Text style={styles.controlLabel}>Sản phẩm</Text>
+          <Text numberOfLines={2} style={styles.sectionTitle}>
             {productFilterLabel || 'Khám phá KaitoKid'}
           </Text>
         </View>
-        <Text style={styles.productCount}>
-          {loadingProducts ? 'Đang tải' : `${productTotal} sản phẩm`}
+        <Text accessibilityLiveRegion="polite" style={styles.productCount}>
+          {loadingProducts ? 'Đang tải…' : `${productTotal} sản phẩm`}
         </Text>
-      </Animated.View>
+      </View>
     </View>
   );
 
   return (
     <SafeAreaView edges={['top']} style={styles.safeArea}>
-      <View style={styles.stickyHeader}>
-        <View style={styles.stickyHeaderInner}>
+      <View style={styles.header}>
+        <View style={styles.headerInner}>
           <View style={styles.headerCopy}>
-            <Animated.Text style={[styles.headerTitle, headerTitleStyle]}>
-              Danh mục
-            </Animated.Text>
-            <Animated.Text
-              numberOfLines={1}
-              style={[styles.headerSubtitle, headerSubtitleStyle]}>
-              {BRAND.promise}
-            </Animated.Text>
+            <Text style={styles.headerTitle}>Danh mục</Text>
+            <Text numberOfLines={1} style={styles.headerSubtitle}>
+              {BRAND.categorySubtitle}
+            </Text>
           </View>
-
-          <MotionPressable
-            label="Tìm kiếm sản phẩm"
+          <Pressable
+            accessibilityLabel="Tìm kiếm sản phẩm"
+            accessibilityRole="button"
             onPress={() => router.push('/search')}
-            style={styles.searchButton}>
+            style={({ pressed }) => [
+              styles.searchButton,
+              pressed && styles.pressed,
+            ]}>
             <AppIcon color={BRAND_COLORS.ink} name="search" size={21} />
-          </MotionPressable>
+          </Pressable>
         </View>
       </View>
 
@@ -875,7 +629,9 @@ export default function CategoriesScreen() {
             />
           ) : (
             <InlineState
+              actionLabel={hasCategoryFilter ? 'Bỏ lọc' : undefined}
               description="Hiện chưa có sản phẩm phù hợp với lựa chọn này."
+              onAction={hasCategoryFilter ? clearCategory : undefined}
               title="Chưa có sản phẩm"
             />
           )
@@ -887,23 +643,13 @@ export default function CategoriesScreen() {
         initialNumToRender={8}
         keyExtractor={(item) => String(item.id)}
         numColumns={columns}
-        onScroll={scrollHandler}
-        renderItem={({ item, index }) => (
+        renderItem={({ item }) => (
           <Animated.View
-            entering={
-              reducedMotion
-                ? undefined
-                : FadeInUp.duration(220).delay(Math.min(index * 24, 160))
-            }
-            exiting={reducedMotion ? undefined : FadeOut.duration(110)}>
-            <ProductCard
-              product={item}
-              width={cardWidth}
-              wishlistPlacement="inline"
-            />
+            entering={reducedMotion ? undefined : FadeIn.duration(180)}
+            exiting={reducedMotion ? undefined : FadeOut.duration(100)}>
+            <ProductCard product={item} width={cardWidth} />
           </Animated.View>
         )}
-        scrollEventThrottle={16}
         showsVerticalScrollIndicator={false}
         windowSize={7}
       />
@@ -916,15 +662,15 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: BRAND_COLORS.canvas,
   },
-  stickyHeader: {
+  header: {
     zIndex: 20,
-    backgroundColor: BRAND_COLORS.canvas,
+    backgroundColor: BRAND_COLORS.surface,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: BRAND_COLORS.line,
   },
-  stickyHeaderInner: {
+  headerInner: {
     width: '100%',
-    maxWidth: 720,
+    maxWidth: 1040,
     minHeight: 72,
     alignSelf: 'center',
     paddingHorizontal: 16,
@@ -935,55 +681,101 @@ const styles = StyleSheet.create({
   },
   headerCopy: {
     flex: 1,
-    height: 52,
-    justifyContent: 'center',
+    gap: 2,
   },
   headerTitle: {
-    alignSelf: 'flex-start',
     color: BRAND_COLORS.ink,
-    fontSize: 27,
+    fontSize: 26,
     lineHeight: 31,
     fontWeight: '900',
-    letterSpacing: -0.65,
+    letterSpacing: -0.5,
   },
   headerSubtitle: {
-    position: 'absolute',
-    left: 0,
-    bottom: 0,
     color: BRAND_COLORS.muted,
-    fontSize: 10,
-    fontWeight: '700',
+    fontSize: 11,
+    lineHeight: 16,
+    fontWeight: '600',
   },
   searchButton: {
     width: 46,
     height: 46,
-    borderRadius: 16,
+    borderRadius: 14,
     backgroundColor: BRAND_COLORS.surface,
-    borderWidth: StyleSheet.hairlineWidth,
+    borderWidth: 1,
     borderColor: BRAND_COLORS.line,
-    overflow: 'hidden',
-  },
-  motionPressableInner: {
-    flex: 1,
-    minHeight: 44,
     alignItems: 'center',
     justifyContent: 'center',
   },
   productList: {
-    paddingBottom: 34,
+    paddingBottom: 36,
     flexGrow: 1,
   },
   listHeader: {
     width: '100%',
-    maxWidth: 720,
+    maxWidth: 1040,
     alignSelf: 'center',
-    paddingTop: 18,
+    paddingTop: 20,
     paddingBottom: 20,
-    gap: 22,
+    gap: 24,
+  },
+  introSection: {
+    paddingHorizontal: 16,
+    gap: 4,
+  },
+  eyebrow: {
+    color: BRAND_COLORS.primary,
+    fontSize: 9,
+    lineHeight: 13,
+    fontWeight: '900',
+    letterSpacing: 1.15,
+  },
+  introTitle: {
+    color: BRAND_COLORS.ink,
+    fontSize: 24,
+    lineHeight: 30,
+    fontWeight: '900',
+    letterSpacing: -0.4,
+  },
+  introDescription: {
+    maxWidth: 560,
+    color: BRAND_COLORS.muted,
+    fontSize: 12,
+    lineHeight: 18,
+    fontWeight: '500',
   },
   audienceSection: {
+    gap: 9,
+  },
+  audienceTabs: {
     paddingHorizontal: 16,
-    gap: 11,
+    paddingRight: 22,
+    gap: 8,
+  },
+  audienceTab: {
+    minHeight: 44,
+    minWidth: 72,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: BRAND_COLORS.surface,
+    borderWidth: 1,
+    borderColor: BRAND_COLORS.line,
+  },
+  audienceTabActive: {
+    backgroundColor: BRAND_COLORS.primary,
+    borderColor: BRAND_COLORS.primary,
+  },
+  audienceTabText: {
+    color: BRAND_COLORS.ink,
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  audienceTabTextActive: {
+    color: BRAND_COLORS.surface,
+  },
+  categorySection: {
+    gap: 12,
   },
   sectionHeading: {
     gap: 3,
@@ -995,127 +787,32 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: 12,
   },
-  eyebrow: {
-    color: BRAND_COLORS.primary,
-    fontSize: 9,
-    fontWeight: '900',
-    letterSpacing: 1.2,
+  controlLabel: {
+    paddingHorizontal: 16,
+    color: BRAND_COLORS.muted,
+    fontSize: 10,
+    lineHeight: 14,
+    fontWeight: '800',
+    letterSpacing: 0.35,
+    textTransform: 'uppercase',
   },
   sectionTitle: {
     color: BRAND_COLORS.ink,
-    fontSize: 20,
+    fontSize: 19,
     lineHeight: 24,
     fontWeight: '900',
-    letterSpacing: -0.35,
-  },
-  audienceTabs: {
-    position: 'relative',
-    height: 52,
-    borderRadius: 18,
-    padding: 4,
-    flexDirection: 'row',
-    backgroundColor: BRAND_COLORS.line,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: BRAND_COLORS.line,
-    overflow: 'hidden',
-  },
-  audienceIndicator: {
-    position: 'absolute',
-    top: 0,
-    right: 0,
-    bottom: 0,
-    left: 0,
-    borderRadius: 14,
-    backgroundColor: BRAND_COLORS.surface,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: BRAND_COLORS.primarySoft,
-    boxShadow: '0 2px 8px rgba(17, 24, 39, 0.06)',
-    elevation: 2,
-  },
-  audienceTab: {
-    zIndex: 1,
-    flex: 1,
-    minHeight: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 14,
-  },
-  audienceTabPressed: {
-    opacity: 0.68,
-  },
-  audienceTabText: {
-    color: BRAND_COLORS.muted,
-    fontSize: 11,
-    fontWeight: '800',
-  },
-  audienceTabTextActive: {
-    color: BRAND_COLORS.primaryDark,
-  },
-  editorialCard: {
-    marginHorizontal: 16,
-    minHeight: 178,
-    borderRadius: 28,
-    overflow: 'hidden',
-    backgroundColor: BRAND_COLORS.ink,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(255,255,255,0.10)',
-    justifyContent: 'flex-end',
-  },
-  editorialCopy: {
-    zIndex: 2,
-    padding: 18,
-    gap: 5,
-    maxWidth: 520,
-  },
-  editorialEyebrowRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 7,
-  },
-  editorialDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: BRAND_COLORS.accent,
-  },
-  editorialEyebrow: {
-    color: BRAND_COLORS.accentSoft,
-    fontSize: 9,
-    fontWeight: '900',
-    letterSpacing: 1.1,
-    textTransform: 'uppercase',
-  },
-  editorialTitle: {
-    color: BRAND_COLORS.surface,
-    fontSize: 26,
-    lineHeight: 29,
-    fontWeight: '900',
-    letterSpacing: -0.6,
-  },
-  editorialDescription: {
-    color: BRAND_COLORS.line,
-    fontSize: 12,
-    lineHeight: 18,
-    fontWeight: '600',
-    maxWidth: 460,
-  },
-  categorySection: {
-    gap: 12,
+    letterSpacing: -0.25,
   },
   clearCategory: {
     minHeight: 44,
-    minWidth: 64,
-    paddingHorizontal: 8,
+    paddingHorizontal: 10,
     alignItems: 'center',
     justifyContent: 'center',
   },
   clearCategoryText: {
     color: BRAND_COLORS.primary,
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '800',
-  },
-  clearCategoryPressed: {
-    opacity: 0.72,
   },
   categoryList: {
     paddingHorizontal: 16,
@@ -1123,22 +820,22 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   categoryCard: {
-    width: 108,
-    minHeight: 124,
-    borderRadius: 20,
+    width: 112,
+    minHeight: 128,
+    borderRadius: 16,
     backgroundColor: BRAND_COLORS.surface,
-    borderWidth: StyleSheet.hairlineWidth,
+    borderWidth: 1,
     borderColor: BRAND_COLORS.line,
     overflow: 'hidden',
   },
   categoryCardActive: {
     borderColor: BRAND_COLORS.primary,
-    backgroundColor: BRAND_COLORS.surface,
+    backgroundColor: '#FCFAFF',
   },
   categoryMedia: {
     width: '100%',
-    height: 76,
-    backgroundColor: BRAND_COLORS.primarySoft,
+    height: 82,
+    backgroundColor: '#F1F5F9',
     overflow: 'hidden',
   },
   categoryFallback: {
@@ -1147,33 +844,18 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: BRAND_COLORS.primarySoft,
   },
-  categorySelectedWash: {
-    position: 'absolute',
-    top: 0,
-    right: 0,
-    bottom: 0,
-    left: 0,
-    backgroundColor: 'rgba(91,33,182,0.12)',
-  },
   categoryCardLabel: {
-    width: '100%',
-    paddingHorizontal: 9,
+    flex: 1,
+    paddingHorizontal: 8,
+    paddingVertical: 9,
     color: BRAND_COLORS.ink,
     fontSize: 11,
+    lineHeight: 15,
     fontWeight: '800',
     textAlign: 'center',
   },
   categoryCardLabelActive: {
     color: BRAND_COLORS.primaryDark,
-  },
-  categoryActiveLine: {
-    position: 'absolute',
-    left: 24,
-    right: 24,
-    bottom: 6,
-    height: 2,
-    borderRadius: 999,
-    backgroundColor: BRAND_COLORS.primary,
   },
   categorySkeletonRow: {
     paddingHorizontal: 16,
@@ -1181,57 +863,52 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   categorySkeletonCard: {
-    width: 108,
-    minHeight: 124,
-    borderRadius: 20,
-    paddingBottom: 12,
+    width: 112,
+    minHeight: 128,
+    borderRadius: 16,
     backgroundColor: BRAND_COLORS.surface,
-    borderWidth: StyleSheet.hairlineWidth,
+    borderWidth: 1,
     borderColor: BRAND_COLORS.line,
     overflow: 'hidden',
-    gap: 12,
     alignItems: 'center',
+    gap: 12,
   },
   categorySkeletonImage: {
     width: '100%',
-    height: 76,
-    backgroundColor: BRAND_COLORS.line,
+    height: 82,
+    backgroundColor: '#E2E8F0',
   },
   categorySkeletonLine: {
-    width: 62,
+    width: 64,
     height: 9,
     borderRadius: 5,
-    backgroundColor: BRAND_COLORS.line,
+    backgroundColor: '#E2E8F0',
   },
   subcategorySection: {
     gap: 8,
   },
-  subcategoryLabel: {
-    paddingHorizontal: 16,
-    color: BRAND_COLORS.muted,
-    fontSize: 10,
-    fontWeight: '800',
-  },
   subcategoryList: {
     paddingHorizontal: 16,
+    paddingRight: 22,
     gap: 8,
   },
   subcategoryChip: {
     minHeight: 44,
     minWidth: 64,
-    borderRadius: 15,
+    borderRadius: 12,
     paddingHorizontal: 14,
     backgroundColor: BRAND_COLORS.surface,
-    borderWidth: StyleSheet.hairlineWidth,
+    borderWidth: 1,
     borderColor: BRAND_COLORS.line,
-    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   subcategoryChipActive: {
     backgroundColor: BRAND_COLORS.primarySoft,
-    borderColor: BRAND_COLORS.primary,
+    borderColor: '#C4B5FD',
   },
   subcategoryChipText: {
-    color: BRAND_COLORS.muted,
+    color: BRAND_COLORS.ink,
     fontSize: 11,
     fontWeight: '800',
   },
@@ -1251,15 +928,22 @@ const styles = StyleSheet.create({
   },
   productCount: {
     color: BRAND_COLORS.muted,
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: '700',
     paddingBottom: 3,
   },
   productRow: {
+    width: '100%',
+    maxWidth: 1040,
+    alignSelf: 'center',
     justifyContent: 'center',
-    marginBottom: 20,
+    paddingHorizontal: 12,
+    marginBottom: 14,
   },
   productSkeletonGrid: {
+    width: '100%',
+    maxWidth: 1040,
+    alignSelf: 'center',
     paddingHorizontal: 12,
     paddingBottom: 24,
     flexDirection: 'row',
@@ -1268,56 +952,56 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   productSkeletonCard: {
-    borderRadius: 22,
-    padding: 8,
+    borderRadius: 16,
     backgroundColor: BRAND_COLORS.surface,
-    borderWidth: StyleSheet.hairlineWidth,
+    borderWidth: 1,
     borderColor: BRAND_COLORS.line,
-    gap: 10,
+    overflow: 'hidden',
   },
   productSkeletonImage: {
     width: '100%',
     aspectRatio: 0.8,
-    borderRadius: 17,
-    backgroundColor: BRAND_COLORS.line,
+    backgroundColor: '#E2E8F0',
   },
   productSkeletonCopy: {
-    gap: 7,
-    paddingHorizontal: 2,
-    paddingBottom: 4,
-  },
-  productSkeletonKicker: {
-    width: '34%',
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: BRAND_COLORS.line,
+    padding: 10,
+    gap: 8,
   },
   productSkeletonName: {
     width: '82%',
     height: 12,
     borderRadius: 6,
-    backgroundColor: BRAND_COLORS.line,
+    backgroundColor: '#E2E8F0',
+  },
+  productSkeletonMeta: {
+    width: '62%',
+    height: 9,
+    borderRadius: 5,
+    backgroundColor: '#E2E8F0',
   },
   productSkeletonPrice: {
-    width: '52%',
-    height: 13,
-    borderRadius: 6,
+    width: '50%',
+    height: 14,
+    borderRadius: 7,
     backgroundColor: BRAND_COLORS.primarySoft,
   },
   inlineState: {
+    width: 'auto',
+    maxWidth: 680,
+    alignSelf: 'center',
     marginHorizontal: 16,
-    padding: 22,
-    borderRadius: 22,
-    borderWidth: StyleSheet.hairlineWidth,
+    padding: 24,
+    borderRadius: 18,
+    borderWidth: 1,
     borderColor: BRAND_COLORS.line,
     backgroundColor: BRAND_COLORS.surface,
     alignItems: 'center',
-    gap: 7,
+    gap: 8,
   },
   inlineStateIcon: {
-    width: 46,
-    height: 46,
-    borderRadius: 16,
+    width: 48,
+    height: 48,
+    borderRadius: 14,
     backgroundColor: BRAND_COLORS.primarySoft,
     alignItems: 'center',
     justifyContent: 'center',
@@ -1325,35 +1009,32 @@ const styles = StyleSheet.create({
   },
   inlineStateTitle: {
     color: BRAND_COLORS.ink,
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '900',
     textAlign: 'center',
   },
   inlineStateDescription: {
     maxWidth: 380,
     color: BRAND_COLORS.muted,
-    fontSize: 11,
-    lineHeight: 17,
+    fontSize: 12,
+    lineHeight: 18,
     textAlign: 'center',
   },
   inlineStateAction: {
     minHeight: 46,
-    minWidth: 112,
     marginTop: 5,
-    borderRadius: 15,
-    overflow: 'hidden',
+    borderRadius: 12,
+    paddingHorizontal: 16,
     backgroundColor: BRAND_COLORS.primary,
-  },
-  inlineStateActionContent: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 7,
-    paddingHorizontal: 14,
   },
   inlineStateActionText: {
     color: BRAND_COLORS.surface,
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '900',
   },
+  pressed: { opacity: 0.72 },
 });
