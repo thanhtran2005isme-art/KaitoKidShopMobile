@@ -1,11 +1,12 @@
 import { Tabs } from 'expo-router';
+import type { ColorValue } from 'react-native';
 
 import { AppIcon, type AppIconName } from '@/components/ui/app-icon';
 import { BRAND_COLORS } from '@/constants/brand';
 import { useNotifications } from '@/context/NotificationsContext';
 import { useShopping } from '@/context/ShoppingContext';
 
-function TabIcon({ name, color }: { name: AppIconName; color: string }) {
+function TabIcon({ name, color }: { name: AppIconName; color: ColorValue }) {
   return <AppIcon color={color} name={name} size={23} />;
 }
 
