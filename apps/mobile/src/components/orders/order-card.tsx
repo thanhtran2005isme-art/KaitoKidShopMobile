@@ -60,10 +60,10 @@ function OrderCardBase({
               style={styles.image}
             />
             <View style={styles.itemCopy}>
-              <Text numberOfLines={1} style={styles.itemName}>
+              <Text numberOfLines={2} style={styles.itemName}>
                 {item.productName}
               </Text>
-              <Text style={styles.itemMeta}>
+              <Text numberOfLines={2} style={styles.itemMeta}>
                 {'Size ' +
                   item.size +
                   ' · ' +
@@ -102,12 +102,12 @@ export const OrderCard = memo(OrderCardBase);
 
 const styles = StyleSheet.create({
   card: {
-    borderRadius: 20,
+    borderRadius: 18,
     borderWidth: 1,
     borderColor: BRAND_COLORS.line,
     backgroundColor: BRAND_COLORS.surface,
     padding: 14,
-    gap: 11,
+    gap: 12,
   },
   topRow: {
     flexDirection: 'row',
@@ -118,48 +118,51 @@ const styles = StyleSheet.create({
   codeBlock: { flex: 1 },
   code: {
     color: BRAND_COLORS.ink,
-    fontSize: 12,
-    lineHeight: 17,
+    fontSize: 14,
+    lineHeight: 19,
     fontWeight: '900',
   },
   date: {
     marginTop: 2,
     color: BRAND_COLORS.muted,
-    fontSize: 8,
-    lineHeight: 12,
+    fontSize: 12,
+    lineHeight: 17,
+    fontWeight: '500',
   },
-  items: { gap: 8 },
+  items: { gap: 10 },
   itemRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 9,
+    gap: 10,
   },
   image: {
-    width: 46,
-    height: 58,
-    borderRadius: 11,
+    width: 52,
+    height: 66,
+    borderRadius: 12,
     backgroundColor: '#F3F4F6',
   },
   itemCopy: { flex: 1, minWidth: 0 },
   itemName: {
     color: BRAND_COLORS.ink,
-    fontSize: 10,
-    lineHeight: 15,
+    fontSize: 13,
+    lineHeight: 18,
     fontWeight: '800',
   },
   itemMeta: {
     marginTop: 3,
     color: BRAND_COLORS.muted,
-    fontSize: 8,
-    lineHeight: 12,
+    fontSize: 11,
+    lineHeight: 16,
+    fontWeight: '500',
   },
   moreText: {
     color: BRAND_COLORS.primary,
-    fontSize: 8,
+    fontSize: 11,
+    lineHeight: 16,
     fontWeight: '800',
   },
   footer: {
-    paddingTop: 10,
+    paddingTop: 11,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: BRAND_COLORS.line,
     flexDirection: 'row',
@@ -169,26 +172,29 @@ const styles = StyleSheet.create({
   },
   quantityLabel: {
     color: BRAND_COLORS.muted,
-    fontSize: 8,
+    fontSize: 11,
+    lineHeight: 16,
     fontWeight: '700',
   },
   totalLabel: {
     marginTop: 2,
     color: BRAND_COLORS.ink,
-    fontSize: 9,
+    fontSize: 12,
+    lineHeight: 17,
     fontWeight: '900',
   },
   totalBlock: { alignItems: 'flex-end', gap: 3 },
   total: {
     color: BRAND_COLORS.accent,
-    fontSize: 15,
-    lineHeight: 18,
+    fontSize: 16,
+    lineHeight: 21,
     fontWeight: '900',
   },
   detailAction: {
     color: BRAND_COLORS.primary,
-    fontSize: 8,
+    fontSize: 11,
+    lineHeight: 16,
     fontWeight: '900',
   },
-  pressed: { opacity: 0.78 },
+  pressed: { opacity: 0.72 },
 });
