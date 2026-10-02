@@ -74,9 +74,198 @@
   background: var(--kk-primary);
 }
 
+/* Customer navigation: neutral chrome, product imagery stays the visual focus. */
+.customer-shell .main-header {
+  background: rgba(255, 255, 255, .98);
+  border-bottom: 1px solid var(--kk-line);
+  box-shadow: 0 4px 16px rgba(17, 24, 39, .045);
+  backdrop-filter: blur(12px);
+  transition: box-shadow 180ms ease;
+}
+
+.customer-shell .main-header:hover {
+  box-shadow: 0 4px 16px rgba(17, 24, 39, .045);
+}
+
+.customer-shell .header-container {
+  max-width: 1280px;
+  padding: 14px 24px;
+}
+
+.customer-shell .logo,
+.customer-shell .logo:hover {
+  transform: none;
+}
+
+.customer-shell .logo img,
+.customer-shell .logo:hover img {
+  width: auto;
+  height: 44px;
+  object-fit: contain;
+  filter: none;
+}
+
+.customer-shell .search-bar {
+  max-width: 560px;
+  margin-inline: 28px;
+}
+
+.customer-shell .search-bar input {
+  min-height: 48px;
+  padding: 0 142px 0 16px;
+  border: 1px solid var(--kk-line);
+  border-radius: 14px;
+  color: var(--kk-ink);
+  background: #fff;
+  box-shadow: none;
+  transition: border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.customer-shell .search-bar input:focus {
+  border-color: var(--kk-primary);
+  background: #fff;
+  box-shadow: 0 0 0 3px rgba(124, 58, 237, .12);
+  transform: none;
+}
+
+.customer-shell .search-bar button[type='submit'] {
+  width: 40px;
+  height: 40px;
+  right: 5px;
+  padding: 0;
+  border-radius: 11px;
+  background: var(--kk-primary);
+  box-shadow: none;
+  transition: background 160ms ease, opacity 160ms ease;
+}
+
+.customer-shell .search-bar button[type='submit']:hover {
+  background: var(--kk-primary-dark);
+  box-shadow: none;
+  transform: translateY(-50%);
+}
+
+.customer-shell .search-voice-btn,
+.customer-shell .search-image-btn {
+  width: 38px;
+  height: 38px;
+  border: 1px solid var(--kk-line);
+  color: var(--kk-muted);
+  background: #fff;
+  transition: color 160ms ease, border-color 160ms ease, background 160ms ease;
+}
+
+.customer-shell .search-voice-btn:hover,
+.customer-shell .search-image-btn:hover {
+  color: var(--kk-primary-dark);
+  border-color: #c4b5fd;
+  background: var(--kk-primary-soft);
+}
+
+.customer-shell .header-actions {
+  gap: 8px;
+}
+
+.customer-shell .icon-link,
+.customer-shell .mobile-menu-btn,
+.customer-shell .notification-bell {
+  display: inline-flex;
+  min-width: 44px;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+}
+
+.customer-shell .icon-link:hover {
+  color: var(--kk-primary-dark);
+  background: var(--kk-primary-soft);
+}
+
+.customer-shell .mega-menu {
+  border-top: 1px solid #f1f5f9;
+  border-bottom: 1px solid var(--kk-line);
+  box-shadow: none;
+}
+
+.customer-shell .menu-list > li > a {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  color: var(--kk-ink);
+  font-weight: 750;
+  letter-spacing: .02em;
+}
+
+.customer-shell .menu-list > li > a:hover {
+  color: var(--kk-primary-dark);
+}
+
+/* Shared Home/catalog controls */
+.customer-shell .filter-tabs .tab,
+.customer-shell .filter-btn,
+.customer-shell .btn-view-all {
+  min-height: 44px;
+  border-radius: 12px;
+}
+
+.customer-shell .filter-tabs .tab,
+.customer-shell .filter-btn {
+  border-color: var(--kk-line);
+  color: var(--kk-muted);
+  background: var(--kk-surface);
+}
+
+.customer-shell .filter-tabs .tab.active,
+.customer-shell .filter-btn.active {
+  color: #fff;
+  border-color: var(--kk-primary);
+  background: var(--kk-primary);
+}
+
+.customer-shell .btn-view-all {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--kk-line);
+  color: var(--kk-ink);
+  background: var(--kk-surface);
+  transition: color 160ms ease, border-color 160ms ease, background 160ms ease;
+}
+
+.customer-shell .btn-view-all:hover {
+  color: var(--kk-primary-dark);
+  border-color: #c4b5fd;
+  background: var(--kk-primary-soft);
+  transform: none;
+}
+
+.customer-shell .hero-banner img,
+.customer-shell .category-tile img,
+.customer-shell .lookbook-card img,
+.customer-shell .collection-card img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+}
+
 @media (max-width: 768px) {
   .customer-shell {
     overflow-x: clip;
+  }
+
+  .customer-shell .header-container {
+    padding: 10px 16px;
+  }
+
+  .customer-shell .logo img,
+  .customer-shell .logo:hover img {
+    height: 38px;
+  }
+
+  .customer-shell .search-bar {
+    margin-inline: 10px;
   }
 }
 
