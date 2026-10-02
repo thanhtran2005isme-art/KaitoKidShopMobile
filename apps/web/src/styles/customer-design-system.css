@@ -201,6 +201,98 @@
   color: var(--kk-primary-dark);
 }
 
+/* Home: remove legacy AI-looking glow/gradient chrome; keep photography dominant. */
+.customer-shell .home-page {
+  background: var(--kk-canvas);
+}
+
+.customer-shell .hero-banner {
+  height: clamp(380px, 56vw, 680px);
+  min-height: 0;
+  background: #f3f4f6;
+}
+
+.customer-shell .hero-banner::before,
+.customer-shell .hero-banner::after {
+  content: none;
+}
+
+.customer-shell .hero-slide {
+  background: #f3f4f6;
+}
+
+.customer-shell .hero-slide img {
+  object-fit: cover;
+  object-position: center;
+}
+
+.customer-shell .hero-arrow {
+  width: 44px;
+  height: 44px;
+  border: 1px solid rgba(255, 255, 255, .55);
+  background: rgba(17, 24, 39, .68);
+  box-shadow: none;
+  transform: none;
+  transition: background 180ms ease, opacity 180ms ease;
+}
+
+.customer-shell .hero-arrow:hover {
+  background: rgba(17, 24, 39, .84);
+  transform: none;
+}
+
+.customer-shell .category-section,
+.customer-shell .products-section {
+  width: min(100%, 1280px);
+  margin-inline: auto;
+}
+
+.customer-shell .category-section {
+  padding-inline: 24px;
+}
+
+.customer-shell .category-grid {
+  gap: 16px;
+}
+
+.customer-shell .category-tile {
+  border-radius: 16px;
+  background: #f3f4f6;
+}
+
+.customer-shell .category-tile:hover img {
+  transform: scale(1.015);
+}
+
+.customer-shell .category-overlay,
+.customer-shell .category-tile:hover .category-overlay {
+  background: linear-gradient(to top, rgba(17, 24, 39, .72), rgba(17, 24, 39, .04) 62%);
+}
+
+.customer-shell .products-section {
+  padding: 24px 24px 64px;
+  background: transparent;
+}
+
+.customer-shell .products-section::before,
+.customer-shell .products-section::after,
+.customer-shell .sale-products-section::before,
+.customer-shell .sale-products-section::after {
+  content: none;
+}
+
+.customer-shell .section-header h2,
+.customer-shell .section-title-with-icon {
+  color: var(--kk-ink);
+  background: none;
+  -webkit-text-fill-color: currentColor;
+  text-shadow: none;
+}
+
+.customer-shell .section-header p {
+  color: var(--kk-muted);
+}
+
 /* Shared Home/catalog controls */
 .customer-shell .filter-tabs .tab,
 .customer-shell .filter-btn,
@@ -266,6 +358,25 @@
 
   .customer-shell .search-bar {
     margin-inline: 10px;
+  }
+
+  .customer-shell .hero-banner {
+    height: clamp(320px, 108vw, 500px);
+  }
+
+  .customer-shell .category-section,
+  .customer-shell .products-section {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .customer-shell .category-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .customer-shell .category-tile {
+    border-radius: 14px;
   }
 }
 
