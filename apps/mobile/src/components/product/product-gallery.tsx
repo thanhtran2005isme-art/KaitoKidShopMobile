@@ -23,8 +23,8 @@ export function ProductGallery({ images }: ProductGalleryProps) {
   const { width } = useWindowDimensions();
   const listRef = useRef<FlatList<string>>(null);
   const [activeIndex, setActiveIndex] = useState(0);
-  const galleryWidth = Math.min(width - 16, 680);
-  const galleryHeight = Math.min(Math.round(galleryWidth * 1.2), 520);
+  const galleryWidth = Math.min(Math.max(280, width - 32), 680);
+  const galleryHeight = Math.min(Math.round(galleryWidth * 1.24), 620);
 
   const sources = Array.from(
     new Set(
@@ -91,7 +91,6 @@ export function ProductGallery({ images }: ProductGalleryProps) {
             accessibilityLabel="Ảnh trước"
             accessibilityRole="button"
             disabled={activeIndex === 0}
-            hitSlop={8}
             onPress={() => selectImage(activeIndex - 1)}
             style={({ pressed }) => [
               styles.arrow,
@@ -106,7 +105,6 @@ export function ProductGallery({ images }: ProductGalleryProps) {
             accessibilityLabel="Ảnh tiếp theo"
             accessibilityRole="button"
             disabled={activeIndex === visibleSources.length - 1}
-            hitSlop={8}
             onPress={() => selectImage(activeIndex + 1)}
             style={({ pressed }) => [
               styles.arrow,
@@ -136,12 +134,11 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     position: 'relative',
     overflow: 'hidden',
-    borderTopLeftRadius: 12,
-    borderTopRightRadius: 12,
-    backgroundColor: '#D9DADD',
+    borderRadius: 18,
+    backgroundColor: '#F3F4F6',
   },
   hero: {
-    backgroundColor: '#D9DADD',
+    backgroundColor: '#F3F4F6',
   },
   heroImage: {
     width: '100%',
@@ -152,7 +149,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 10,
-    backgroundColor: '#EDE9FE',
+    backgroundColor: BRAND_COLORS.primarySoft,
   },
   fallbackText: {
     color: BRAND_COLORS.primaryDark,
@@ -161,19 +158,19 @@ const styles = StyleSheet.create({
   },
   arrow: {
     position: 'absolute',
-    top: '48%',
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: 'rgba(12,13,15,0.72)',
+    top: '47%',
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(17,24,39,0.72)',
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(255,255,255,0.22)',
+    borderColor: 'rgba(255,255,255,0.32)',
   },
   arrowLeft: { left: 10 },
   arrowRight: { right: 10 },
-  arrowDisabled: { opacity: 0.25 },
+  arrowDisabled: { opacity: 0.28 },
   dots: {
     position: 'absolute',
     left: 0,
@@ -185,14 +182,14 @@ const styles = StyleSheet.create({
     gap: 5,
   },
   dot: {
-    width: 5,
-    height: 5,
+    width: 6,
+    height: 6,
     borderRadius: 999,
-    backgroundColor: 'rgba(255,255,255,0.35)',
+    backgroundColor: 'rgba(255,255,255,0.48)',
   },
   dotActive: {
-    width: 17,
+    width: 20,
     backgroundColor: '#FFFFFF',
   },
-  pressed: { opacity: 0.74 },
+  pressed: { opacity: 0.78 },
 });
