@@ -28,6 +28,7 @@ function StatusBadgeBase({
 
   return (
     <View
+      accessible
       accessibilityLabel={meta.label}
       style={[
         styles.badge,
@@ -46,16 +47,16 @@ export const OrderStatusBadge = memo(StatusBadgeBase);
 const styles = StyleSheet.create({
   badge: {
     alignSelf: 'flex-start',
-    minHeight: 28,
+    minHeight: 30,
     justifyContent: 'center',
     borderRadius: 999,
     borderWidth: 1,
-    paddingHorizontal: 9,
-    paddingVertical: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
   },
   text: {
-    fontSize: 8,
-    lineHeight: 12,
+    fontSize: 11,
+    lineHeight: 15,
     fontWeight: '900',
   },
 });
