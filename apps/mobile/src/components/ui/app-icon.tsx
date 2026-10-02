@@ -23,6 +23,11 @@ const SYMBOLS = {
     android: 'published_with_changes',
     web: 'published_with_changes',
   },
+  logout: {
+    ios: 'rectangle.portrait.and.arrow.right',
+    android: 'logout',
+    web: 'logout',
+  },
   shield: { ios: 'checkmark.shield', android: 'verified_user', web: 'verified_user' },
   check: { ios: 'checkmark', android: 'check', web: 'check' },
   clothing: { ios: 'tshirt', android: 'checkroom', web: 'checkroom' },
