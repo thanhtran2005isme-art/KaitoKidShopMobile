@@ -115,6 +115,9 @@ export default function OrdersScreen() {
     return (
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.centerState}>
+          <View style={styles.stateIcon}>
+            <AppIcon color={BRAND_COLORS.primary} name="bag" size={28} />
+          </View>
           <Text style={styles.stateTitle}>Đăng nhập để xem đơn hàng</Text>
           <Text style={styles.stateText}>
             Lịch sử mua hàng và theo dõi vận chuyển chỉ hiển thị cho chính chủ tài khoản.
@@ -128,7 +131,7 @@ export default function OrdersScreen() {
                 params: { redirect: '/orders' },
               })
             }
-            style={styles.primaryButton}>
+            style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed]}>
             <Text style={styles.primaryButtonText}>Đăng nhập</Text>
           </Pressable>
         </View>
@@ -168,6 +171,7 @@ export default function OrdersScreen() {
             const active = filter === item.key;
             return (
               <Pressable
+                accessibilityLabel={`${item.label}, ${counts.get(item.key) || 0} đơn`}
                 accessibilityRole="button"
                 accessibilityState={{ selected: active }}
                 key={item.key}
@@ -212,7 +216,7 @@ export default function OrdersScreen() {
               accessibilityLabel="Thử tải lại đơn hàng"
               accessibilityRole="button"
               onPress={() => void loadOrders('initial')}
-              style={styles.retryButton}>
+              style={({ pressed }) => [styles.retryButton, pressed && styles.pressed]}>
               <Text style={styles.retryText}>Thử lại</Text>
             </Pressable>
           </View>
@@ -234,6 +238,9 @@ export default function OrdersScreen() {
             keyExtractor={(item) => String(item.id)}
             ListEmptyComponent={
               <View style={styles.emptyCard}>
+                <View style={styles.stateIcon}>
+                  <AppIcon color={BRAND_COLORS.primary} name="bag" size={28} />
+                </View>
                 <Text style={styles.emptyTitle}>
                   {orders.length === 0
                     ? 'Bạn chưa có đơn hàng nào'
@@ -246,9 +253,10 @@ export default function OrdersScreen() {
                 </Text>
                 {orders.length === 0 ? (
                   <Pressable
+                    accessibilityLabel="Tiếp tục mua sắm"
                     accessibilityRole="button"
                     onPress={() => router.replace('/')}
-                    style={styles.emptyButton}>
+                    style={({ pressed }) => [styles.emptyButton, pressed && styles.pressed]}>
                     <Text style={styles.emptyButtonText}>
                       Tiếp tục mua sắm
                     </Text>
@@ -297,25 +305,20 @@ const styles = StyleSheet.create({
   backButton: {
     width: 44,
     height: 44,
-    borderRadius: 15,
+    borderRadius: 14,
     borderWidth: 1,
     borderColor: BRAND_COLORS.line,
     backgroundColor: BRAND_COLORS.surface,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  backText: {
-    color: BRAND_COLORS.ink,
-    fontSize: 30,
-    lineHeight: 32,
-    marginTop: -2,
-  },
   headerCopy: { flex: 1 },
   eyebrow: {
     color: BRAND_COLORS.primary,
-    fontSize: 8,
+    fontSize: 10,
+    lineHeight: 14,
     fontWeight: '900',
-    letterSpacing: 1.1,
+    letterSpacing: 1.05,
   },
   title: {
     color: BRAND_COLORS.ink,
@@ -324,10 +327,11 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
   subtitle: {
-    marginTop: 2,
+    marginTop: 3,
     color: BRAND_COLORS.muted,
-    fontSize: 9,
-    lineHeight: 14,
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: '500',
   },
   filters: {
     gap: 8,
@@ -335,22 +339,23 @@ const styles = StyleSheet.create({
   },
   filterChip: {
     minHeight: 44,
-    borderRadius: 15,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: BRAND_COLORS.line,
     backgroundColor: BRAND_COLORS.surface,
-    paddingHorizontal: 11,
+    paddingHorizontal: 12,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 7,
   },
   filterChipActive: {
-    borderColor: BRAND_COLORS.primary,
+    borderColor: '#C4B5FD',
     backgroundColor: BRAND_COLORS.primarySoft,
   },
   filterText: {
     color: BRAND_COLORS.muted,
-    fontSize: 9,
+    fontSize: 12,
+    lineHeight: 17,
     fontWeight: '800',
   },
   filterTextActive: {
@@ -358,20 +363,21 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
   filterCount: {
-    minWidth: 22,
-    height: 22,
-    borderRadius: 11,
+    minWidth: 24,
+    height: 24,
+    borderRadius: 12,
     backgroundColor: '#F3F4F6',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 5,
+    paddingHorizontal: 6,
   },
   filterCountActive: {
     backgroundColor: BRAND_COLORS.primary,
   },
   filterCountText: {
     color: BRAND_COLORS.muted,
-    fontSize: 8,
+    fontSize: 10,
+    lineHeight: 14,
     fontWeight: '900',
   },
   filterCountTextActive: { color: '#FFFFFF' },
@@ -386,7 +392,7 @@ const styles = StyleSheet.create({
   separator: { height: 10 },
   loadingCard: {
     minHeight: 180,
-    borderRadius: 20,
+    borderRadius: 18,
     borderWidth: 1,
     borderColor: BRAND_COLORS.line,
     backgroundColor: BRAND_COLORS.surface,
@@ -396,41 +402,44 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     color: BRAND_COLORS.muted,
-    fontSize: 9,
+    fontSize: 13,
+    lineHeight: 18,
     fontWeight: '700',
   },
   errorCard: {
     marginBottom: 12,
-    minHeight: 72,
-    borderRadius: 18,
+    minHeight: 76,
+    borderRadius: 16,
     borderWidth: 1,
     borderColor: '#FECACA',
     backgroundColor: '#FEF2F2',
-    padding: 12,
+    padding: 14,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 12,
   },
   errorCopy: { flex: 1 },
   errorTitle: {
     color: '#991B1B',
-    fontSize: 10,
+    fontSize: 14,
+    lineHeight: 19,
     fontWeight: '900',
   },
   errorText: {
     marginTop: 2,
     color: '#B91C1C',
-    fontSize: 8,
-    lineHeight: 13,
+    fontSize: 12,
+    lineHeight: 18,
   },
   retryButton: {
     minHeight: 44,
     justifyContent: 'center',
-    paddingHorizontal: 8,
+    paddingHorizontal: 10,
   },
   retryText: {
     color: BRAND_COLORS.danger,
-    fontSize: 9,
+    fontSize: 12,
+    lineHeight: 17,
     fontWeight: '900',
   },
   emptyCard: {
@@ -439,10 +448,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: 28,
     paddingVertical: 40,
   },
+  stateIcon: {
+    width: 52,
+    height: 52,
+    borderRadius: 16,
+    backgroundColor: BRAND_COLORS.primarySoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 4,
+  },
   emptyTitle: {
     color: BRAND_COLORS.ink,
     fontSize: 18,
-    lineHeight: 23,
+    lineHeight: 24,
     fontWeight: '900',
     textAlign: 'center',
   },
@@ -450,14 +468,14 @@ const styles = StyleSheet.create({
     marginTop: 6,
     maxWidth: 360,
     color: BRAND_COLORS.muted,
-    fontSize: 10,
-    lineHeight: 16,
+    fontSize: 14,
+    lineHeight: 20,
     textAlign: 'center',
   },
   emptyButton: {
-    marginTop: 14,
+    marginTop: 16,
     minHeight: 48,
-    borderRadius: 15,
+    borderRadius: 12,
     backgroundColor: BRAND_COLORS.primary,
     paddingHorizontal: 18,
     alignItems: 'center',
@@ -465,7 +483,8 @@ const styles = StyleSheet.create({
   },
   emptyButtonText: {
     color: '#FFFFFF',
-    fontSize: 10,
+    fontSize: 14,
+    lineHeight: 19,
     fontWeight: '900',
   },
   centerState: {
@@ -478,19 +497,20 @@ const styles = StyleSheet.create({
   stateTitle: {
     color: BRAND_COLORS.ink,
     fontSize: 20,
+    lineHeight: 26,
     fontWeight: '900',
     textAlign: 'center',
   },
   stateText: {
     maxWidth: 380,
     color: BRAND_COLORS.muted,
-    fontSize: 10,
-    lineHeight: 16,
+    fontSize: 14,
+    lineHeight: 20,
     textAlign: 'center',
   },
   primaryButton: {
     minHeight: 48,
-    borderRadius: 15,
+    borderRadius: 12,
     backgroundColor: BRAND_COLORS.primary,
     paddingHorizontal: 18,
     alignItems: 'center',
@@ -498,8 +518,9 @@ const styles = StyleSheet.create({
   },
   primaryButtonText: {
     color: '#FFFFFF',
-    fontSize: 10,
+    fontSize: 14,
+    lineHeight: 19,
     fontWeight: '900',
   },
-  pressed: { opacity: 0.78 },
+  pressed: { opacity: 0.72 },
 });
