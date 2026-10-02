@@ -57,6 +57,7 @@ export default function ProductListPage({
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [retryKey, setRetryKey] = useState(0);
 
   const [page, setPage] = useState(() => Math.max(1, Number(params.get('page')) || 1));
   const [pageSize, setPageSize] = useState<PageSize>(() => {
@@ -96,12 +97,22 @@ export default function ProductListPage({
       );
       setAvailableSizes(
         Array.from(
-          new Set(source.flatMap((product) => product.sizes || []).map((size) => size.trim()).filter(Boolean)),
+          new Set(
+            source
+              .flatMap((product) => product.sizes || [])
+              .map((size) => size.trim())
+              .filter(Boolean),
+          ),
         ),
       );
       setAvailableColors(
         Array.from(
-          new Set(source.flatMap((product) => product.colors || []).map((color) => color.trim()).filter(Boolean)),
+          new Set(
+            source
+              .flatMap((product) => product.colors || [])
+              .map((color) => color.trim())
+              .filter(Boolean),
+          ),
         ),
       );
     });
@@ -109,7 +120,7 @@ export default function ProductListPage({
     return () => {
       cancelled = true;
     };
-    // fixedFilters represents route-level constraints and is intentionally loaded as one facet source.
+    // Route-level fixed filters are intentionally used as the facet source for this page.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -169,7 +180,18 @@ export default function ProductListPage({
     };
     // URL params are included so deep-link filters stay authoritative.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeCategory, activePriceIdx, activeSizes, activeColors, minRating, sort, page, pageSize, params]);
+  }, [
+    activeCategory,
+    activePriceIdx,
+    activeSizes,
+    activeColors,
+    minRating,
+    sort,
+    page,
+    pageSize,
+    params,
+    retryKey,
+  ]);
 
   useEffect(() => {
     const next = new URLSearchParams(params);
@@ -264,11 +286,9 @@ export default function ProductListPage({
       )}
 
       <section className="catalog-toolbar" aria-label="Điều khiển danh sách sản phẩm">
-        <div>
-          <p className="catalog-result-count" aria-live="polite">
-            {loading ? 'Đang tải sản phẩm…' : <>Tìm thấy <strong>{total}</strong> sản phẩm</>}
-          </p>
-        </div>
+        <p className="catalog-result-count" aria-live="polite">
+          {loading ? 'Đang tải sản phẩm…' : <>Tìm thấy <strong>{total}</strong> sản phẩm</>}
+        </p>
 
         <div className="catalog-toolbar-actions">
           <button
@@ -343,7 +363,9 @@ export default function ProductListPage({
         <aside
           className={`catalog-sidebar ${mobileFilterOpen ? 'is-open' : ''}`}
           id="catalog-filter-panel"
-          aria-label="Bộ lọc sản phẩm">
+          aria-label="Bộ lọc sản phẩm"
+          role={mobileFilterOpen ? 'dialog' : undefined}
+          aria-modal={mobileFilterOpen || undefined}>
           <div className="catalog-sidebar-panel">
             <div className="catalog-sidebar-header">
               <h2 className="catalog-sidebar-title">
@@ -489,8 +511,8 @@ export default function ProductListPage({
               <button
                 className="catalog-primary-action"
                 type="button"
-                onClick={() => setPage((current) => current)}>
-                Tải lại trang
+                onClick={() => setRetryKey((current) => current + 1)}>
+                Thử lại
               </button>
             </div>
           ) : products.length > 0 ? (
