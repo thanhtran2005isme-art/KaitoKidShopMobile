@@ -66,8 +66,9 @@ export default function WishlistScreen() {
         <View style={styles.header}>
           <Pressable
             accessibilityLabel="Quay lại"
+            accessibilityRole="button"
             onPress={() => router.back()}
-            style={styles.backButton}>
+            style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}>
             <AppIcon color={BRAND_COLORS.ink} name="arrowLeft" size={22} />
           </Pressable>
           <Text style={styles.headerTitle}>Yêu thích</Text>
@@ -83,13 +84,14 @@ export default function WishlistScreen() {
             Đăng nhập để đồng bộ danh sách yêu thích trên tài khoản KaitoKid.
           </Text>
           <Pressable
+            accessibilityRole="button"
             onPress={() =>
               router.push({
                 pathname: '/auth/login',
                 params: { redirect: '/wishlist' },
               })
             }
-            style={styles.primaryButton}>
+            style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed]}>
             <Text style={styles.primaryButtonText}>Đăng nhập</Text>
           </Pressable>
         </View>
@@ -102,8 +104,9 @@ export default function WishlistScreen() {
       <View style={styles.header}>
         <Pressable
           accessibilityLabel="Quay lại"
+          accessibilityRole="button"
           onPress={() => router.back()}
-          style={styles.backButton}>
+          style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}>
           <AppIcon color={BRAND_COLORS.ink} name="arrowLeft" size={22} />
         </Pressable>
         <View style={styles.headerCopy}>
@@ -142,6 +145,8 @@ export default function WishlistScreen() {
             return (
               <View style={styles.card}>
                 <Pressable
+                  accessibilityLabel={`Xem ${item.productName}`}
+                  accessibilityRole="button"
                   onPress={() => openProduct(item)}
                   style={({ pressed }) => [
                     styles.productArea,
@@ -150,6 +155,8 @@ export default function WishlistScreen() {
                   <View style={styles.imageWrap}>
                     {image ? (
                       <Image
+                        accessibilityLabel={item.productName}
+                        cachePolicy="memory-disk"
                         contentFit="cover"
                         source={{ uri: image }}
                         style={styles.image}
@@ -174,12 +181,17 @@ export default function WishlistScreen() {
                       ) : null}
                     </View>
 
-                    <View style={styles.openRow}><Text style={styles.openText}>Xem sản phẩm</Text><AppIcon color={BRAND_COLORS.primary} name="arrowRight" size={14} /></View>
+                    <View style={styles.openRow}>
+                      <Text style={styles.openText}>Xem sản phẩm</Text>
+                      <AppIcon color={BRAND_COLORS.primary} name="arrowRight" size={14} />
+                    </View>
                   </View>
                 </Pressable>
 
                 <Pressable
                   accessibilityLabel="Bỏ khỏi danh sách yêu thích"
+                  accessibilityRole="button"
+                  accessibilityState={{ disabled: removing }}
                   disabled={removing}
                   onPress={() => void remove(item.productId)}
                   style={({ pressed }) => [
@@ -206,8 +218,9 @@ export default function WishlistScreen() {
                 Chạm biểu tượng tim trên sản phẩm để lưu lại và xem sau.
               </Text>
               <Pressable
+                accessibilityRole="button"
                 onPress={() => router.replace('/(tabs)')}
-                style={styles.secondaryButton}>
+                style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]}>
                 <Text style={styles.secondaryButtonText}>Khám phá sản phẩm</Text>
               </Pressable>
             </View>
@@ -225,7 +238,7 @@ const styles = StyleSheet.create({
     backgroundColor: BRAND_COLORS.canvas,
   },
   header: {
-    minHeight: 70,
+    minHeight: 72,
     paddingHorizontal: 16,
     flexDirection: 'row',
     alignItems: 'center',
@@ -235,10 +248,12 @@ const styles = StyleSheet.create({
     borderBottomColor: BRAND_COLORS.line,
   },
   backButton: {
-    width: 42,
-    height: 42,
-    borderRadius: 15,
-    backgroundColor: '#F3F4F6',
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: BRAND_COLORS.line,
+    backgroundColor: BRAND_COLORS.surface,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -251,25 +266,29 @@ const styles = StyleSheet.create({
   },
   headerSubtitle: {
     color: BRAND_COLORS.muted,
-    fontSize: 9,
-    fontWeight: '700',
+    fontSize: 11,
+    fontWeight: '600',
     textAlign: 'center',
     marginTop: 2,
   },
-  headerSpacer: { width: 42 },
+  headerSpacer: { width: 44 },
   list: {
+    width: '100%',
+    maxWidth: 720,
+    alignSelf: 'center',
     padding: 16,
     gap: 12,
     paddingBottom: 36,
   },
   emptyList: { flexGrow: 1 },
   card: {
-    borderRadius: 20,
+    borderRadius: 18,
     backgroundColor: BRAND_COLORS.surface,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: BRAND_COLORS.line,
     padding: 10,
     flexDirection: 'row',
+    alignItems: 'flex-start',
     gap: 8,
   },
   productArea: {
@@ -279,8 +298,8 @@ const styles = StyleSheet.create({
   },
   imageWrap: {
     width: 92,
-    height: 112,
-    borderRadius: 16,
+    aspectRatio: 0.8,
+    borderRadius: 14,
     overflow: 'hidden',
     backgroundColor: '#F3F4F6',
     alignItems: 'center',
@@ -294,9 +313,9 @@ const styles = StyleSheet.create({
   },
   productName: {
     color: BRAND_COLORS.ink,
-    fontSize: 13,
-    lineHeight: 18,
-    fontWeight: '900',
+    fontSize: 14,
+    lineHeight: 19,
+    fontWeight: '800',
   },
   priceRow: {
     flexDirection: 'row',
@@ -305,13 +324,13 @@ const styles = StyleSheet.create({
     gap: 7,
   },
   price: {
-    color: BRAND_COLORS.primary,
-    fontSize: 14,
+    color: BRAND_COLORS.ink,
+    fontSize: 15,
     fontWeight: '900',
   },
   oldPrice: {
     color: '#9CA3AF',
-    fontSize: 10,
+    fontSize: 11,
     textDecorationLine: 'line-through',
   },
   openRow: {
@@ -321,18 +340,20 @@ const styles = StyleSheet.create({
   },
   openText: {
     color: BRAND_COLORS.primary,
-    fontSize: 9,
+    fontSize: 11,
     fontWeight: '800',
   },
   removeButton: {
-    width: 40,
-    height: 40,
+    width: 44,
+    height: 44,
     borderRadius: 14,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#FECACA',
     backgroundColor: '#FEF2F2',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  pressed: { opacity: 0.7 },
+  pressed: { opacity: 0.76 },
   disabled: { opacity: 0.5 },
   loading: {
     flex: 1,
@@ -342,7 +363,7 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     color: BRAND_COLORS.muted,
-    fontSize: 11,
+    fontSize: 12,
   },
   authState: {
     flex: 1,
@@ -354,7 +375,7 @@ const styles = StyleSheet.create({
   authIcon: {
     width: 76,
     height: 76,
-    borderRadius: 26,
+    borderRadius: 24,
     backgroundColor: '#FEF2F2',
     alignItems: 'center',
     justifyContent: 'center',
@@ -367,19 +388,20 @@ const styles = StyleSheet.create({
   },
   stateText: {
     color: BRAND_COLORS.muted,
-    fontSize: 11,
-    lineHeight: 17,
+    fontSize: 12,
+    lineHeight: 18,
     textAlign: 'center',
-    maxWidth: 320,
+    maxWidth: 340,
   },
   primaryButton: {
     marginTop: 5,
     minWidth: 170,
-    height: 48,
-    borderRadius: 16,
+    minHeight: 48,
+    borderRadius: 14,
     backgroundColor: BRAND_COLORS.primary,
     alignItems: 'center',
     justifyContent: 'center',
+    paddingHorizontal: 18,
   },
   primaryButtonText: {
     color: '#FFFFFF',
@@ -389,14 +411,17 @@ const styles = StyleSheet.create({
   secondaryButton: {
     marginTop: 5,
     minWidth: 180,
-    height: 46,
-    borderRadius: 15,
-    backgroundColor: BRAND_COLORS.ink,
+    minHeight: 46,
+    borderRadius: 14,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: BRAND_COLORS.line,
+    backgroundColor: BRAND_COLORS.surface,
     alignItems: 'center',
     justifyContent: 'center',
+    paddingHorizontal: 18,
   },
   secondaryButtonText: {
-    color: '#FFFFFF',
+    color: BRAND_COLORS.ink,
     fontSize: 12,
     fontWeight: '900',
   },
@@ -410,7 +435,7 @@ const styles = StyleSheet.create({
   emptyIcon: {
     width: 74,
     height: 74,
-    borderRadius: 25,
+    borderRadius: 24,
     backgroundColor: BRAND_COLORS.primarySoft,
     alignItems: 'center',
     justifyContent: 'center',
