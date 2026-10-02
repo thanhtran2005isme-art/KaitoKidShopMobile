@@ -198,7 +198,7 @@ const styles = StyleSheet.create({
   },
   pressed: { opacity: 0.93 },
   imageFallback: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: BRAND_COLORS.primarySoft,
     alignItems: 'center',
     justifyContent: 'center',
@@ -209,7 +209,7 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
   overlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: 'rgba(17,24,39,0.38)',
   },
   copy: {
