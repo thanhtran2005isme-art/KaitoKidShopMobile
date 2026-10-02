@@ -84,6 +84,7 @@ export default function WishlistScreen() {
             Đăng nhập để đồng bộ danh sách yêu thích trên tài khoản KaitoKid.
           </Text>
           <Pressable
+            accessibilityLabel="Đăng nhập để xem danh sách yêu thích"
             accessibilityRole="button"
             onPress={() =>
               router.push({
@@ -111,7 +112,7 @@ export default function WishlistScreen() {
         </Pressable>
         <View style={styles.headerCopy}>
           <Text style={styles.headerTitle}>Yêu thích</Text>
-          <Text style={styles.headerSubtitle}>
+          <Text accessibilityLiveRegion="polite" style={styles.headerSubtitle}>
             {wishlistItems.length} sản phẩm đã lưu
           </Text>
         </View>
@@ -119,7 +120,7 @@ export default function WishlistScreen() {
       </View>
 
       {wishlistLoading && !wishlistItems.length ? (
-        <View style={styles.loading}>
+        <View accessibilityRole="progressbar" style={styles.loading}>
           <ActivityIndicator color={BRAND_COLORS.primary} size="large" />
           <Text style={styles.loadingText}>Đang tải danh sách...</Text>
         </View>
@@ -183,13 +184,13 @@ export default function WishlistScreen() {
 
                     <View style={styles.openRow}>
                       <Text style={styles.openText}>Xem sản phẩm</Text>
-                      <AppIcon color={BRAND_COLORS.primary} name="arrowRight" size={14} />
+                      <AppIcon color={BRAND_COLORS.primary} name="arrowRight" size={16} />
                     </View>
                   </View>
                 </Pressable>
 
                 <Pressable
-                  accessibilityLabel="Bỏ khỏi danh sách yêu thích"
+                  accessibilityLabel={`Bỏ ${item.productName} khỏi danh sách yêu thích`}
                   accessibilityRole="button"
                   accessibilityState={{ disabled: removing }}
                   disabled={removing}
@@ -218,6 +219,7 @@ export default function WishlistScreen() {
                 Chạm biểu tượng tim trên sản phẩm để lưu lại và xem sau.
               </Text>
               <Pressable
+                accessibilityLabel="Khám phá sản phẩm"
                 accessibilityRole="button"
                 onPress={() => router.replace('/(tabs)')}
                 style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]}>
@@ -261,12 +263,14 @@ const styles = StyleSheet.create({
   headerTitle: {
     color: BRAND_COLORS.ink,
     fontSize: 20,
+    lineHeight: 26,
     fontWeight: '900',
     textAlign: 'center',
   },
   headerSubtitle: {
     color: BRAND_COLORS.muted,
-    fontSize: 11,
+    fontSize: 12,
+    lineHeight: 17,
     fontWeight: '600',
     textAlign: 'center',
     marginTop: 2,
@@ -282,7 +286,7 @@ const styles = StyleSheet.create({
   },
   emptyList: { flexGrow: 1 },
   card: {
-    borderRadius: 18,
+    borderRadius: 16,
     backgroundColor: BRAND_COLORS.surface,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: BRAND_COLORS.line,
@@ -297,7 +301,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   imageWrap: {
-    width: 92,
+    width: 96,
     aspectRatio: 0.8,
     borderRadius: 14,
     overflow: 'hidden',
@@ -325,22 +329,26 @@ const styles = StyleSheet.create({
   },
   price: {
     color: BRAND_COLORS.ink,
-    fontSize: 15,
+    fontSize: 16,
+    lineHeight: 21,
     fontWeight: '900',
   },
   oldPrice: {
     color: '#9CA3AF',
-    fontSize: 11,
+    fontSize: 12,
+    lineHeight: 17,
     textDecorationLine: 'line-through',
   },
   openRow: {
+    minHeight: 32,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 5,
   },
   openText: {
     color: BRAND_COLORS.primary,
-    fontSize: 11,
+    fontSize: 13,
+    lineHeight: 18,
     fontWeight: '800',
   },
   removeButton: {
@@ -353,7 +361,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  pressed: { opacity: 0.76 },
+  pressed: { opacity: 0.72 },
   disabled: { opacity: 0.5 },
   loading: {
     flex: 1,
@@ -363,7 +371,8 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     color: BRAND_COLORS.muted,
-    fontSize: 12,
+    fontSize: 13,
+    lineHeight: 19,
   },
   authState: {
     flex: 1,
@@ -382,14 +391,15 @@ const styles = StyleSheet.create({
   },
   stateTitle: {
     color: BRAND_COLORS.ink,
-    fontSize: 18,
+    fontSize: 20,
+    lineHeight: 26,
     fontWeight: '900',
     textAlign: 'center',
   },
   stateText: {
     color: BRAND_COLORS.muted,
-    fontSize: 12,
-    lineHeight: 18,
+    fontSize: 13,
+    lineHeight: 19,
     textAlign: 'center',
     maxWidth: 340,
   },
@@ -405,13 +415,14 @@ const styles = StyleSheet.create({
   },
   primaryButtonText: {
     color: '#FFFFFF',
-    fontSize: 13,
+    fontSize: 14,
+    lineHeight: 19,
     fontWeight: '900',
   },
   secondaryButton: {
     marginTop: 5,
     minWidth: 180,
-    minHeight: 46,
+    minHeight: 48,
     borderRadius: 14,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: BRAND_COLORS.line,
@@ -422,7 +433,8 @@ const styles = StyleSheet.create({
   },
   secondaryButtonText: {
     color: BRAND_COLORS.ink,
-    fontSize: 12,
+    fontSize: 14,
+    lineHeight: 19,
     fontWeight: '900',
   },
   empty: {
