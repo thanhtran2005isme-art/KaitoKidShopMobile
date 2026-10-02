@@ -1,15 +1,11 @@
-import { useRef } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, {
   Easing,
   interpolate,
   useAnimatedStyle,
   useSharedValue,
-  withDelay,
   withTiming,
 } from 'react-native-reanimated';
-
-import { AppIcon } from '@/components/ui/app-icon';
 
 type AnimatedLogoutButtonProps = {
   onPress: () => void;
@@ -18,12 +14,12 @@ type AnimatedLogoutButtonProps = {
   accessibilityLabel?: string;
 };
 
-const COLLAPSED_WIDTH = 45;
-const EXPANDED_WIDTH = 125;
-const HEIGHT = 45;
+const BUTTON_WIDTH = 150;
+const IDLE_ROTATION = 5;
+const PRESSED_TRANSLATE_Y = 5;
+const IDLE_PADDING_BOTTOM = 3;
 const DURATION = 300;
-const EXPANDED_SIGN_WIDTH = EXPANDED_WIDTH * 0.3 + 20;
-const EXPANDED_TEXT_WIDTH = EXPANDED_WIDTH * 0.7 + 10;
+const SPRINGY_EASING = Easing.bezier(0.175, 0.885, 0.32, 1.275);
 
 export function AnimatedLogoutButton({
   onPress,
@@ -31,139 +27,112 @@ export function AnimatedLogoutButton({
   label = 'Logout',
   accessibilityLabel = 'Logout',
 }: AnimatedLogoutButtonProps) {
-  const expanded = useSharedValue(0);
   const pressed = useSharedValue(0);
-  const hovering = useRef(false);
 
-  const expand = () => {
-    if (disabled) return;
-    expanded.value = withTiming(1, {
+  const buttonStyle = useAnimatedStyle(() => {
+    const progress = pressed.value;
+
+    return {
+      paddingBottom: interpolate(
+        progress,
+        [0, 1],
+        [IDLE_PADDING_BOTTOM, 0],
+      ),
+      transform: [
+        {
+          translateY: interpolate(
+            progress,
+            [0, 1],
+            [0, PRESSED_TRANSLATE_Y],
+          ),
+        },
+        {
+          rotate: `${interpolate(progress, [0, 1], [IDLE_ROTATION, 0])}deg`,
+        },
+      ],
+    };
+  });
+
+  const setPressed = (next: 0 | 1) => {
+    pressed.value = withTiming(next, {
       duration: DURATION,
-      easing: Easing.out(Easing.cubic),
+      easing: SPRINGY_EASING,
     });
   };
 
-  const collapse = (delay = 0) => {
-    expanded.value = withDelay(
-      delay,
-      withTiming(0, {
-        duration: DURATION,
-        easing: Easing.out(Easing.cubic),
-      }),
-    );
-  };
-
-  const buttonStyle = useAnimatedStyle(() => ({
-    width: interpolate(expanded.value, [0, 1], [COLLAPSED_WIDTH, EXPANDED_WIDTH]),
-    borderRadius: interpolate(expanded.value, [0, 1], [HEIGHT / 2, 40]),
-    transform: [
-      { translateX: interpolate(pressed.value, [0, 1], [0, 2]) },
-      { translateY: interpolate(pressed.value, [0, 1], [0, 2]) },
-    ],
-  }));
-
-  const signStyle = useAnimatedStyle(() => ({
-    width: interpolate(expanded.value, [0, 1], [COLLAPSED_WIDTH, EXPANDED_SIGN_WIDTH]),
-    paddingLeft: interpolate(expanded.value, [0, 1], [0, 20]),
-  }));
-
-  const textStyle = useAnimatedStyle(() => ({
-    width: interpolate(expanded.value, [0, 1], [0, EXPANDED_TEXT_WIDTH]),
-    opacity: expanded.value,
-    paddingRight: interpolate(expanded.value, [0, 1], [0, 10]),
-  }));
-
   return (
-    <Animated.View
-      style={[
-        styles.button,
-        buttonStyle,
-        disabled && styles.disabled,
-      ]}>
-      <Pressable
-        accessibilityLabel={accessibilityLabel}
-        accessibilityRole="button"
-        accessibilityState={{ disabled }}
-        disabled={disabled}
-        onHoverIn={() => {
-          hovering.current = true;
-          expand();
-        }}
-        onHoverOut={() => {
-          hovering.current = false;
-          collapse();
-        }}
-        onPress={onPress}
-        onPressIn={() => {
-          expand();
-          pressed.value = withTiming(1, { duration: 80 });
-        }}
-        onPressOut={() => {
-          pressed.value = withTiming(0, { duration: 100 });
-          if (!hovering.current) collapse(120);
-        }}
-        style={styles.pressable}>
-        <Animated.View style={[styles.sign, signStyle]}>
-          <View style={styles.iconBox}>
-            <AppIcon color="#FFFFFF" name="logout" size={17} />
+    <View style={styles.layoutBox}>
+      <Animated.View
+        style={[
+          styles.button,
+          buttonStyle,
+          disabled && styles.disabled,
+        ]}>
+        <Pressable
+          accessibilityLabel={accessibilityLabel}
+          accessibilityRole="button"
+          accessibilityState={{ disabled }}
+          disabled={disabled}
+          onPress={onPress}
+          onPressIn={() => setPressed(1)}
+          onPressOut={() => setPressed(0)}
+          style={styles.pressable}>
+          <View style={styles.face}>
+            <Text numberOfLines={1} style={styles.text}>
+              {label}
+            </Text>
           </View>
-        </Animated.View>
-
-        <Animated.View pointerEvents="none" style={[styles.textWrap, textStyle]}>
-          <Text numberOfLines={1} style={styles.text}>
-            {label}
-          </Text>
-        </Animated.View>
-      </Pressable>
-    </Animated.View>
+        </Pressable>
+      </Animated.View>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  button: {
+  layoutBox: {
+    width: BUTTON_WIDTH + 16,
+    minHeight: 54,
+    alignItems: 'center',
+    justifyContent: 'center',
     alignSelf: 'flex-start',
-    height: HEIGHT,
-    overflow: 'hidden',
-    backgroundColor: 'rgb(255, 65, 65)',
-    shadowColor: '#000000',
-    shadowOffset: { width: 2, height: 2 },
-    shadowOpacity: 0.199,
-    shadowRadius: 10,
-    elevation: 5,
+  },
+  button: {
+    width: BUTTON_WIDTH,
+    padding: 0,
+    borderRadius: 5,
+    backgroundColor: '#5CDB95',
+    shadowColor: '#494A4B',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 1,
+    shadowRadius: 0,
+    elevation: 2,
   },
   pressable: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'flex-start',
-    position: 'relative',
-    overflow: 'hidden',
+    width: '100%',
+    borderRadius: 5,
   },
-  sign: {
-    height: HEIGHT,
+  face: {
+    width: '100%',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 5,
+    borderWidth: 2,
+    borderColor: '#494A4B',
+    backgroundColor: '#F1F5F8',
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  iconBox: {
-    width: 17,
-    height: 17,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  textWrap: {
-    position: 'absolute',
-    right: 0,
-    top: 0,
-    bottom: 0,
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
   },
   text: {
-    color: '#FFFFFF',
-    fontSize: 19,
-    lineHeight: 23,
-    fontWeight: '600',
+    color: '#111827',
+    fontSize: 15,
+    lineHeight: 18,
+    fontWeight: '400',
+    textAlign: 'center',
+    fontFamily: Platform.select({
+      ios: 'Marker Felt',
+      android: 'cursive',
+      default: 'cursive',
+    }),
   },
   disabled: {
     opacity: 0.55,
