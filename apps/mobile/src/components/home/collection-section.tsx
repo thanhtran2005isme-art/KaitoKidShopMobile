@@ -112,7 +112,7 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
   overlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: 'rgba(17,24,39,0.26)',
   },
   copy: {
