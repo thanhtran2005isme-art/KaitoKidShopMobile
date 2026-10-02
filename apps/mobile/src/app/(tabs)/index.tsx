@@ -19,6 +19,7 @@ import { HomeSkeleton } from '@/components/home/home-skeleton';
 import { LookbookSection } from '@/components/home/lookbook-section';
 import { ProductSection } from '@/components/home/product-section';
 import { PromoStrip } from '@/components/home/promo-strip';
+import { AppIcon } from '@/components/ui/app-icon';
 import { BRAND, BRAND_COLORS } from '@/constants/brand';
 import { useAuth } from '@/context/AuthContext';
 import { useShopping } from '@/context/ShoppingContext';
@@ -59,16 +60,21 @@ export default function HomeScreen() {
         {loading && !data ? <HomeSkeleton /> : null}
 
         {error && !data ? (
-          <View style={styles.errorCard}>
+          <View accessibilityRole="alert" style={styles.errorCard}>
             <View style={styles.errorIcon}>
-              <Text style={styles.errorIconText}>!</Text>
+              <AppIcon color={BRAND_COLORS.danger} name="warning" size={24} />
             </View>
             <Text style={styles.errorTitle}>Chưa tải được cửa hàng</Text>
             <Text style={styles.stateText}>{error}</Text>
             <Text style={styles.hint}>
-              Kiểm tra API.Customer cổng 5265 và kết nối LAN nếu đang dùng điện thoại thật.
+              Kiểm tra API KaitoKid cổng 5300 và kết nối mạng nếu đang dùng điện thoại thật.
             </Text>
-            <Pressable onPress={reload} style={({ pressed }) => [styles.retry, pressed && styles.pressed]}>
+            <Pressable
+              accessibilityLabel="Thử tải lại cửa hàng"
+              accessibilityRole="button"
+              onPress={reload}
+              style={({ pressed }) => [styles.retry, pressed && styles.pressed]}>
+              <AppIcon color={BRAND_COLORS.surface} name="refresh" size={18} />
               <Text style={styles.retryText}>Thử lại</Text>
             </Pressable>
           </View>
@@ -77,7 +83,7 @@ export default function HomeScreen() {
         {data ? (
           <>
             {error ? (
-              <View style={styles.inlineError}>
+              <View accessibilityRole="alert" style={styles.inlineError}>
                 <Text style={styles.inlineErrorText}>Không làm mới được một phần dữ liệu: {error}</Text>
               </View>
             ) : null}
@@ -148,6 +154,7 @@ export default function HomeScreen() {
                     return image ? (
                       <View key={item.id} style={styles.socialCard}>
                         <Image
+                          accessibilityLabel={item.title || `Hình ảnh ${BRAND.name}`}
                           source={{ uri: image }}
                           contentFit="cover"
                           transition={180}
@@ -188,70 +195,74 @@ const styles = StyleSheet.create({
   errorCard: {
     marginHorizontal: 16,
     padding: 24,
-    borderRadius: 24,
+    borderRadius: 20,
     backgroundColor: BRAND_COLORS.surface,
     alignItems: 'center',
     gap: 10,
-    borderWidth: StyleSheet.hairlineWidth,
+    borderWidth: 1,
     borderColor: BRAND_COLORS.line,
   },
   errorIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 15,
+    width: 48,
+    height: 48,
+    borderRadius: 14,
     backgroundColor: '#FEF2F2',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  errorIconText: {
-    color: BRAND_COLORS.danger,
-    fontSize: 23,
-    fontWeight: '900',
-  },
   stateText: {
+    maxWidth: 420,
     color: BRAND_COLORS.muted,
     textAlign: 'center',
-    fontSize: 12,
-    lineHeight: 18,
+    fontSize: 14,
+    lineHeight: 20,
   },
   errorTitle: {
     color: BRAND_COLORS.ink,
     fontSize: 18,
+    lineHeight: 24,
     fontWeight: '900',
     textAlign: 'center',
   },
   hint: {
-    color: BRAND_COLORS.primary,
+    maxWidth: 420,
+    color: BRAND_COLORS.primaryDark,
     textAlign: 'center',
-    fontSize: 10,
-    lineHeight: 15,
+    fontSize: 12,
+    lineHeight: 18,
+    fontWeight: '600',
   },
   retry: {
+    minHeight: 46,
     marginTop: 4,
-    backgroundColor: BRAND_COLORS.ink,
-    borderRadius: 999,
-    paddingHorizontal: 20,
-    paddingVertical: 11,
+    backgroundColor: BRAND_COLORS.primary,
+    borderRadius: 12,
+    paddingHorizontal: 18,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 7,
   },
-  pressed: { opacity: 0.75 },
+  pressed: { opacity: 0.72 },
   retryText: {
     color: '#FFFFFF',
     fontWeight: '900',
-    fontSize: 12,
+    fontSize: 14,
+    lineHeight: 19,
   },
   inlineError: {
     marginHorizontal: 16,
     backgroundColor: '#FFFBEB',
     borderRadius: 14,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderWidth: 1,
     borderColor: '#FDE68A',
   },
   inlineErrorText: {
     color: '#92400E',
-    fontSize: 10,
-    lineHeight: 15,
+    fontSize: 12,
+    lineHeight: 18,
     fontWeight: '700',
   },
   socialSection: { gap: 13 },
@@ -260,14 +271,16 @@ const styles = StyleSheet.create({
   },
   sectionEyebrow: {
     color: BRAND_COLORS.primary,
-    fontSize: 9,
+    fontSize: 10,
+    lineHeight: 14,
     fontWeight: '900',
-    letterSpacing: 1.2,
+    letterSpacing: 1.1,
     marginBottom: 2,
   },
   sectionTitle: {
     color: BRAND_COLORS.ink,
     fontSize: 20,
+    lineHeight: 26,
     fontWeight: '900',
   },
   socialList: {
@@ -277,7 +290,7 @@ const styles = StyleSheet.create({
   socialCard: {
     width: 140,
     height: 174,
-    borderRadius: 20,
+    borderRadius: 18,
     overflow: 'hidden',
     backgroundColor: '#E5E7EB',
   },
@@ -287,7 +300,7 @@ const styles = StyleSheet.create({
   },
   brandFooter: {
     marginHorizontal: 16,
-    borderRadius: 24,
+    borderRadius: 20,
     backgroundColor: BRAND_COLORS.primaryDark,
     padding: 18,
     flexDirection: 'row',
@@ -297,7 +310,7 @@ const styles = StyleSheet.create({
   brandMark: {
     width: 52,
     height: 52,
-    borderRadius: 18,
+    borderRadius: 16,
     backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
@@ -314,12 +327,13 @@ const styles = StyleSheet.create({
   brandFooterTitle: {
     color: '#FFFFFF',
     fontSize: 14,
+    lineHeight: 20,
     fontWeight: '900',
   },
   brandFooterText: {
     color: '#DDD6FE',
-    fontSize: 10,
-    lineHeight: 15,
+    fontSize: 12,
+    lineHeight: 18,
     fontWeight: '600',
   },
 });
