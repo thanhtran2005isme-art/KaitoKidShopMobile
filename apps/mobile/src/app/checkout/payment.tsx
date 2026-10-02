@@ -73,6 +73,8 @@ export default function CheckoutPaymentScreen() {
       return;
     }
 
+    const activeToken = token;
+    const activeOrderCode = orderCode;
     let active = true;
 
     async function load() {
@@ -83,8 +85,8 @@ export default function CheckoutPaymentScreen() {
         const [configResult, instructionsResult, statusResult] =
           await Promise.all([
             checkoutApi.getPaymentConfig(),
-            checkoutApi.getPaymentInstructions(token, orderCode),
-            checkoutApi.getPaymentStatus(token, orderCode),
+            checkoutApi.getPaymentInstructions(activeToken, activeOrderCode),
+            checkoutApi.getPaymentStatus(activeToken, activeOrderCode),
           ]);
 
         if (!active) return;
@@ -102,7 +104,7 @@ export default function CheckoutPaymentScreen() {
         if (statusResult.paidAt) {
           router.replace({
             pathname: '/order-success/[orderCode]',
-            params: { orderCode },
+            params: { orderCode: activeOrderCode },
           });
         }
       } catch (loadError) {
@@ -129,11 +131,13 @@ export default function CheckoutPaymentScreen() {
     if (!token || !orderCode || loading) return;
     if (status?.status === 'cancelled' || status?.paidAt) return;
 
+    const activeToken = token;
+    const activeOrderCode = orderCode;
     let active = true;
 
     async function poll() {
       try {
-        const next = await checkoutApi.getPaymentStatus(token, orderCode);
+        const next = await checkoutApi.getPaymentStatus(activeToken, activeOrderCode);
         if (!active) return;
 
         setStatus(next);
@@ -142,7 +146,7 @@ export default function CheckoutPaymentScreen() {
         if (next.paidAt) {
           router.replace({
             pathname: '/order-success/[orderCode]',
-            params: { orderCode },
+            params: { orderCode: activeOrderCode },
           });
         }
       } catch {
