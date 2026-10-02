@@ -9,8 +9,6 @@ import {
   Text,
   TextInput,
   View,
-  type StyleProp,
-  type ViewStyle,
 } from 'react-native';
 
 import { AppIcon } from '@/components/ui/app-icon';
@@ -20,52 +18,6 @@ type HomeHeaderProps = {
   cartCount?: number | null;
   userName?: string | null;
 };
-
-type EffectLayerProps = {
-  progress: Animated.Value;
-  from: number;
-  to: number;
-  colors: readonly [string, string, ...string[]];
-  locations?: readonly number[];
-  style: StyleProp<ViewStyle>;
-  opacity?: number;
-};
-
-function EffectLayer({
-  progress,
-  from,
-  to,
-  colors,
-  locations,
-  style,
-  opacity = 1,
-}: EffectLayerProps) {
-  const rotation = progress.interpolate({
-    inputRange: [0, 1],
-    outputRange: [`${from}deg`, `${to}deg`],
-  });
-
-  return (
-    <View pointerEvents="none" style={[styles.effectLayer, style]}>
-      <Animated.View
-        style={[
-          styles.effectRotor,
-          {
-            opacity,
-            transform: [{ rotate: rotation }],
-          },
-        ]}>
-        <LinearGradient
-          colors={colors as [string, string, ...string[]]}
-          end={{ x: 1, y: 1 }}
-          locations={locations as number[] | undefined}
-          start={{ x: 0, y: 0 }}
-          style={StyleSheet.absoluteFill}
-        />
-      </Animated.View>
-    </View>
-  );
-}
 
 export function HomeHeader({ cartCount, userName }: HomeHeaderProps) {
   const router = useRouter();
@@ -98,8 +50,8 @@ export function HomeHeader({ cartCount, userName }: HomeHeaderProps) {
     setSearchFocused(focused);
     Animated.timing(focusProgress, {
       toValue: focused ? 1 : 0,
-      duration: focused ? 4000 : 2000,
-      easing: Easing.linear,
+      duration: focused ? 4000 : 650,
+      easing: Easing.out(Easing.cubic),
       useNativeDriver: true,
     }).start();
   };
@@ -109,6 +61,14 @@ export function HomeHeader({ cartCount, userName }: HomeHeaderProps) {
   const filterRotation = filterProgress.interpolate({
     inputRange: [0, 1],
     outputRange: ['0deg', '360deg'],
+  });
+  const glowOpacity = focusProgress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.62, 0.95],
+  });
+  const frameScale = focusProgress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 1.006],
   });
 
   return (
@@ -153,168 +113,125 @@ export function HomeHeader({ cartCount, userName }: HomeHeaderProps) {
       </View>
 
       <View style={styles.searchStage}>
-        <EffectLayer
-          colors={[
-            '#000000',
-            '#402FB5',
-            '#000000',
-            '#000000',
-            '#CF30AA',
-            '#000000',
-            '#000000',
-          ]}
-          from={60}
-          locations={[0, 0.05, 0.38, 0.5, 0.6, 0.87, 1]}
-          opacity={0.4}
-          progress={focusProgress}
-          style={styles.glow}
-          to={420}
-        />
-
-        <EffectLayer
-          colors={[
-            'rgba(0,0,0,0)',
-            '#18116A',
-            'rgba(0,0,0,0)',
-            'rgba(0,0,0,0)',
-            '#6E1B60',
-            'rgba(0,0,0,0)',
-          ]}
-          from={82}
-          locations={[0, 0.05, 0.1, 0.5, 0.56, 0.6]}
-          progress={focusProgress}
-          style={styles.darkBorderBg}
-          to={442}
-        />
-        <EffectLayer
-          colors={[
-            'rgba(0,0,0,0)',
-            '#18116A',
-            'rgba(0,0,0,0)',
-            'rgba(0,0,0,0)',
-            '#6E1B60',
-            'rgba(0,0,0,0)',
-          ]}
-          from={82}
-          locations={[0, 0.05, 0.1, 0.5, 0.56, 0.6]}
-          opacity={0.92}
-          progress={focusProgress}
-          style={styles.darkBorderBg}
-          to={442}
-        />
-        <EffectLayer
-          colors={[
-            'rgba(0,0,0,0)',
-            '#18116A',
-            'rgba(0,0,0,0)',
-            'rgba(0,0,0,0)',
-            '#6E1B60',
-            'rgba(0,0,0,0)',
-          ]}
-          from={82}
-          locations={[0, 0.05, 0.1, 0.5, 0.56, 0.6]}
-          opacity={0.84}
-          progress={focusProgress}
-          style={styles.darkBorderBg}
-          to={442}
-        />
-
-        <EffectLayer
-          colors={[
-            'rgba(0,0,0,0)',
-            '#A099D8',
-            'rgba(0,0,0,0)',
-            'rgba(0,0,0,0)',
-            '#DFA2DA',
-            'rgba(0,0,0,0)',
-          ]}
-          from={83}
-          locations={[0, 0.04, 0.08, 0.5, 0.54, 0.58]}
-          progress={focusProgress}
-          style={styles.whiteLayer}
-          to={443}
-        />
-
-        <EffectLayer
-          colors={['#1C191C', '#402FB5', '#1C191C', '#1C191C', '#CF30AA', '#1C191C']}
-          from={70}
-          locations={[0, 0.05, 0.14, 0.5, 0.6, 0.64]}
-          progress={focusProgress}
-          style={styles.borderLayer}
-          to={430}
-        />
-
-        <View style={styles.searchMain}>
-          <View pointerEvents="none" style={styles.pinkMask} />
-
-          {!searchFocused ? (
-            <LinearGradient
-              colors={['rgba(0,0,0,0)', '#000000']}
-              end={{ x: 1, y: 0 }}
-              pointerEvents="none"
-              start={{ x: 0, y: 0 }}
-              style={styles.inputMask}
-            />
-          ) : null}
-
-          <View pointerEvents="none" style={styles.searchIcon}>
-            <AppIcon color="#C8C0CA" name="search" size={24} />
-          </View>
-
-          <TextInput
-            accessibilityLabel="Tìm kiếm sản phẩm"
-            enterKeyHint="search"
-            onBlur={() => animateFocus(false)}
-            onChangeText={setSearch}
-            onFocus={() => animateFocus(true)}
-            onSubmitEditing={submitSearch}
-            placeholder="Tìm kiếm..."
-            placeholderTextColor="#C0B9C0"
-            returnKeyType="search"
-            selectionColor="#DFA2DA"
-            style={styles.input}
-            value={search}
-          />
-
-          <View pointerEvents="none" style={styles.filterBorder}>
-            <Animated.View
-              style={[
-                styles.filterRotor,
-                {
-                  transform: [{ rotate: filterRotation }],
-                },
-              ]}>
-              <LinearGradient
-                colors={[
-                  'rgba(0,0,0,0)',
-                  '#3D3A4F',
-                  'rgba(0,0,0,0)',
-                  'rgba(0,0,0,0)',
-                  '#3D3A4F',
-                  'rgba(0,0,0,0)',
-                ]}
-                end={{ x: 1, y: 1 }}
-                locations={[0, 0.18, 0.48, 0.5, 0.7, 1]}
-                start={{ x: 0, y: 0 }}
-                style={StyleSheet.absoluteFill}
-              />
-            </Animated.View>
-          </View>
-
+        <Animated.View
+          pointerEvents="none"
+          style={[styles.edgeGlow, styles.leftGlow, { opacity: glowOpacity }]}>
           <LinearGradient
-            colors={['#161329', '#000000', '#1D1B4B']}
-            end={{ x: 0.5, y: 1 }}
-            start={{ x: 0.5, y: 0 }}
-            style={styles.filterIconFrame}>
-            <Pressable
-              accessibilityLabel="Mở bộ lọc sản phẩm"
-              accessibilityRole="button"
-              onPress={() => router.push('/categories')}
-              style={({ pressed }) => [styles.filterButton, pressed && styles.filterPressed]}>
-              <AppIcon color="#D6D6E6" name="filter" size={27} />
-            </Pressable>
+            colors={['rgba(64,47,181,0)', 'rgba(64,47,181,0.78)', 'rgba(160,153,216,0.24)', 'rgba(64,47,181,0)']}
+            end={{ x: 1, y: 0.5 }}
+            locations={[0, 0.34, 0.58, 1]}
+            start={{ x: 0, y: 0.5 }}
+            style={StyleSheet.absoluteFill}
+          />
+        </Animated.View>
+
+        <Animated.View
+          pointerEvents="none"
+          style={[styles.edgeGlow, styles.rightGlow, { opacity: glowOpacity }]}>
+          <LinearGradient
+            colors={['rgba(207,48,170,0)', 'rgba(207,48,170,0.78)', 'rgba(223,162,218,0.26)', 'rgba(207,48,170,0)']}
+            end={{ x: 0, y: 0.5 }}
+            locations={[0, 0.34, 0.58, 1]}
+            start={{ x: 1, y: 0.5 }}
+            style={StyleSheet.absoluteFill}
+          />
+        </Animated.View>
+
+        <Animated.View style={[styles.searchFrameWrap, { transform: [{ scale: frameScale }] }]}>
+          <LinearGradient
+            colors={['#5B4CE8', '#2D2458', '#1C191C', '#1C191C', '#72245F', '#E04ABC']}
+            end={{ x: 1, y: 0.58 }}
+            locations={[0, 0.1, 0.24, 0.62, 0.84, 1]}
+            start={{ x: 0, y: 0.42 }}
+            style={styles.outerBorder}>
+            <LinearGradient
+              colors={['#A099D8', '#201A2D', '#111014', '#25172B', '#DFA2DA']}
+              end={{ x: 1, y: 0.62 }}
+              locations={[0, 0.08, 0.42, 0.86, 1]}
+              start={{ x: 0, y: 0.38 }}
+              style={styles.whiteBorder}>
+              <View style={styles.searchMain}>
+                <LinearGradient
+                  colors={['rgba(207,48,170,0)', 'rgba(207,48,170,0.16)', 'rgba(207,48,170,0)']}
+                  end={{ x: 1, y: 0.5 }}
+                  pointerEvents="none"
+                  start={{ x: 0, y: 0.5 }}
+                  style={styles.pinkMask}
+                />
+
+                {!searchFocused ? (
+                  <LinearGradient
+                    colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.62)', 'rgba(0,0,0,0)']}
+                    end={{ x: 1, y: 0 }}
+                    locations={[0, 0.68, 1]}
+                    pointerEvents="none"
+                    start={{ x: 0, y: 0 }}
+                    style={styles.inputMask}
+                  />
+                ) : null}
+
+                <View pointerEvents="none" style={styles.searchIcon}>
+                  <AppIcon color="#C8C0CA" name="search" size={24} />
+                </View>
+
+                <TextInput
+                  accessibilityLabel="Tìm kiếm sản phẩm"
+                  enterKeyHint="search"
+                  onBlur={() => animateFocus(false)}
+                  onChangeText={setSearch}
+                  onFocus={() => animateFocus(true)}
+                  onSubmitEditing={submitSearch}
+                  placeholder="Tìm kiếm..."
+                  placeholderTextColor="#C0B9C0"
+                  returnKeyType="search"
+                  selectionColor="#DFA2DA"
+                  style={styles.input}
+                  value={search}
+                />
+
+                <View pointerEvents="none" style={styles.filterBorder}>
+                  <Animated.View
+                    style={[
+                      styles.filterRotor,
+                      {
+                        transform: [{ rotate: filterRotation }],
+                      },
+                    ]}>
+                    <LinearGradient
+                      colors={[
+                        'rgba(0,0,0,0)',
+                        '#514D67',
+                        'rgba(0,0,0,0)',
+                        'rgba(0,0,0,0)',
+                        '#514D67',
+                        'rgba(0,0,0,0)',
+                      ]}
+                      end={{ x: 1, y: 1 }}
+                      locations={[0, 0.18, 0.48, 0.5, 0.7, 1]}
+                      start={{ x: 0, y: 0 }}
+                      style={StyleSheet.absoluteFill}
+                    />
+                  </Animated.View>
+                </View>
+
+                <LinearGradient
+                  colors={['#161329', '#050507', '#000000', '#1D1B4B']}
+                  end={{ x: 0.5, y: 1 }}
+                  locations={[0, 0.35, 0.66, 1]}
+                  start={{ x: 0.5, y: 0 }}
+                  style={styles.filterIconFrame}>
+                  <Pressable
+                    accessibilityLabel="Mở bộ lọc sản phẩm"
+                    accessibilityRole="button"
+                    onPress={() => router.push('/categories')}
+                    style={({ pressed }) => [styles.filterButton, pressed && styles.filterPressed]}>
+                    <AppIcon color="#D6D6E6" name="filter" size={27} />
+                  </Pressable>
+                </LinearGradient>
+              </View>
+            </LinearGradient>
           </LinearGradient>
-        </View>
+        </Animated.View>
       </View>
     </View>
   );
@@ -361,66 +278,60 @@ const styles = StyleSheet.create({
     position: 'relative',
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'visible',
   },
-  effectLayer: {
+  edgeGlow: {
     position: 'absolute',
-    overflow: 'hidden',
+    top: 5,
+    width: 112,
+    height: 60,
+    borderRadius: 18,
   },
-  effectRotor: {
-    position: 'absolute',
-    width: 600,
-    height: 600,
-    left: '50%',
-    top: '50%',
-    marginLeft: -300,
-    marginTop: -300,
+  leftGlow: {
+    left: 0,
+    shadowColor: '#5B4CE8',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.75,
+    shadowRadius: 16,
+    elevation: 8,
   },
-  glow: {
-    left: -20,
-    right: -20,
-    top: 0,
-    height: 70,
-    borderRadius: 12,
+  rightGlow: {
+    right: 0,
     shadowColor: '#CF30AA',
     shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.55,
-    shadowRadius: 18,
-    elevation: 10,
+    shadowOpacity: 0.75,
+    shadowRadius: 16,
+    elevation: 8,
   },
-  darkBorderBg: {
-    left: 1,
-    right: 1,
-    top: 2.5,
-    height: 65,
+  searchFrameWrap: {
+    position: 'absolute',
+    left: 6,
+    right: 6,
+    top: 5,
+    height: 60,
     borderRadius: 12,
-  },
-  whiteLayer: {
-    left: 3.5,
-    right: 3.5,
-    top: 3.5,
-    height: 63,
-    borderRadius: 10,
-    shadowColor: '#DFA2DA',
+    shadowColor: '#8B5CF6',
     shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.34,
-    shadowRadius: 5,
+    shadowOpacity: 0.26,
+    shadowRadius: 6,
+    elevation: 4,
   },
-  borderLayer: {
-    left: 5.5,
-    right: 5.5,
-    top: 5.5,
-    height: 59,
+  outerBorder: {
+    flex: 1,
+    borderRadius: 12,
+    padding: 1,
+  },
+  whiteBorder: {
+    flex: 1,
     borderRadius: 11,
+    padding: 1,
   },
   searchMain: {
-    position: 'absolute',
-    left: 6.5,
-    right: 6.5,
-    top: 7,
-    height: 56,
+    flex: 1,
     borderRadius: 10,
     overflow: 'hidden',
     backgroundColor: '#010201',
+    position: 'relative',
   },
   input: {
     width: '100%',
@@ -435,29 +346,23 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
   },
   inputMask: {
-    pointerEvents: 'none',
     position: 'absolute',
-    width: 100,
+    width: 96,
     height: 20,
     top: 18,
     left: 70,
-    zIndex: 2,
+    zIndex: 1,
+    opacity: 0.34,
   },
   pinkMask: {
-    pointerEvents: 'none',
     position: 'absolute',
-    width: 30,
-    height: 20,
-    top: 10,
-    left: 5,
-    borderRadius: 12,
-    backgroundColor: '#CF30AA',
-    opacity: 0.8,
-    shadowColor: '#CF30AA',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 1,
-    shadowRadius: 20,
-    elevation: 8,
+    width: 70,
+    height: 42,
+    top: 7,
+    left: -13,
+    borderRadius: 21,
+    zIndex: 0,
+    opacity: 0.72,
   },
   searchIcon: {
     position: 'absolute',
@@ -481,10 +386,10 @@ const styles = StyleSheet.create({
   },
   filterRotor: {
     position: 'absolute',
-    width: 160,
-    height: 160,
-    left: -60,
-    top: -59,
+    width: 104,
+    height: 104,
+    left: -32,
+    top: -31,
   },
   filterIconFrame: {
     position: 'absolute',
@@ -495,7 +400,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: 'rgba(61,58,79,0.7)',
+    borderColor: 'rgba(81,77,103,0.78)',
     zIndex: 3,
     shadowColor: '#402FB5',
     shadowOffset: { width: 0, height: 0 },
