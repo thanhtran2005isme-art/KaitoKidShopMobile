@@ -6,7 +6,7 @@
     "mobile": "npm --prefix apps/mobile start",
     "mobile:android": "npm --prefix apps/mobile run android",
     "mobile:lint": "npm --prefix apps/mobile run lint",
-    "mobile:typecheck": "npm --prefix apps/mobile exec tsc -- --noEmit",
+    "mobile:typecheck": "npm --prefix apps/mobile run typecheck",
     "web": "npm --prefix apps/web run dev",
     "web:build": "npm --prefix apps/web run build",
     "web:lint": "npm --prefix apps/web run lint",
