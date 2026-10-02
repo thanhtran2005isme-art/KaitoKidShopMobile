@@ -441,6 +441,7 @@ export default function CheckoutScreen() {
             Đăng nhập để xác nhận giỏ hàng, địa chỉ và tạo đơn KaitoKid.
           </Text>
           <Pressable
+            accessibilityLabel="Đăng nhập để thanh toán"
             accessibilityRole="button"
             onPress={() =>
               router.replace({
@@ -465,6 +466,7 @@ export default function CheckoutScreen() {
             Quay lại giỏ hàng và chọn ít nhất một sản phẩm trước khi tiếp tục.
           </Text>
           <Pressable
+            accessibilityLabel="Quay lại giỏ hàng"
             accessibilityRole="button"
             onPress={() => router.replace('/cart')}
             style={styles.primaryButton}>
@@ -501,6 +503,7 @@ export default function CheckoutScreen() {
           <View style={styles.headerRow}>
             <Pressable
               accessibilityLabel="Quay lại giỏ hàng"
+              accessibilityRole="button"
               hitSlop={10}
               onPress={() => router.back()}
               style={({ pressed }) => [
@@ -521,11 +524,12 @@ export default function CheckoutScreen() {
           <CheckoutStepper active={2} />
 
           {error ? (
-            <View style={styles.errorCard}>
+            <View accessibilityRole="alert" style={styles.errorCard}>
               <Text style={styles.errorText}>{error}</Text>
               {!paymentConfig ? (
                 <Pressable
                   accessibilityLabel="Tải lại cấu hình checkout"
+                  accessibilityRole="button"
                   onPress={() => setInitialRetryKey((value) => value + 1)}
                   style={({ pressed }) => [
                     styles.retryButton,
@@ -538,12 +542,13 @@ export default function CheckoutScreen() {
           ) : null}
 
           {!paymentConfig && !error ? (
-            <View style={styles.errorCard}>
+            <View accessibilityRole="alert" style={styles.errorCard}>
               <Text style={styles.errorText}>
                 Chưa tải được cấu hình thanh toán.
               </Text>
               <Pressable
                 accessibilityLabel="Tải lại cấu hình checkout"
+                accessibilityRole="button"
                 onPress={() => setInitialRetryKey((value) => value + 1)}
                 style={({ pressed }) => [
                   styles.retryButton,
@@ -589,6 +594,7 @@ export default function CheckoutScreen() {
                 </Text>
                 <Pressable
                   accessibilityLabel="Đổi hoặc quản lý địa chỉ nhận hàng"
+                  accessibilityRole="button"
                   onPress={() => router.push('/checkout/address')}
                   style={({ pressed }) => [
                     styles.outlineAction,
@@ -602,6 +608,7 @@ export default function CheckoutScreen() {
             ) : (
               <Pressable
                 accessibilityLabel="Thêm địa chỉ nhận hàng"
+                accessibilityRole="button"
                 onPress={() => router.push('/checkout/address')}
                 style={({ pressed }) => [
                   styles.emptyAction,
@@ -638,7 +645,7 @@ export default function CheckoutScreen() {
                 </Text>
               </View>
             ) : shippingLoading ? (
-              <View style={styles.loadingCard}>
+              <View accessibilityRole="progressbar" style={styles.loadingCard}>
                 <ActivityIndicator color={BRAND_COLORS.primary} />
                 <Text style={styles.infoText}>Đang tính phí giao hàng...</Text>
               </View>
@@ -649,6 +656,7 @@ export default function CheckoutScreen() {
                 </Text>
                 <Pressable
                   accessibilityLabel="Tính lại phí giao hàng"
+                  accessibilityRole="button"
                   onPress={() => setShippingRetryKey((value) => value + 1)}
                   style={({ pressed }) => [
                     styles.retryButton,
@@ -757,6 +765,7 @@ export default function CheckoutScreen() {
               {couponCode ? (
                 <Pressable
                   accessibilityLabel="Bỏ mã giảm giá"
+                  accessibilityRole="button"
                   onPress={removeCoupon}
                   style={({ pressed }) => [
                     styles.couponButtonSecondary,
@@ -767,6 +776,8 @@ export default function CheckoutScreen() {
               ) : (
                 <Pressable
                   accessibilityLabel="Áp dụng mã giảm giá"
+                  accessibilityRole="button"
+                  accessibilityState={{ disabled: couponBusy }}
                   disabled={couponBusy}
                   onPress={() => void applyCoupon()}
                   style={({ pressed }) => [
@@ -782,7 +793,7 @@ export default function CheckoutScreen() {
             </View>
 
             {couponCode && coupon?.isValid ? (
-              <Text style={styles.appliedText}>
+              <Text accessibilityLiveRegion="polite" style={styles.appliedText}>
                 {'Đã áp dụng ' +
                   couponCode +
                   ' · giảm ' +
@@ -874,7 +885,7 @@ export default function CheckoutScreen() {
 
             {paymentConfig &&
             paymentConfig.supportedMethods.length === 0 ? (
-              <View style={styles.errorCard}>
+              <View accessibilityRole="alert" style={styles.errorCard}>
                 <Text style={styles.errorText}>
                   Shop chưa bật phương thức thanh toán khả dụng.
                 </Text>
@@ -940,6 +951,14 @@ export default function CheckoutScreen() {
 
           <Pressable
             accessibilityLabel="Xem lại đơn hàng trước khi đặt"
+            accessibilityRole="button"
+            accessibilityState={{
+              disabled:
+                submitting ||
+                !selectedAddress ||
+                !selectedShipping ||
+                !paymentConfig?.supportedMethods.includes(paymentMethod),
+            }}
             disabled={
               submitting ||
               !selectedAddress ||
@@ -1000,7 +1019,7 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     paddingHorizontal: 16,
     paddingTop: 12,
-    gap: 16,
+    gap: 18,
   },
   headerRow: {
     flexDirection: 'row',
@@ -1010,39 +1029,36 @@ const styles = StyleSheet.create({
   backButton: {
     width: 44,
     height: 44,
-    borderRadius: 15,
+    borderRadius: 14,
     borderWidth: 1,
     borderColor: BRAND_COLORS.line,
     backgroundColor: BRAND_COLORS.surface,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  backText: {
-    color: BRAND_COLORS.ink,
-    fontSize: 30,
-    lineHeight: 32,
-    marginTop: -2,
-  },
   headerCopy: { flex: 1 },
   eyebrow: {
     color: BRAND_COLORS.primary,
-    fontSize: 8,
+    fontSize: 10,
+    lineHeight: 14,
     fontWeight: '900',
     letterSpacing: 1.1,
   },
   title: {
     color: BRAND_COLORS.ink,
     fontSize: 26,
+    lineHeight: 32,
     fontWeight: '900',
   },
   subtitle: {
     color: BRAND_COLORS.muted,
-    fontSize: 9,
+    fontSize: 12,
+    lineHeight: 17,
     fontWeight: '700',
     marginTop: 2,
   },
   section: {
-    gap: 11,
+    gap: 12,
   },
   sectionHeading: {
     flexDirection: 'row',
@@ -1050,36 +1066,38 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   stepBadge: {
-    width: 36,
-    height: 36,
-    borderRadius: 13,
+    width: 40,
+    height: 40,
+    borderRadius: 12,
     backgroundColor: BRAND_COLORS.primarySoft,
     alignItems: 'center',
     justifyContent: 'center',
   },
   stepBadgeText: {
     color: BRAND_COLORS.primaryDark,
-    fontSize: 9,
+    fontSize: 12,
+    lineHeight: 17,
     fontWeight: '900',
   },
   sectionCopy: { flex: 1, gap: 2 },
   sectionTitle: {
     color: BRAND_COLORS.ink,
-    fontSize: 16,
+    fontSize: 18,
+    lineHeight: 23,
     fontWeight: '900',
   },
   sectionHint: {
     color: BRAND_COLORS.muted,
-    fontSize: 9,
-    lineHeight: 13,
+    fontSize: 12,
+    lineHeight: 18,
   },
   selectedCard: {
-    borderRadius: 20,
+    borderRadius: 18,
     borderWidth: 1.5,
     borderColor: '#C4B5FD',
     backgroundColor: '#FDFBFF',
     padding: 14,
-    gap: 8,
+    gap: 9,
   },
   selectedHeader: {
     flexDirection: 'row',
@@ -1088,34 +1106,37 @@ const styles = StyleSheet.create({
   },
   addressName: {
     color: BRAND_COLORS.ink,
-    fontSize: 13,
+    fontSize: 15,
+    lineHeight: 20,
     fontWeight: '900',
   },
   addressPhone: {
     color: BRAND_COLORS.muted,
-    fontSize: 10,
+    fontSize: 12,
+    lineHeight: 17,
     fontWeight: '700',
     marginTop: 2,
   },
   addressText: {
     color: '#374151',
-    fontSize: 10,
-    lineHeight: 16,
+    fontSize: 13,
+    lineHeight: 19,
   },
   defaultBadge: {
     borderRadius: 999,
     backgroundColor: BRAND_COLORS.primarySoft,
-    paddingHorizontal: 8,
+    paddingHorizontal: 9,
     paddingVertical: 5,
   },
   defaultBadgeText: {
     color: BRAND_COLORS.primaryDark,
-    fontSize: 8,
+    fontSize: 11,
+    lineHeight: 15,
     fontWeight: '900',
   },
   outlineAction: {
-    minHeight: 42,
-    borderRadius: 13,
+    minHeight: 44,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: '#DDD6FE',
     alignItems: 'center',
@@ -1124,12 +1145,13 @@ const styles = StyleSheet.create({
   },
   outlineActionText: {
     color: BRAND_COLORS.primaryDark,
-    fontSize: 9,
+    fontSize: 13,
+    lineHeight: 18,
     fontWeight: '900',
   },
   emptyAction: {
     minHeight: 124,
-    borderRadius: 20,
+    borderRadius: 18,
     borderWidth: 1.5,
     borderStyle: 'dashed',
     borderColor: '#C4B5FD',
@@ -1137,33 +1159,36 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     padding: 18,
-    gap: 4,
+    gap: 5,
   },
   emptyActionTitle: {
     color: BRAND_COLORS.ink,
-    fontSize: 13,
+    fontSize: 15,
+    lineHeight: 20,
     fontWeight: '900',
   },
   emptyActionText: {
     color: BRAND_COLORS.muted,
-    fontSize: 9,
+    fontSize: 12,
+    lineHeight: 18,
     textAlign: 'center',
   },
   emptyActionLink: {
     color: BRAND_COLORS.primary,
-    fontSize: 10,
+    fontSize: 13,
+    lineHeight: 18,
     fontWeight: '900',
     marginTop: 5,
   },
   optionList: { gap: 8 },
   optionCard: {
-    minHeight: 70,
-    borderRadius: 18,
+    minHeight: 76,
+    borderRadius: 16,
     borderWidth: 1,
     borderColor: BRAND_COLORS.line,
     backgroundColor: BRAND_COLORS.surface,
     paddingHorizontal: 13,
-    paddingVertical: 11,
+    paddingVertical: 12,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 11,
@@ -1174,9 +1199,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#FDFBFF',
   },
   radio: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
     borderWidth: 1.5,
     borderColor: '#9CA3AF',
     alignItems: 'center',
@@ -1194,28 +1219,29 @@ const styles = StyleSheet.create({
   optionCopy: { flex: 1, gap: 3 },
   optionTitle: {
     color: BRAND_COLORS.ink,
-    fontSize: 10,
-    lineHeight: 15,
+    fontSize: 14,
+    lineHeight: 19,
     fontWeight: '900',
   },
   optionMeta: {
     color: BRAND_COLORS.muted,
-    fontSize: 8,
-    lineHeight: 13,
+    fontSize: 12,
+    lineHeight: 18,
   },
   optionPrice: {
     color: BRAND_COLORS.primary,
-    fontSize: 11,
+    fontSize: 14,
+    lineHeight: 19,
     fontWeight: '900',
   },
   infoCard: {
-    borderRadius: 16,
+    borderRadius: 14,
     backgroundColor: '#F3F4F6',
     padding: 13,
   },
   loadingCard: {
-    minHeight: 58,
-    borderRadius: 16,
+    minHeight: 60,
+    borderRadius: 14,
     backgroundColor: BRAND_COLORS.surface,
     borderWidth: 1,
     borderColor: BRAND_COLORS.line,
@@ -1226,11 +1252,11 @@ const styles = StyleSheet.create({
   },
   infoText: {
     color: '#4B5563',
-    fontSize: 9,
-    lineHeight: 14,
+    fontSize: 12,
+    lineHeight: 18,
   },
   comboCard: {
-    borderRadius: 16,
+    borderRadius: 14,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: '#A7F3D0',
     backgroundColor: '#ECFDF5',
@@ -1239,13 +1265,14 @@ const styles = StyleSheet.create({
   },
   comboTitle: {
     color: '#047857',
-    fontSize: 9,
-    lineHeight: 14,
+    fontSize: 12,
+    lineHeight: 18,
     fontWeight: '800',
   },
   comboValue: {
     color: '#065F46',
-    fontSize: 11,
+    fontSize: 14,
+    lineHeight: 19,
     fontWeight: '900',
   },
   couponRow: {
@@ -1256,95 +1283,101 @@ const styles = StyleSheet.create({
   couponField: { flex: 1, gap: 5 },
   fieldLabel: {
     color: BRAND_COLORS.ink,
-    fontSize: 9,
+    fontSize: 12,
+    lineHeight: 17,
     fontWeight: '900',
   },
   input: {
     minHeight: 48,
-    borderRadius: 14,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: '#D1D5DB',
     backgroundColor: BRAND_COLORS.surface,
     paddingHorizontal: 12,
     color: BRAND_COLORS.ink,
-    fontSize: 11,
+    fontSize: 14,
   },
   inputApplied: {
     borderColor: '#A7F3D0',
     backgroundColor: '#F0FDF4',
   },
   noteInput: {
-    minHeight: 92,
+    minHeight: 96,
     paddingTop: 12,
     paddingBottom: 12,
   },
   couponButton: {
     minHeight: 48,
-    borderRadius: 14,
+    borderRadius: 12,
     backgroundColor: BRAND_COLORS.ink,
-    paddingHorizontal: 13,
+    paddingHorizontal: 14,
     alignItems: 'center',
     justifyContent: 'center',
   },
   couponButtonText: {
     color: '#FFFFFF',
-    fontSize: 9,
+    fontSize: 13,
+    lineHeight: 18,
     fontWeight: '900',
   },
   couponButtonSecondary: {
     minHeight: 48,
-    borderRadius: 14,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: '#FECACA',
     backgroundColor: '#FEF2F2',
-    paddingHorizontal: 13,
+    paddingHorizontal: 14,
     alignItems: 'center',
     justifyContent: 'center',
   },
   couponButtonSecondaryText: {
     color: BRAND_COLORS.danger,
-    fontSize: 9,
+    fontSize: 13,
+    lineHeight: 18,
     fontWeight: '900',
   },
   appliedText: {
     color: BRAND_COLORS.success,
-    fontSize: 9,
+    fontSize: 12,
+    lineHeight: 18,
     fontWeight: '800',
   },
   itemList: {
-    borderRadius: 18,
+    borderRadius: 16,
     borderWidth: 1,
     borderColor: BRAND_COLORS.line,
     backgroundColor: BRAND_COLORS.surface,
     paddingHorizontal: 13,
   },
   itemRow: {
-    minHeight: 61,
+    minHeight: 68,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: BRAND_COLORS.line,
   },
-  itemCopy: { flex: 1, gap: 2 },
+  itemCopy: { flex: 1, gap: 3 },
   itemName: {
     color: BRAND_COLORS.ink,
-    fontSize: 10,
-    lineHeight: 15,
+    fontSize: 13,
+    lineHeight: 18,
     fontWeight: '800',
   },
   itemMeta: {
     color: BRAND_COLORS.muted,
-    fontSize: 8,
+    fontSize: 11,
+    lineHeight: 16,
   },
   itemPrice: {
     color: BRAND_COLORS.ink,
-    fontSize: 10,
+    fontSize: 13,
+    lineHeight: 18,
     fontWeight: '900',
   },
   submitButton: {
-    minHeight: 58,
-    borderRadius: 18,
+    minHeight: 60,
+    borderRadius: 16,
     backgroundColor: BRAND_COLORS.primary,
     paddingHorizontal: 16,
     flexDirection: 'row',
@@ -1358,29 +1391,32 @@ const styles = StyleSheet.create({
   submitCopy: { flex: 1, gap: 2 },
   submitText: {
     color: '#FFFFFF',
-    fontSize: 12,
+    fontSize: 15,
+    lineHeight: 20,
     fontWeight: '900',
   },
   submitHint: {
     color: '#EDE9FE',
-    fontSize: 8,
+    fontSize: 11,
+    lineHeight: 16,
   },
   submitTotal: {
     color: '#FFFFFF',
-    fontSize: 13,
+    fontSize: 15,
+    lineHeight: 20,
     fontWeight: '900',
   },
   errorCard: {
-    borderRadius: 15,
+    borderRadius: 14,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: '#FECACA',
     backgroundColor: '#FEF2F2',
-    padding: 11,
+    padding: 12,
   },
   errorText: {
     color: '#B91C1C',
-    fontSize: 9,
-    lineHeight: 14,
+    fontSize: 12,
+    lineHeight: 18,
     fontWeight: '700',
   },
   retryButton: {
@@ -1397,7 +1433,8 @@ const styles = StyleSheet.create({
   },
   retryButtonText: {
     color: '#B91C1C',
-    fontSize: 8,
+    fontSize: 12,
+    lineHeight: 17,
     fontWeight: '900',
   },
   centerState: {
@@ -1410,19 +1447,20 @@ const styles = StyleSheet.create({
   stateTitle: {
     color: BRAND_COLORS.ink,
     fontSize: 20,
+    lineHeight: 26,
     fontWeight: '900',
     textAlign: 'center',
   },
   stateText: {
     color: BRAND_COLORS.muted,
-    fontSize: 10,
-    lineHeight: 16,
+    fontSize: 13,
+    lineHeight: 19,
     textAlign: 'center',
     maxWidth: 360,
   },
   primaryButton: {
     minHeight: 48,
-    borderRadius: 15,
+    borderRadius: 14,
     backgroundColor: BRAND_COLORS.primary,
     paddingHorizontal: 18,
     alignItems: 'center',
@@ -1430,10 +1468,11 @@ const styles = StyleSheet.create({
   },
   primaryButtonText: {
     color: '#FFFFFF',
-    fontSize: 11,
+    fontSize: 14,
+    lineHeight: 19,
     fontWeight: '900',
   },
-  pressed: { opacity: 0.8 },
+  pressed: { opacity: 0.72 },
   disabled: { opacity: 0.5 },
   bottomSpace: { height: 28 },
 });
