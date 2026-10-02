@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { AnimatedLogoutButton } from '@/components/account/animated-logout-button';
 import { GuestAccountExperience } from '@/components/auth/guest-account-experience';
 import { AppIcon } from '@/components/ui/app-icon';
 import { BRAND_COLORS } from '@/constants/brand';
@@ -283,16 +284,11 @@ export default function AccountScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionKicker}>BẢO MẬT TÀI KHOẢN</Text>
           <Text style={styles.sectionTitle}>Phiên & dữ liệu cá nhân</Text>
-          <Pressable
+          <AnimatedLogoutButton
             accessibilityLabel="Đăng xuất khỏi KaitoKid"
-            accessibilityRole="button"
+            label="Logout"
             onPress={confirmLogout}
-            style={({ pressed }) => [
-              styles.logoutButton,
-              pressed && styles.pressed,
-            ]}>
-            <Text style={styles.logoutText}>Đăng xuất</Text>
-          </Pressable>
+          />
           <Pressable
             accessibilityLabel="Mở màn hình hủy tài khoản"
             accessibilityRole="button"
@@ -584,20 +580,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 5,
   },
   badgeText: { color: '#FFFFFF', fontSize: 8, fontWeight: '900' },
-  logoutButton: {
-    minHeight: 48,
-    borderRadius: 15,
-    borderWidth: 1,
-    borderColor: BRAND_COLORS.line,
-    backgroundColor: '#F9FAFB',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  logoutText: {
-    color: BRAND_COLORS.ink,
-    fontSize: 10,
-    fontWeight: '900',
-  },
   deleteAccountButton: {
     minHeight: 48,
     borderRadius: 15,
