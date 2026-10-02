@@ -4,6 +4,7 @@ import { memo, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { AppIcon } from '@/components/ui/app-icon';
+import { BRAND_COLORS } from '@/constants/brand';
 import { useAuth } from '@/context/AuthContext';
 import { useShopping } from '@/context/ShoppingContext';
 import { resolveMediaUrl } from '@/services/api-client';
@@ -92,7 +93,7 @@ export const ProductCard = memo(function ProductCard({
       accessibilityRole="button"
       accessibilityState={{ disabled: wishlistBusy, selected: wished }}
       disabled={wishlistBusy}
-      hitSlop={5}
+      hitSlop={inline ? 2 : 4}
       onPress={() => void handleWishlist()}
       style={({ pressed }) => [
         inline ? styles.inlineWishlist : styles.overlayWishlist,
@@ -100,12 +101,12 @@ export const ProductCard = memo(function ProductCard({
         pressed && styles.pressed,
       ]}>
       {wishlistBusy ? (
-        <ActivityIndicator color="#FFFFFF" size="small" />
+        <ActivityIndicator color={BRAND_COLORS.primary} size="small" />
       ) : (
         <AppIcon
-          color={wished ? '#FB7185' : '#FFFFFF'}
+          color={wished ? '#E11D48' : BRAND_COLORS.ink}
           name={wished ? 'heartFilled' : 'heart'}
-          size={inline ? 16 : 18}
+          size={19}
         />
       )}
     </Pressable>
@@ -119,7 +120,7 @@ export const ProductCard = memo(function ProductCard({
 
       <View style={styles.metaRow}>
         <View style={styles.ratingRow}>
-          <AppIcon color="#F59E0B" name="starFilled" size={12} />
+          <AppIcon color="#D97706" name="starFilled" size={13} />
           <Text style={styles.rating}>
             {product.rating > 0 ? product.rating.toFixed(1) : 'Mới'}
           </Text>
@@ -167,8 +168,8 @@ export const ProductCard = memo(function ProductCard({
               {
                 backgroundColor: productColorValue(color),
                 borderColor: color.toLowerCase().includes('trắng')
-                  ? '#D1D5DB'
-                  : 'rgba(255,255,255,0.28)',
+                  ? '#CBD5E1'
+                  : BRAND_COLORS.surface,
               },
             ]}
           />
@@ -187,7 +188,7 @@ export const ProductCard = memo(function ProductCard({
           accessibilityLabel={`Xem ${product.name}`}
           accessibilityRole="button"
           onPress={openProduct}
-          style={({ pressed }) => [styles.imagePressable, pressed && styles.pressed]}>
+          style={({ pressed }) => [styles.imagePressable, pressed && styles.imagePressed]}>
           {image ? (
             <Image
               accessibilityLabel={product.name}
@@ -199,7 +200,7 @@ export const ProductCard = memo(function ProductCard({
             />
           ) : (
             <View style={styles.imageFallback}>
-              <AppIcon color="#7C3AED" name="image" size={30} />
+              <AppIcon color={BRAND_COLORS.primary} name="image" size={30} />
             </View>
           )}
         </Pressable>
@@ -207,17 +208,17 @@ export const ProductCard = memo(function ProductCard({
         <View pointerEvents="none" style={styles.badges}>
           {product.isNew ? (
             <View style={[styles.badge, styles.newBadge]}>
-              <Text style={styles.badgeDarkText}>Mới</Text>
+              <Text style={[styles.badgeText, styles.newBadgeText]}>Mới</Text>
             </View>
           ) : null}
           {product.isBestSeller ? (
             <View style={[styles.badge, styles.bestBadge]}>
-              <Text style={styles.badgeDarkText}>Bán chạy</Text>
+              <Text style={[styles.badgeText, styles.bestBadgeText]}>Bán chạy</Text>
             </View>
           ) : null}
           {discount > 0 ? (
             <View style={[styles.badge, styles.saleBadge]}>
-              <Text style={styles.badgeLightText}>-{discount}%</Text>
+              <Text style={[styles.badgeText, styles.saleBadgeText]}>-{discount}%</Text>
             </View>
           ) : null}
         </View>
@@ -246,13 +247,15 @@ export const ProductCard = memo(function ProductCard({
             <WishlistButton inline />
           </View>
 
-          <Pressable
-            accessibilityLabel={`Mở ${product.name}`}
-            accessibilityRole="button"
-            onPress={openProduct}
-            style={({ pressed }) => [styles.colorPressable, pressed && styles.contentPressed]}>
-            <ColorRow />
-          </Pressable>
+          {visibleColors.length ? (
+            <Pressable
+              accessibilityLabel={`Mở ${product.name}`}
+              accessibilityRole="button"
+              onPress={openProduct}
+              style={({ pressed }) => [styles.colorPressable, pressed && styles.contentPressed]}>
+              <ColorRow />
+            </Pressable>
+          ) : null}
         </View>
       ) : (
         <Pressable
@@ -273,27 +276,28 @@ export const ProductCard = memo(function ProductCard({
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: '#08090A',
-    borderRadius: 14,
+    backgroundColor: BRAND_COLORS.surface,
+    borderRadius: 16,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: '#26282D',
+    borderColor: BRAND_COLORS.line,
     overflow: 'hidden',
   },
   imageWrap: {
-    aspectRatio: 0.88,
+    aspectRatio: 0.8,
     position: 'relative',
     overflow: 'hidden',
-    backgroundColor: '#E5E7EB',
+    backgroundColor: '#F1F5F9',
   },
   imagePressable: { width: '100%', height: '100%' },
   image: { width: '100%', height: '100%' },
+  imagePressed: { opacity: 0.9 },
   imageOut: { opacity: 0.58 },
   imageFallback: {
     width: '100%',
     height: '100%',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#EDE9FE',
+    backgroundColor: BRAND_COLORS.primarySoft,
   },
   badges: {
     position: 'absolute',
@@ -303,109 +307,120 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   badge: {
-    minHeight: 19,
-    borderRadius: 999,
-    paddingHorizontal: 8,
+    minHeight: 21,
+    borderRadius: 9,
+    paddingHorizontal: 7,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  newBadge: { backgroundColor: '#3B82F6' },
-  bestBadge: { backgroundColor: '#F59E0B' },
-  saleBadge: { backgroundColor: '#F43F5E' },
-  badgeDarkText: { color: '#101114', fontSize: 8, fontWeight: '900' },
-  badgeLightText: { color: '#FFFFFF', fontSize: 8, fontWeight: '900' },
+  badgeText: { fontSize: 8, lineHeight: 11, fontWeight: '900' },
+  newBadge: { backgroundColor: BRAND_COLORS.primarySoft },
+  newBadgeText: { color: BRAND_COLORS.primaryDark },
+  bestBadge: { backgroundColor: BRAND_COLORS.accentSoft },
+  bestBadgeText: { color: '#C2410C' },
+  saleBadge: { backgroundColor: '#FEF2F2' },
+  saleBadgeText: { color: BRAND_COLORS.danger },
   overlayWishlist: {
     position: 'absolute',
     top: 8,
     right: 8,
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(11,11,13,0.78)',
+    backgroundColor: 'rgba(255,255,255,0.94)',
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(255,255,255,0.28)',
+    borderColor: 'rgba(229,231,235,0.95)',
   },
   inlineWishlist: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#1C1E22',
+    backgroundColor: BRAND_COLORS.surface,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: '#303238',
+    borderColor: BRAND_COLORS.line,
   },
   wishlistActive: {
-    backgroundColor: 'rgba(76,5,25,0.88)',
-    borderColor: '#FB7185',
+    backgroundColor: '#FFF1F2',
+    borderColor: '#FDA4AF',
   },
-  content: { padding: 10, gap: 6 },
-  contentMain: { gap: 6 },
-  contentPressed: { opacity: 0.82 },
+  content: { padding: 10, gap: 7 },
+  contentMain: { gap: 7 },
+  contentPressed: { opacity: 0.72 },
   name: {
-    minHeight: 32,
-    color: '#FFFFFF',
-    fontSize: 12,
-    lineHeight: 16,
-    fontWeight: '900',
+    minHeight: 36,
+    color: BRAND_COLORS.ink,
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: '800',
   },
   metaRow: {
-    minHeight: 16,
+    minHeight: 18,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    gap: 5,
+    gap: 6,
   },
   ratingRow: {
     flex: 1,
     minWidth: 0,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 2,
+    gap: 3,
   },
-  rating: { color: '#FFFFFF', fontSize: 9, fontWeight: '800' },
-  sold: { flexShrink: 1, color: '#8F949E', fontSize: 7 },
+  rating: { color: BRAND_COLORS.ink, fontSize: 10, fontWeight: '800' },
+  sold: { flexShrink: 1, color: BRAND_COLORS.muted, fontSize: 8 },
   stock: {
     maxWidth: 58,
-    color: '#34D399',
-    fontSize: 7,
+    color: BRAND_COLORS.success,
+    fontSize: 8,
     fontWeight: '800',
     textAlign: 'right',
   },
-  stockLow: { color: '#FBBF24' },
-  stockOut: { color: '#F87171' },
+  stockLow: { color: '#B45309' },
+  stockOut: { color: BRAND_COLORS.danger },
   priceRow: {
-    minHeight: 32,
+    minHeight: 44,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: 6,
   },
-  pricePressable: { flex: 1, minWidth: 0, minHeight: 32, justifyContent: 'center' },
+  pricePressable: { flex: 1, minWidth: 0, minHeight: 44, justifyContent: 'center' },
   priceCopy: {
     flex: 1,
     minWidth: 0,
     flexDirection: 'row',
     alignItems: 'baseline',
+    flexWrap: 'wrap',
     gap: 5,
   },
-  price: { color: '#FFFFFF', fontSize: 14, fontWeight: '900' },
+  price: { color: BRAND_COLORS.ink, fontSize: 15, fontWeight: '900' },
   oldPrice: {
     flexShrink: 1,
-    color: '#7C818A',
-    fontSize: 8,
+    color: '#94A3B8',
+    fontSize: 9,
     textDecorationLine: 'line-through',
   },
-  colorPressable: { minHeight: 20, justifyContent: 'center' },
+  colorPressable: { minHeight: 26, justifyContent: 'center' },
   colorRow: {
-    minHeight: 20,
+    minHeight: 22,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
+    gap: 6,
   },
-  colorDot: { width: 16, height: 16, borderRadius: 8, borderWidth: 1 },
-  moreColors: { color: '#9CA3AF', fontSize: 8, fontWeight: '700' },
-  pressed: { opacity: 0.76 },
+  colorDot: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    borderWidth: 1.5,
+    shadowColor: '#0F172A',
+    shadowOpacity: 0.08,
+    shadowRadius: 1,
+  },
+  moreColors: { color: BRAND_COLORS.muted, fontSize: 9, fontWeight: '700' },
+  pressed: { opacity: 0.72 },
 });
