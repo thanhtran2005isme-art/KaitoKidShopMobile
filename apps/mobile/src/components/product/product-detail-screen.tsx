@@ -76,7 +76,12 @@ function OptionGroup({
           {selected ? <Text style={styles.optionSelected}>Đã chọn: {selected}</Text> : null}
         </View>
         {actionLabel && onAction ? (
-          <Pressable accessibilityRole="button" onPress={onAction}>
+          <Pressable
+            accessibilityLabel={actionLabel}
+            accessibilityRole="button"
+            hitSlop={8}
+            onPress={onAction}
+            style={({ pressed }) => [styles.optionActionButton, pressed && styles.pressed]}>
             <Text style={styles.optionAction}>{actionLabel}</Text>
           </Pressable>
         ) : null}
@@ -292,7 +297,11 @@ export default function ProductDetailScreen() {
     return (
       <SafeAreaView style={styles.center}>
         <Text style={styles.errorTitle}>Thiếu mã sản phẩm</Text>
-        <Pressable onPress={goBack} style={styles.retryButton}>
+        <Pressable
+          accessibilityLabel="Quay lại"
+          accessibilityRole="button"
+          onPress={goBack}
+          style={({ pressed }) => [styles.retryButton, pressed && styles.pressed]}>
           <Text style={styles.retryButtonText}>Quay lại</Text>
         </Pressable>
       </SafeAreaView>
@@ -312,7 +321,11 @@ export default function ProductDetailScreen() {
       <SafeAreaView style={styles.center}>
         <Text style={styles.errorTitle}>Không tải được sản phẩm</Text>
         <Text style={styles.errorText}>{error || 'Không tìm thấy sản phẩm.'}</Text>
-        <Pressable onPress={() => setRetryKey((value) => value + 1)} style={styles.retryButton}>
+        <Pressable
+          accessibilityLabel="Thử tải lại sản phẩm"
+          accessibilityRole="button"
+          onPress={() => setRetryKey((value) => value + 1)}
+          style={({ pressed }) => [styles.retryButton, pressed && styles.pressed]}>
           <Text style={styles.retryButtonText}>Thử lại</Text>
         </Pressable>
       </SafeAreaView>
@@ -463,8 +476,13 @@ export default function ProductDetailScreen() {
           <View style={styles.mediaSection}>
             <ProductGallery images={galleryImages} />
 
-            <Pressable accessibilityLabel="Quay lại" onPress={goBack} style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}>
-              <AppIcon color="#FFFFFF" name="arrowLeft" size={19} />
+            <Pressable
+              accessibilityLabel="Quay lại"
+              accessibilityRole="button"
+              hitSlop={8}
+              onPress={goBack}
+              style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}>
+              <AppIcon color="#FFFFFF" name="arrowLeft" size={20} />
             </Pressable>
 
             <View pointerEvents="none" style={styles.mediaBadges}>
@@ -485,7 +503,12 @@ export default function ProductDetailScreen() {
               )}
             </Pressable>
 
-            <Pressable accessibilityLabel="Chia sẻ sản phẩm" onPress={() => void shareProduct()} style={({ pressed }) => [styles.shareButton, pressed && styles.pressed]}>
+            <Pressable
+              accessibilityLabel="Chia sẻ sản phẩm"
+              accessibilityRole="button"
+              hitSlop={8}
+              onPress={() => void shareProduct()}
+              style={({ pressed }) => [styles.shareButton, pressed && styles.pressed]}>
               <Text style={styles.shareButtonText}>↗</Text>
             </Pressable>
           </View>
@@ -530,18 +553,32 @@ export default function ProductDetailScreen() {
                 </Text>
               </View>
               <View style={styles.stepper}>
-                <Pressable accessibilityLabel="Giảm số lượng" disabled={quantity <= 1} onPress={() => setQuantity((current) => Math.max(1, current - 1))} style={[styles.stepButton, quantity <= 1 && styles.stepDisabled]}>
+                <Pressable
+                  accessibilityLabel="Giảm số lượng"
+                  accessibilityRole="button"
+                  accessibilityState={{ disabled: quantity <= 1 }}
+                  disabled={quantity <= 1}
+                  onPress={() => setQuantity((current) => Math.max(1, current - 1))}
+                  style={[styles.stepButton, quantity <= 1 && styles.stepDisabled]}>
                   <Text style={styles.stepText}>−</Text>
                 </Pressable>
-                <Text style={styles.stepValue}>{availableStock > 0 ? quantity : 0}</Text>
-                <Pressable accessibilityLabel="Tăng số lượng" disabled={availableStock <= 0 || quantity >= availableStock} onPress={() => setQuantity((current) => Math.min(availableStock, current + 1))} style={[styles.stepButton, (availableStock <= 0 || quantity >= availableStock) && styles.stepDisabled]}>
+                <Text accessibilityLiveRegion="polite" style={styles.stepValue}>{availableStock > 0 ? quantity : 0}</Text>
+                <Pressable
+                  accessibilityLabel="Tăng số lượng"
+                  accessibilityRole="button"
+                  accessibilityState={{ disabled: availableStock <= 0 || quantity >= availableStock }}
+                  disabled={availableStock <= 0 || quantity >= availableStock}
+                  onPress={() => setQuantity((current) => Math.min(availableStock, current + 1))}
+                  style={[styles.stepButton, (availableStock <= 0 || quantity >= availableStock) && styles.stepDisabled]}>
                   <Text style={styles.stepText}>+</Text>
                 </Pressable>
               </View>
             </View>
 
             {feedback ? (
-              <View style={[styles.feedback, feedback.type === 'success' ? styles.feedbackSuccess : styles.feedbackError]}>
+              <View
+                accessibilityRole="alert"
+                style={[styles.feedback, feedback.type === 'success' ? styles.feedbackSuccess : styles.feedbackError]}>
                 <Text style={[styles.feedbackText, feedback.type === 'success' ? styles.feedbackTextSuccess : styles.feedbackTextError]}>{feedback.text}</Text>
               </View>
             ) : null}
@@ -589,7 +626,13 @@ export default function ProductDetailScreen() {
             <View style={styles.relatedSection}>
               <View style={styles.relatedHeading}>
                 <View><Text style={styles.sectionEyebrow}>GỢI Ý THÊM</Text><Text style={styles.sectionTitle}>Có thể bạn cũng thích</Text></View>
-                <Pressable onPress={() => router.push('/categories')}><Text style={styles.more}>Xem thêm</Text></Pressable>
+                <Pressable
+                  accessibilityLabel="Xem thêm sản phẩm"
+                  accessibilityRole="button"
+                  hitSlop={8}
+                  onPress={() => router.push('/categories')}>
+                  <Text style={styles.more}>Xem thêm</Text>
+                </Pressable>
               </View>
               <ScrollView contentContainerStyle={styles.relatedList} horizontal showsHorizontalScrollIndicator={false}>
                 {relatedProducts.map((item) => <ProductCard key={item.id} product={item} width={174} />)}
@@ -609,86 +652,87 @@ const styles = StyleSheet.create({
   scroll: { flex: 1 },
   scrollContent: { paddingBottom: 28 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 12, backgroundColor: BRAND_COLORS.canvas },
-  errorTitle: { color: BRAND_COLORS.ink, fontSize: 18, fontWeight: '900', textAlign: 'center' },
-  errorText: { color: BRAND_COLORS.muted, fontSize: 12, lineHeight: 18, textAlign: 'center' },
-  retryButton: { borderRadius: 999, backgroundColor: BRAND_COLORS.ink, paddingHorizontal: 18, paddingVertical: 11 },
-  retryButtonText: { color: '#FFFFFF', fontSize: 12, fontWeight: '900' },
+  errorTitle: { color: BRAND_COLORS.ink, fontSize: 20, lineHeight: 26, fontWeight: '900', textAlign: 'center' },
+  errorText: { color: BRAND_COLORS.muted, fontSize: 13, lineHeight: 19, textAlign: 'center' },
+  retryButton: { minHeight: 44, borderRadius: 12, backgroundColor: BRAND_COLORS.ink, paddingHorizontal: 18, alignItems: 'center', justifyContent: 'center' },
+  retryButtonText: { color: '#FFFFFF', fontSize: 14, lineHeight: 19, fontWeight: '900' },
   purchaseShell: { width: '100%', maxWidth: 680, alignSelf: 'center', backgroundColor: '#08090A' },
   mediaSection: { position: 'relative', paddingTop: 8, backgroundColor: '#08090A' },
-  backButton: { position: 'absolute', top: 18, left: 18, width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(11,11,13,0.76)', borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(255,255,255,0.25)' },
-  mediaBadges: { position: 'absolute', left: 18, top: 66, alignItems: 'flex-start', gap: 5 },
-  heroBadge: { minHeight: 22, borderRadius: 999, paddingHorizontal: 10, alignItems: 'center', justifyContent: 'center' },
+  backButton: { position: 'absolute', top: 16, left: 16, width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(11,11,13,0.76)', borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(255,255,255,0.25)' },
+  mediaBadges: { position: 'absolute', left: 16, top: 68, alignItems: 'flex-start', gap: 5 },
+  heroBadge: { minHeight: 24, borderRadius: 999, paddingHorizontal: 10, alignItems: 'center', justifyContent: 'center' },
   newBadge: { backgroundColor: '#3B82F6' },
   bestBadge: { backgroundColor: '#F59E0B' },
   saleBadge: { backgroundColor: '#F43F5E' },
-  heroBadgeDarkText: { color: '#101114', fontSize: 9, fontWeight: '900' },
-  heroBadgeLightText: { color: '#FFFFFF', fontSize: 9, fontWeight: '900' },
-  wishlistButton: { position: 'absolute', top: 18, right: 18, width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(11,11,13,0.76)', borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(255,255,255,0.25)' },
+  heroBadgeDarkText: { color: '#101114', fontSize: 10, lineHeight: 14, fontWeight: '900' },
+  heroBadgeLightText: { color: '#FFFFFF', fontSize: 10, lineHeight: 14, fontWeight: '900' },
+  wishlistButton: { position: 'absolute', top: 16, right: 16, width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(11,11,13,0.76)', borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(255,255,255,0.25)' },
   wishlistButtonActive: { backgroundColor: 'rgba(76,5,25,0.88)', borderColor: '#FB7185' },
-  shareButton: { position: 'absolute', top: 66, right: 18, width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(11,11,13,0.72)' },
-  shareButtonText: { color: '#FFFFFF', fontSize: 17, fontWeight: '900' },
-  purchasePanel: { paddingHorizontal: 16, paddingTop: 15, paddingBottom: 18, gap: 12, backgroundColor: '#08090A' },
-  title: { color: '#FFFFFF', fontSize: 17, lineHeight: 22, fontWeight: '900' },
+  shareButton: { position: 'absolute', top: 68, right: 16, width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(11,11,13,0.72)' },
+  shareButtonText: { color: '#FFFFFF', fontSize: 18, lineHeight: 22, fontWeight: '900' },
+  purchasePanel: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 18, gap: 13, backgroundColor: '#08090A' },
+  title: { color: '#FFFFFF', fontSize: 20, lineHeight: 26, fontWeight: '900' },
   metaRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
   ratingGroup: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 4 },
-  rating: { color: '#FFFFFF', fontSize: 11, fontWeight: '900' },
-  reviewCount: { color: '#A4A8B0', fontSize: 9 },
-  sold: { color: '#7C818A', fontSize: 9 },
-  stockText: { color: '#34D399', fontSize: 9, fontWeight: '800' },
+  rating: { color: '#FFFFFF', fontSize: 13, lineHeight: 18, fontWeight: '900' },
+  reviewCount: { color: '#C5C8CE', fontSize: 12, lineHeight: 17 },
+  sold: { color: '#A4A8B0', fontSize: 12, lineHeight: 17 },
+  stockText: { color: '#34D399', fontSize: 12, lineHeight: 17, fontWeight: '800' },
   stockLow: { color: '#FBBF24' },
   stockOut: { color: '#F87171' },
   priceRow: { flexDirection: 'row', alignItems: 'baseline', flexWrap: 'wrap', gap: 8 },
-  price: { color: '#FFFFFF', fontSize: 22, fontWeight: '900' },
-  oldPrice: { color: '#7C818A', fontSize: 11, textDecorationLine: 'line-through' },
-  optionSection: { gap: 7 },
+  price: { color: '#FFFFFF', fontSize: 24, lineHeight: 30, fontWeight: '900' },
+  oldPrice: { color: '#9CA3AF', fontSize: 13, lineHeight: 18, textDecorationLine: 'line-through' },
+  optionSection: { gap: 8 },
   optionHeading: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: 10 },
   optionHeadingCopy: { gap: 2 },
-  optionLabel: { color: '#B7BBC3', fontSize: 10, fontWeight: '800' },
-  optionSelected: { color: '#747982', fontSize: 8 },
-  optionAction: { color: '#A78BFA', fontSize: 9, fontWeight: '800' },
-  optionRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
-  colorButton: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: 'transparent' },
+  optionLabel: { color: '#D1D5DB', fontSize: 13, lineHeight: 18, fontWeight: '800' },
+  optionSelected: { color: '#A4A8B0', fontSize: 11, lineHeight: 16 },
+  optionActionButton: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 4 },
+  optionAction: { color: '#C4B5FD', fontSize: 12, lineHeight: 17, fontWeight: '800' },
+  optionRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  colorButton: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: 'transparent' },
   colorButtonActive: { borderColor: '#FFFFFF' },
-  colorDot: { width: 22, height: 22, borderRadius: 11, borderWidth: 1 },
-  sizeButton: { minWidth: 42, minHeight: 36, borderRadius: 8, paddingHorizontal: 9, backgroundColor: '#1C1E22', borderWidth: 1, borderColor: '#292C31', alignItems: 'center', justifyContent: 'center' },
+  colorDot: { width: 26, height: 26, borderRadius: 13, borderWidth: 1 },
+  sizeButton: { minWidth: 44, minHeight: 44, borderRadius: 10, paddingHorizontal: 11, backgroundColor: '#1C1E22', borderWidth: 1, borderColor: '#292C31', alignItems: 'center', justifyContent: 'center' },
   sizeButtonActive: { backgroundColor: '#F1F2F4', borderColor: '#F1F2F4' },
-  sizeText: { color: '#FFFFFF', fontSize: 10, fontWeight: '900' },
+  sizeText: { color: '#FFFFFF', fontSize: 13, lineHeight: 18, fontWeight: '900' },
   sizeTextActive: { color: '#0B0B0D' },
-  optionDisabled: { opacity: 0.28 },
+  optionDisabled: { opacity: 0.32 },
   quantityRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
   quantityCopy: { flex: 1, gap: 2 },
-  quantityLabel: { color: '#B7BBC3', fontSize: 10, fontWeight: '800' },
-  quantityHelper: { color: '#747982', fontSize: 8, lineHeight: 12 },
-  stepper: { height: 36, borderRadius: 9, overflow: 'hidden', flexDirection: 'row', alignItems: 'center', backgroundColor: '#1C1E22' },
-  stepButton: { width: 34, height: 36, alignItems: 'center', justifyContent: 'center' },
-  stepDisabled: { opacity: 0.28 },
-  stepText: { color: '#FFFFFF', fontSize: 18, fontWeight: '800' },
-  stepValue: { minWidth: 28, textAlign: 'center', color: '#FFFFFF', fontSize: 11, fontWeight: '900' },
-  feedback: { borderRadius: 9, paddingHorizontal: 10, paddingVertical: 8, borderWidth: StyleSheet.hairlineWidth },
+  quantityLabel: { color: '#D1D5DB', fontSize: 13, lineHeight: 18, fontWeight: '800' },
+  quantityHelper: { color: '#A4A8B0', fontSize: 11, lineHeight: 16 },
+  stepper: { height: 44, borderRadius: 10, overflow: 'hidden', flexDirection: 'row', alignItems: 'center', backgroundColor: '#1C1E22' },
+  stepButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+  stepDisabled: { opacity: 0.32 },
+  stepText: { color: '#FFFFFF', fontSize: 20, lineHeight: 24, fontWeight: '800' },
+  stepValue: { minWidth: 34, textAlign: 'center', color: '#FFFFFF', fontSize: 13, lineHeight: 18, fontWeight: '900' },
+  feedback: { borderRadius: 10, paddingHorizontal: 11, paddingVertical: 9, borderWidth: StyleSheet.hairlineWidth },
   feedbackSuccess: { backgroundColor: 'rgba(6,78,59,0.34)', borderColor: '#10B981' },
   feedbackError: { backgroundColor: 'rgba(127,29,29,0.34)', borderColor: '#F87171' },
-  feedbackText: { fontSize: 9, lineHeight: 14, fontWeight: '800' },
+  feedbackText: { fontSize: 12, lineHeight: 18, fontWeight: '800' },
   feedbackTextSuccess: { color: '#6EE7B7' },
   feedbackTextError: { color: '#FDA4AF' },
-  cartButton: { minHeight: 48, borderRadius: 9, backgroundColor: '#F1F2F4', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingHorizontal: 12 },
+  cartButton: { minHeight: 52, borderRadius: 12, backgroundColor: '#F1F2F4', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingHorizontal: 14 },
   cartButtonDisabled: { opacity: 0.5 },
-  cartButtonPressed: { opacity: 0.78 },
-  cartButtonText: { color: '#0B0B0D', fontSize: 11, fontWeight: '900' },
-  cartButtonPrice: { color: '#4B5563', fontSize: 9, fontWeight: '800' },
+  cartButtonPressed: { opacity: 0.76 },
+  cartButtonText: { color: '#0B0B0D', fontSize: 14, lineHeight: 19, fontWeight: '900' },
+  cartButtonPrice: { color: '#4B5563', fontSize: 12, lineHeight: 17, fontWeight: '800' },
   microMetaRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  microMeta: { color: '#6F747D', fontSize: 8, fontWeight: '700' },
+  microMeta: { color: '#A4A8B0', fontSize: 11, lineHeight: 16, fontWeight: '700' },
   detailShell: { width: '100%', maxWidth: 680, alignSelf: 'center', paddingHorizontal: 16, paddingTop: 18, gap: 14 },
-  shortDescription: { color: '#4B5563', fontSize: 12, lineHeight: 19 },
+  shortDescription: { color: '#4B5563', fontSize: 13, lineHeight: 20 },
   infoCard: { borderRadius: 16, backgroundColor: '#FFFFFF', borderWidth: StyleSheet.hairlineWidth, borderColor: '#E5E7EB', padding: 14, gap: 8 },
-  sectionEyebrow: { color: BRAND_COLORS.primary, fontSize: 8, fontWeight: '900', letterSpacing: 1 },
-  sectionTitle: { color: BRAND_COLORS.ink, fontSize: 18, fontWeight: '900' },
-  description: { color: '#4B5563', fontSize: 12, lineHeight: 20 },
-  specRow: { minHeight: 38, paddingVertical: 8, flexDirection: 'row', alignItems: 'center', gap: 12, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#E5E7EB' },
-  specLabel: { width: 100, color: '#6B7280', fontSize: 10, fontWeight: '700' },
-  specValue: { flex: 1, color: BRAND_COLORS.ink, fontSize: 10, fontWeight: '800', textAlign: 'right' },
+  sectionEyebrow: { color: BRAND_COLORS.primary, fontSize: 10, lineHeight: 14, fontWeight: '900', letterSpacing: 1 },
+  sectionTitle: { color: BRAND_COLORS.ink, fontSize: 18, lineHeight: 23, fontWeight: '900' },
+  description: { color: '#4B5563', fontSize: 13, lineHeight: 21 },
+  specRow: { minHeight: 44, paddingVertical: 9, flexDirection: 'row', alignItems: 'center', gap: 12, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#E5E7EB' },
+  specLabel: { width: 104, color: '#6B7280', fontSize: 12, lineHeight: 18, fontWeight: '700' },
+  specValue: { flex: 1, color: BRAND_COLORS.ink, fontSize: 12, lineHeight: 18, fontWeight: '800', textAlign: 'right' },
   relatedSection: { gap: 10, marginHorizontal: -16 },
   relatedHeading: { paddingHorizontal: 16, flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: 10 },
   relatedList: { paddingHorizontal: 16, paddingBottom: 4, gap: 10 },
-  more: { color: BRAND_COLORS.primary, fontSize: 11, fontWeight: '800' },
-  pressed: { opacity: 0.74 },
+  more: { color: BRAND_COLORS.primary, fontSize: 13, lineHeight: 18, fontWeight: '800' },
+  pressed: { opacity: 0.72 },
 });
