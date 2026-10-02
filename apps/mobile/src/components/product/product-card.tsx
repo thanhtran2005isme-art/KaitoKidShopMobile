@@ -2,6 +2,7 @@ import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { memo, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useReducedMotion } from 'react-native-reanimated';
 
 import { AppIcon } from '@/components/ui/app-icon';
 import { BRAND_COLORS } from '@/constants/brand';
@@ -27,6 +28,7 @@ export const ProductCard = memo(function ProductCard({
   wishlistPlacement = 'overlay',
 }: ProductCardProps) {
   const router = useRouter();
+  const reducedMotion = useReducedMotion();
   const { token } = useAuth();
   const { isWishlisted, toggleWishlist } = useShopping();
   const [wishlistBusy, setWishlistBusy] = useState(false);
@@ -131,6 +133,7 @@ export const ProductCard = memo(function ProductCard({
           ) : null}
         </View>
         <Text
+          accessibilityLabel={`Tồn kho: ${stockLabel}`}
           numberOfLines={1}
           style={[
             styles.stock,
@@ -158,10 +161,11 @@ export const ProductCard = memo(function ProductCard({
 
   const ColorRow = () =>
     visibleColors.length > 0 ? (
-      <View style={styles.colorRow}>
+      <View accessibilityLabel={`${colors.length} màu sắc`} style={styles.colorRow}>
         {visibleColors.map((color) => (
           <View
             key={color}
+            accessible
             accessibilityLabel={`Màu ${color}`}
             style={[
               styles.colorDot,
@@ -196,11 +200,12 @@ export const ProductCard = memo(function ProductCard({
               contentFit="cover"
               source={{ uri: image }}
               style={[styles.image, isOutOfStock && styles.imageOut]}
-              transition={160}
+              transition={reducedMotion ? 0 : 160}
             />
           ) : (
             <View style={styles.imageFallback}>
               <AppIcon color={BRAND_COLORS.primary} name="image" size={30} />
+              <Text style={styles.imageFallbackText}>Ảnh đang cập nhật</Text>
             </View>
           )}
         </Pressable>
@@ -278,7 +283,7 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: BRAND_COLORS.surface,
     borderRadius: 16,
-    borderWidth: StyleSheet.hairlineWidth,
+    borderWidth: 1,
     borderColor: BRAND_COLORS.line,
     overflow: 'hidden',
   },
@@ -297,7 +302,16 @@ const styles = StyleSheet.create({
     height: '100%',
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 8,
+    paddingHorizontal: 12,
     backgroundColor: BRAND_COLORS.primarySoft,
+  },
+  imageFallbackText: {
+    color: BRAND_COLORS.primaryDark,
+    fontSize: 11,
+    lineHeight: 16,
+    fontWeight: '700',
+    textAlign: 'center',
   },
   badges: {
     position: 'absolute',
@@ -307,13 +321,13 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   badge: {
-    minHeight: 21,
+    minHeight: 22,
     borderRadius: 9,
     paddingHorizontal: 7,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  badgeText: { fontSize: 8, lineHeight: 11, fontWeight: '900' },
+  badgeText: { fontSize: 9, lineHeight: 12, fontWeight: '900' },
   newBadge: { backgroundColor: BRAND_COLORS.primarySoft },
   newBadgeText: { color: BRAND_COLORS.primaryDark },
   bestBadge: { backgroundColor: BRAND_COLORS.accentSoft },
@@ -329,9 +343,9 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.94)',
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(229,231,235,0.95)',
+    backgroundColor: 'rgba(255,255,255,0.96)',
+    borderWidth: 1,
+    borderColor: 'rgba(229,231,235,0.96)',
   },
   inlineWishlist: {
     width: 44,
@@ -340,25 +354,25 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: BRAND_COLORS.surface,
-    borderWidth: StyleSheet.hairlineWidth,
+    borderWidth: 1,
     borderColor: BRAND_COLORS.line,
   },
   wishlistActive: {
     backgroundColor: '#FFF1F2',
     borderColor: '#FDA4AF',
   },
-  content: { padding: 10, gap: 7 },
-  contentMain: { gap: 7 },
+  content: { padding: 10, gap: 8 },
+  contentMain: { gap: 8 },
   contentPressed: { opacity: 0.72 },
   name: {
-    minHeight: 36,
+    minHeight: 40,
     color: BRAND_COLORS.ink,
-    fontSize: 13,
-    lineHeight: 18,
+    fontSize: 14,
+    lineHeight: 20,
     fontWeight: '800',
   },
   metaRow: {
-    minHeight: 18,
+    minHeight: 20,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -371,12 +385,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 3,
   },
-  rating: { color: BRAND_COLORS.ink, fontSize: 10, fontWeight: '800' },
-  sold: { flexShrink: 1, color: BRAND_COLORS.muted, fontSize: 8 },
+  rating: { color: BRAND_COLORS.ink, fontSize: 11, lineHeight: 15, fontWeight: '800' },
+  sold: { flexShrink: 1, color: BRAND_COLORS.muted, fontSize: 10, lineHeight: 14 },
   stock: {
-    maxWidth: 58,
+    maxWidth: 66,
     color: BRAND_COLORS.success,
-    fontSize: 8,
+    fontSize: 10,
+    lineHeight: 14,
     fontWeight: '800',
     textAlign: 'right',
   },
@@ -398,16 +413,17 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 5,
   },
-  price: { color: BRAND_COLORS.ink, fontSize: 15, fontWeight: '900' },
+  price: { color: BRAND_COLORS.ink, fontSize: 16, lineHeight: 21, fontWeight: '900' },
   oldPrice: {
     flexShrink: 1,
     color: '#94A3B8',
-    fontSize: 9,
+    fontSize: 10,
+    lineHeight: 14,
     textDecorationLine: 'line-through',
   },
-  colorPressable: { minHeight: 26, justifyContent: 'center' },
+  colorPressable: { minHeight: 28, justifyContent: 'center' },
   colorRow: {
-    minHeight: 22,
+    minHeight: 24,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
@@ -421,6 +437,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.08,
     shadowRadius: 1,
   },
-  moreColors: { color: BRAND_COLORS.muted, fontSize: 9, fontWeight: '700' },
+  moreColors: { color: BRAND_COLORS.muted, fontSize: 10, lineHeight: 14, fontWeight: '700' },
   pressed: { opacity: 0.72 },
 });
