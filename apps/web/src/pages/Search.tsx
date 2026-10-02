@@ -376,6 +376,10 @@ export default function Search() {
     event.target.value = '';
   };
 
+  const keepSuggestionOpen = (event: React.MouseEvent) => {
+    event.preventDefault();
+  };
+
   return (
     <div className="search-page">
       <header className="search-heading">
@@ -392,6 +396,13 @@ export default function Search() {
               onChange={(event) => setKeyword(event.target.value)}
               onFocus={() => setShowSuggestions(true)}
               onBlur={() => window.setTimeout(() => setShowSuggestions(false), 160)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') {
+                  setDebounced(keyword.trim());
+                  setSearchRetryKey((value) => value + 1);
+                  setShowSuggestions(false);
+                }
+              }}
               placeholder="Tìm áo sơ mi, quần jeans, váy..."
               aria-label="Tìm kiếm sản phẩm"
               aria-expanded={showSuggestions}
@@ -460,7 +471,7 @@ export default function Search() {
           </div>
 
           {showSuggestions ? (
-            <div className="search-suggestions" role="listbox">
+            <div className="search-suggestions">
               {keyword.trim().length >= 2 && autocomplete.suggestions.length > 0 ? (
                 <div>
                   <div className="search-suggestion-head">Gợi ý từ khóa</div>
@@ -469,8 +480,8 @@ export default function Search() {
                       key={suggestion}
                       className="search-suggestion-row"
                       type="button"
-                      onMouseDown={(event) => {
-                        event.preventDefault();
+                      onMouseDown={keepSuggestionOpen}
+                      onClick={() => {
                         setKeyword(suggestion);
                         setShowSuggestions(false);
                       }}>
@@ -489,10 +500,8 @@ export default function Search() {
                       key={product.id}
                       className="search-suggestion-row"
                       type="button"
-                      onMouseDown={(event) => {
-                        event.preventDefault();
-                        navigate(`/product/${product.id}`);
-                      }}>
+                      onMouseDown={keepSuggestionOpen}
+                      onClick={() => navigate(`/product/${product.id}`)}>
                       <img
                         className="search-suggestion-product-image"
                         src={product.image}
@@ -520,8 +529,8 @@ export default function Search() {
                     <button
                       className="search-suggestion-clear"
                       type="button"
-                      onMouseDown={(event) => {
-                        event.preventDefault();
+                      onMouseDown={keepSuggestionOpen}
+                      onClick={() => {
                         clearSearchHistory();
                         setHistory([]);
                       }}>
@@ -535,18 +544,16 @@ export default function Search() {
                         type="button"
                         className="search-suggestion-clear"
                         style={{ flex: 1, textAlign: 'left', color: 'inherit' }}
-                        onMouseDown={(event) => {
-                          event.preventDefault();
-                          setKeyword(item.keyword);
-                        }}>
+                        onMouseDown={keepSuggestionOpen}
+                        onClick={() => setKeyword(item.keyword)}>
                         {item.keyword}
                       </button>
                       <button
                         type="button"
                         className="search-suggestion-clear"
                         aria-label={`Xóa ${item.keyword}`}
-                        onMouseDown={(event) => {
-                          event.preventDefault();
+                        onMouseDown={keepSuggestionOpen}
+                        onClick={() => {
                           removeSearchEntry(item.keyword);
                           setHistory(getSearchHistory());
                         }}>
@@ -567,10 +574,8 @@ export default function Search() {
                       key={product.id}
                       className="search-suggestion-row"
                       type="button"
-                      onMouseDown={(event) => {
-                        event.preventDefault();
-                        navigate(`/product/${product.id}`);
-                      }}>
+                      onMouseDown={keepSuggestionOpen}
+                      onClick={() => navigate(`/product/${product.id}`)}>
                       <img
                         className="search-suggestion-product-image"
                         src={product.image}
