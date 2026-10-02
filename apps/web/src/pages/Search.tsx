@@ -109,6 +109,7 @@ export default function Search() {
   const [didYouMean, setDidYouMean] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
+  const [searchRetryKey, setSearchRetryKey] = useState(0);
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
 
   const voice = useVoiceSearch({
@@ -282,6 +283,7 @@ export default function Search() {
     maxPrice,
     minPrice,
     minRating,
+    searchRetryKey,
     sort,
   ]);
 
@@ -291,13 +293,14 @@ export default function Search() {
       else params.delete('category');
     });
 
+  const clearPrice = () =>
+    updateParams((params) => {
+      params.delete('min');
+      params.delete('max');
+    });
+
   const togglePrice = (index: number) =>
     updateParams((params) => {
-      if (activePriceIdx === index) {
-        params.delete('min');
-        params.delete('max');
-        return;
-      }
       const range = PRICE_RANGES[index];
       params.set('min', String(range.min));
       params.set('max', String(range.max));
@@ -448,6 +451,7 @@ export default function Search() {
                 aria-label="Tìm kiếm"
                 onClick={() => {
                   setDebounced(keyword.trim());
+                  setSearchRetryKey((value) => value + 1);
                   setShowSuggestions(false);
                 }}>
                 <PiMagnifyingGlassBold aria-hidden="true" />
@@ -648,6 +652,9 @@ export default function Search() {
 
             <FilterGroup title="Khoảng giá">
               <div className="search-radio-list">
+                <Radio checked={activePriceIdx === null} onChange={clearPrice}>
+                  Tất cả
+                </Radio>
                 {PRICE_RANGES.map((range, index) => (
                   <Radio
                     key={range.label}
@@ -833,7 +840,7 @@ export default function Search() {
                   icon={<PiX aria-hidden="true" />}
                   error
                   actionLabel="Thử lại"
-                  onAction={() => setDebounced(`${keyword.trim()} ` .trim())}
+                  onAction={() => setSearchRetryKey((value) => value + 1)}
                 />
               ) : results.length ? (
                 <div className="search-products-grid">
