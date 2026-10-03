@@ -5,21 +5,20 @@ import { join, resolve } from "node:path";
 import { NestFactory } from "@nestjs/core";
 import type { NestExpressApplication } from "@nestjs/platform-express";
 import { AppModule } from "./app.module.js";
+import { isCorsOriginAllowed, parseCorsOrigins } from "./common/cors.js";
 import {
   registerLegacyMediaFallback,
   resolveSharedWebPublicRoot,
 } from "./media/legacy-media.js";
 
-function parseOrigins(raw: string | undefined): string[] {
-  return (raw ?? "").split(",").map((value) => value.trim()).filter(Boolean);
-}
-
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
-  const origins = parseOrigins(process.env.CORS_ORIGINS);
+  const origins = parseCorsOrigins(process.env.CORS_ORIGINS);
 
   app.enableCors({
-    origin: origins.length > 0 ? origins : false,
+    origin: (origin, callback) => {
+      callback(null, isCorsOriginAllowed(origin, origins));
+    },
     credentials: true,
   });
 

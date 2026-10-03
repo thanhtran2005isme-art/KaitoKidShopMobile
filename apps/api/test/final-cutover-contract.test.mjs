@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
 import { basename, dirname, normalize } from "node:path";
 import test from "node:test";
+import { isCorsOriginAllowed, parseCorsOrigins } from "../dist/common/cors.js";
 import { backgroundWorkerOwner, nodeOwnsBackgroundWorkers, nodeWorkerEnabled } from "../dist/common/worker-owner.js";
 import { LOOKBOOK_PLACEHOLDER_SVG, PRODUCT_PLACEHOLDER_SVG, resolveSharedWebPublicRoot } from "../dist/media/legacy-media.js";
 import { nextShippingSimulationStep } from "../dist/modules/shipping/shipping-status-simulator.service.js";
@@ -51,6 +52,20 @@ test("Web/Mobile chỉ dùng Node :5300, không còn legacy C# ports", () => {
 
   assert.match(joined, /5300/);
   for (const port of ["5053", "5265", "5089", "5155"]) assert.doesNotMatch(joined, new RegExp(port));
+});
+
+test("CORS local cho phép Expo Web đổi port nhưng không mở origin ngoài cấu hình", () => {
+  const origins = parseCorsOrigins(
+    "http://localhost:5173,http://127.0.0.1:8081,https://shop.example.com",
+  );
+
+  assert.equal(isCorsOriginAllowed(undefined, origins), true);
+  assert.equal(isCorsOriginAllowed("http://localhost:8082", origins), true);
+  assert.equal(isCorsOriginAllowed("http://127.0.0.1:8083", origins), true);
+  assert.equal(isCorsOriginAllowed("https://localhost:8082", origins), false);
+  assert.equal(isCorsOriginAllowed("https://shop.example.com", origins), true);
+  assert.equal(isCorsOriginAllowed("https://evil.example.com", origins), false);
+  assert.equal(isCorsOriginAllowed("http://192.168.2.8:8082", origins), false);
 });
 
 test("launchers không còn dotnet/C# runtime và Node owns critical workers", () => {
