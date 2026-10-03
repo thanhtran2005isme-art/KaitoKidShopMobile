@@ -68,6 +68,11 @@ test("CORS local cho phép Expo Web đổi port nhưng không mở origin ngoài
   assert.equal(isCorsOriginAllowed("http://192.168.2.8:8082", origins), false);
 });
 
+test("JSON body limit đủ cho cấu hình admin chứa QR base64", () => {
+  const main = readApi("src/main.ts");
+  assert.match(main, /app\.useBodyParser\("json", \{ limit: "16mb" \}\);/);
+});
+
 test("launchers không còn dotnet/C# runtime và Node owns critical workers", () => {
   const root = readRepo("run.bat");
   const all = readRepo("scripts/run-all.bat");
