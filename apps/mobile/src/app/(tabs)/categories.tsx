@@ -1,8 +1,12 @@
 import { Image } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  ActivityIndicator,
+  Alert,
   FlatList,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -12,13 +16,40 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, { FadeIn, FadeOut, useReducedMotion } from 'react-native-reanimated';
 
-import { ProductCard } from '@/components/product/product-card';
 import { AppIcon } from '@/components/ui/app-icon';
-import { BRAND, BRAND_COLORS } from '@/constants/brand';
+import { useAuth } from '@/context/AuthContext';
+import { useShopping } from '@/context/ShoppingContext';
 import { useProductGrid } from '@/hooks/use-product-grid';
+import { BRAND, BRAND_COLORS } from '@/constants/brand';
 import { resolveMediaUrl } from '@/services/api-client';
 import { shopApi } from '@/services/home.api';
 import type { Category, Product } from '@/types/shop';
+
+const COLORS = {
+  background: BRAND_COLORS.canvas,
+  surface: BRAND_COLORS.surface,
+  ink: BRAND_COLORS.ink,
+  dark: '#24113D',
+  darkSoft: '#3B1B63',
+  secondary: '#4B5563',
+  muted: BRAND_COLORS.muted,
+  line: BRAND_COLORS.line,
+  accent: BRAND_COLORS.primary,
+  accentSoft: BRAND_COLORS.primarySoft,
+  accentDeep: BRAND_COLORS.primaryDark,
+  warm: BRAND_COLORS.accent,
+  warmSoft: BRAND_COLORS.accentSoft,
+  success: BRAND_COLORS.success,
+  danger: BRAND_COLORS.danger,
+  white: BRAND_COLORS.surface,
+} as const;
+
+const DISPLAY_FONT = Platform.select({
+  ios: 'Georgia',
+  android: 'serif',
+  web: 'Georgia',
+  default: undefined,
+});
 
 type AudienceKey = 'all' | 'women' | 'men' | 'kids';
 
@@ -35,14 +66,14 @@ const AUDIENCES: AudienceOption[] = [
   {
     key: 'all',
     label: 'Tất cả',
-    title: 'Mọi phong cách',
+    title: 'Khám phá KaitoKid',
     description: BRAND.promise,
   },
   {
     key: 'women',
     label: 'Nữ',
     title: 'Thời trang Nữ',
-    description: 'Thanh lịch · hiện đại · dễ phối',
+    description: 'Thanh lịch · hiện đại · linh hoạt',
     gender: 'Nu',
     ageGroup: 'NguoiLon',
   },
@@ -50,7 +81,7 @@ const AUDIENCES: AudienceOption[] = [
     key: 'men',
     label: 'Nam',
     title: 'Thời trang Nam',
-    description: 'Gọn gàng · năng động · linh hoạt',
+    description: 'Gọn gàng · năng động · dễ phối',
     gender: 'Nam',
     ageGroup: 'NguoiLon',
   },
@@ -170,7 +201,7 @@ function InlineState({
   return (
     <View accessibilityRole="alert" style={styles.inlineState}>
       <View style={styles.inlineStateIcon}>
-        <AppIcon color={BRAND_COLORS.primary} name="clothing" size={24} />
+        <AppIcon color={COLORS.accent} name="clothing" size={24} />
       </View>
       <Text style={styles.inlineStateTitle}>{title}</Text>
       <Text style={styles.inlineStateDescription}>{description}</Text>
@@ -183,13 +214,159 @@ function InlineState({
             styles.inlineStateAction,
             pressed && styles.pressed,
           ]}>
-          <AppIcon color={BRAND_COLORS.surface} name="refresh" size={18} />
+          <AppIcon color={COLORS.white} name="refresh" size={18} />
           <Text style={styles.inlineStateActionText}>{actionLabel}</Text>
         </Pressable>
       ) : null}
     </View>
   );
 }
+
+function formatPrice(value: number) {
+  return `${Math.round(value).toLocaleString('vi-VN')}đ`;
+}
+
+const EditorialProductCard = memo(function EditorialProductCard({
+  product,
+  width,
+}: {
+  product: Product;
+  width: number;
+}) {
+  const router = useRouter();
+  const reducedMotion = useReducedMotion();
+  const { token } = useAuth();
+  const { isWishlisted, toggleWishlist } = useShopping();
+  const [wishlistBusy, setWishlistBusy] = useState(false);
+
+  const image = resolveMediaUrl(product.image);
+  const wished = isWishlisted(product.id);
+  const discount =
+    product.oldPrice && product.oldPrice > product.price
+      ? Math.round((1 - product.price / product.oldPrice) * 100)
+      : 0;
+
+  const openProduct = () => {
+    router.push({
+      pathname: '/product/[slug]',
+      params: { slug: product.slug || String(product.id) },
+    });
+  };
+
+  const handleWishlist = async () => {
+    if (wishlistBusy) return;
+    if (!token) {
+      router.push({
+        pathname: '/auth/login',
+        params: { redirect: `/product/${product.slug || product.id}` },
+      });
+      return;
+    }
+
+    try {
+      setWishlistBusy(true);
+      await toggleWishlist(product.id);
+    } catch (error) {
+      Alert.alert(
+        'Danh sách yêu thích',
+        error instanceof Error ? error.message : 'Không thể cập nhật danh sách yêu thích.',
+      );
+    } finally {
+      setWishlistBusy(false);
+    }
+  };
+
+  return (
+    <View style={[styles.editorialProductCard, { width }]}>
+      <View style={styles.editorialProductMedia}>
+        <Pressable
+          accessibilityLabel={`Xem ${product.name}`}
+          accessibilityRole="button"
+          onPress={openProduct}
+          style={({ pressed }) => [styles.productImagePressable, pressed && styles.productPressed]}>
+          {image ? (
+            <Image
+              accessibilityLabel={product.name}
+              cachePolicy="memory-disk"
+              contentFit="cover"
+              source={{ uri: image }}
+              style={StyleSheet.absoluteFill}
+              transition={reducedMotion ? 0 : 180}
+            />
+          ) : (
+            <LinearGradient colors={['#F4F4F5', '#E4E4E7']} style={styles.productImageFallback}>
+              <AppIcon color={COLORS.secondary} name="image" size={30} />
+              <Text style={styles.productImageFallbackText}>CHƯA CÓ ẢNH</Text>
+            </LinearGradient>
+          )}
+        </Pressable>
+
+        <View pointerEvents="none" style={styles.editorialBadges}>
+          {product.isNew ? (
+            <View style={[styles.editorialBadge, styles.newBadge]}>
+              <Text style={styles.newBadgeText}>NEW</Text>
+            </View>
+          ) : null}
+          {product.isBestSeller ? (
+            <View style={[styles.editorialBadge, styles.bestBadge]}>
+              <Text style={styles.bestBadgeText}>BEST</Text>
+            </View>
+          ) : null}
+          {discount > 0 ? (
+            <View style={[styles.editorialBadge, styles.saleBadge]}>
+              <Text style={styles.saleBadgeText}>-{discount}%</Text>
+            </View>
+          ) : null}
+        </View>
+
+        <Pressable
+          accessibilityLabel={wished ? 'Bỏ khỏi yêu thích' : 'Thêm vào yêu thích'}
+          accessibilityRole="button"
+          accessibilityState={{ disabled: wishlistBusy, selected: wished }}
+          disabled={wishlistBusy}
+          onPress={() => void handleWishlist()}
+          style={({ pressed }) => [
+            styles.editorialWishlist,
+            wished && styles.editorialWishlistActive,
+            pressed && styles.productPressed,
+          ]}>
+          {wishlistBusy ? (
+            <ActivityIndicator color={COLORS.ink} size="small" />
+          ) : (
+            <AppIcon
+              color={wished ? COLORS.accent : COLORS.ink}
+              name={wished ? 'heartFilled' : 'heart'}
+              size={19}
+            />
+          )}
+        </Pressable>
+      </View>
+
+      <Pressable
+        accessibilityLabel={`Mở ${product.name}`}
+        accessibilityRole="button"
+        onPress={openProduct}
+        style={({ pressed }) => [styles.editorialProductCopy, pressed && styles.productPressed]}>
+        <Text numberOfLines={1} style={styles.editorialProductCategory}>
+          {product.subcategory || product.category || 'KAITOKID'}
+        </Text>
+        <Text numberOfLines={2} style={styles.editorialProductName}>
+          {product.name}
+        </Text>
+        <View style={styles.editorialPriceRow}>
+          <Text numberOfLines={1} style={styles.editorialPrice}>
+            {formatPrice(product.price)}
+          </Text>
+          {product.oldPrice && product.oldPrice > product.price ? (
+            <Text numberOfLines={1} style={styles.editorialOldPrice}>
+              {formatPrice(product.oldPrice)}
+            </Text>
+          ) : null}
+        </View>
+      </Pressable>
+    </View>
+  );
+});
 
 export default function CategoriesScreen() {
   const router = useRouter();
@@ -243,7 +420,6 @@ export default function CategoriesScreen() {
 
   useEffect(() => {
     let active = true;
-    setCategoryError(false);
 
     void shopApi
       .getCategories()
@@ -429,10 +605,9 @@ export default function CategoriesScreen() {
           onPress={() => handleRootSelect(item)}
           style={({ pressed }) => [
             styles.categoryCard,
-            active && styles.categoryCardActive,
             pressed && styles.pressed,
           ]}>
-          <View style={styles.categoryMedia}>
+          <View style={[styles.categoryMedia, active && styles.categoryMediaActive]}>
             {image ? (
               <Image
                 accessibilityLabel={item.name}
@@ -443,14 +618,19 @@ export default function CategoriesScreen() {
                 transition={reducedMotion ? 0 : 160}
               />
             ) : (
-              <View style={styles.categoryFallback}>
+              <View style={[styles.categoryFallback, active && styles.categoryFallbackActive]}>
                 <AppIcon
-                  color={active ? BRAND_COLORS.primaryDark : BRAND_COLORS.primary}
+                  color={active ? COLORS.white : COLORS.ink}
                   name="clothing"
                   size={26}
                 />
               </View>
             )}
+            {active ? (
+              <View style={styles.categorySelectedBadge}>
+                <AppIcon color={COLORS.white} name="check" size={14} />
+              </View>
+            ) : null}
           </View>
           <Text
             numberOfLines={2}
@@ -468,33 +648,40 @@ export default function CategoriesScreen() {
 
   const listHeader = (
     <View style={styles.listHeader}>
-      <View style={styles.introSection}>
-        <Text style={styles.eyebrow}>KHÁM PHÁ</Text>
-        <Text style={styles.introTitle}>{audienceOption.title}</Text>
-        <Text style={styles.introDescription}>{audienceOption.description}</Text>
-      </View>
+      <LinearGradient colors={['#2E1065', '#4C1D95', '#24113D']} style={styles.catalogHero}>
+        <View pointerEvents="none" style={styles.heroGlowPink} />
+        <View pointerEvents="none" style={styles.heroGlowWhite} />
 
-      <View style={styles.audienceSection}>
-        <Text style={styles.controlLabel}>Đối tượng</Text>
+        <View style={styles.catalogHeroTop}>
+          <View style={styles.catalogHeroIcon}>
+            <AppIcon color={COLORS.accent} name="sparkles" size={22} />
+          </View>
+          <View style={styles.catalogHeroCopy}>
+            <Text style={styles.heroEyebrow}>KAITOKID / DANH MỤC</Text>
+            <Text style={styles.heroTitle}>{audienceOption.title}</Text>
+            <Text style={styles.heroDescription}>{audienceOption.description}</Text>
+          </View>
+        </View>
         <AudienceTabs onSelect={handleAudienceSelect} selected={audience} />
-      </View>
+      </LinearGradient>
 
       <View style={styles.categorySection}>
         <View style={styles.sectionHeadingRow}>
           <View style={styles.sectionHeading}>
-            <Text style={styles.controlLabel}>Danh mục</Text>
-            <Text style={styles.sectionTitle}>Chọn kiểu sản phẩm</Text>
+            <Text style={styles.sectionEyebrow}>01 / DANH MỤC</Text>
+            <Text style={styles.sectionTitle}>Chọn kiểu bạn thích</Text>
           </View>
           {hasCategoryFilter ? (
             <Pressable
-              accessibilityLabel="Bỏ lọc danh mục"
+              accessibilityLabel="Xóa danh mục đã chọn"
               accessibilityRole="button"
               onPress={clearCategory}
               style={({ pressed }) => [
                 styles.clearCategory,
                 pressed && styles.pressed,
               ]}>
-              <Text style={styles.clearCategoryText}>Bỏ lọc</Text>
+              <AppIcon color={COLORS.ink} name="close" size={15} />
+              <Text style={styles.clearCategoryText}>BỎ LỌC</Text>
             </Pressable>
           ) : null}
         </View>
@@ -508,7 +695,7 @@ export default function CategoriesScreen() {
             onAction={retryCategories}
             title="Chưa tải được danh mục"
           />
-        ) : (
+        ) : rootCategories.length ? (
           <FlatList
             contentContainerStyle={styles.categoryList}
             data={rootCategories}
@@ -517,11 +704,16 @@ export default function CategoriesScreen() {
             renderItem={renderCategory}
             showsHorizontalScrollIndicator={false}
           />
+        ) : (
+          <InlineState
+            description="Hiện chưa có danh mục sản phẩm để hiển thị."
+            title="Chưa có danh mục"
+          />
         )}
 
         {childCategories.length ? (
           <View style={styles.subcategorySection}>
-            <Text style={styles.controlLabel}>Danh mục con</Text>
+            <Text style={styles.subcategoryLabel}>LỌC CHI TIẾT</Text>
             <ScrollView
               contentContainerStyle={styles.subcategoryList}
               horizontal
@@ -576,14 +768,16 @@ export default function CategoriesScreen() {
 
       <View style={styles.productsHeading}>
         <View style={styles.productsHeadingCopy}>
-          <Text style={styles.controlLabel}>Sản phẩm</Text>
+          <Text style={styles.sectionEyebrow}>02 / SẢN PHẨM</Text>
           <Text numberOfLines={2} style={styles.sectionTitle}>
-            {productFilterLabel || 'Khám phá KaitoKid'}
+            {productFilterLabel || 'Gợi ý dành cho bạn'}
           </Text>
         </View>
-        <Text accessibilityLiveRegion="polite" style={styles.productCount}>
-          {loadingProducts ? 'Đang tải…' : `${productTotal} sản phẩm`}
-        </Text>
+        <View style={styles.productCountPill}>
+          <Text accessibilityLiveRegion="polite" style={styles.productCount}>
+            {loadingProducts ? 'Đang tải…' : `${productTotal} sản phẩm`}
+          </Text>
+        </View>
       </View>
     </View>
   );
@@ -593,10 +787,8 @@ export default function CategoriesScreen() {
       <View style={styles.header}>
         <View style={styles.headerInner}>
           <View style={styles.headerCopy}>
+            <Text style={styles.headerKicker}>KAITOKID / CATALOG</Text>
             <Text style={styles.headerTitle}>Danh mục</Text>
-            <Text numberOfLines={1} style={styles.headerSubtitle}>
-              {BRAND.categorySubtitle}
-            </Text>
           </View>
           <Pressable
             accessibilityLabel="Tìm kiếm sản phẩm"
@@ -606,7 +798,7 @@ export default function CategoriesScreen() {
               styles.searchButton,
               pressed && styles.pressed,
             ]}>
-            <AppIcon color={BRAND_COLORS.ink} name="search" size={21} />
+            <AppIcon color={COLORS.white} name="search" size={20} />
           </Pressable>
         </View>
       </View>
@@ -644,7 +836,7 @@ export default function CategoriesScreen() {
           <Animated.View
             entering={reducedMotion ? undefined : FadeIn.duration(180)}
             exiting={reducedMotion ? undefined : FadeOut.duration(100)}>
-            <ProductCard product={item} width={cardWidth} />
+            <EditorialProductCard product={item} width={cardWidth} />
           </Animated.View>
         )}
         showsVerticalScrollIndicator={false}
@@ -657,13 +849,13 @@ export default function CategoriesScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: BRAND_COLORS.canvas,
+    backgroundColor: COLORS.background,
   },
   header: {
     zIndex: 20,
-    backgroundColor: BRAND_COLORS.surface,
+    backgroundColor: COLORS.surface,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: BRAND_COLORS.line,
+    borderBottomColor: COLORS.line,
   },
   headerInner: {
     width: '100%',
@@ -681,25 +873,27 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   headerTitle: {
-    color: BRAND_COLORS.ink,
+    color: COLORS.ink,
+    fontFamily: DISPLAY_FONT,
     fontSize: 26,
     lineHeight: 32,
-    fontWeight: '900',
-    letterSpacing: -0.5,
+    fontWeight: '700',
+    letterSpacing: -0.7,
   },
-  headerSubtitle: {
-    color: BRAND_COLORS.muted,
-    fontSize: 12,
-    lineHeight: 17,
-    fontWeight: '600',
+  headerKicker: {
+    color: COLORS.accentDeep,
+    fontSize: 9,
+    lineHeight: 13,
+    fontWeight: '900',
+    letterSpacing: 1.5,
   },
   searchButton: {
     width: 46,
     height: 46,
-    borderRadius: 14,
-    backgroundColor: BRAND_COLORS.surface,
+    borderRadius: 23,
+    backgroundColor: COLORS.ink,
     borderWidth: 1,
-    borderColor: BRAND_COLORS.line,
+    borderColor: COLORS.ink,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -711,69 +905,109 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 1040,
     alignSelf: 'center',
-    paddingTop: 20,
-    paddingBottom: 20,
-    gap: 24,
+    paddingTop: 14,
+    paddingBottom: 22,
+    gap: 22,
   },
-  introSection: {
-    paddingHorizontal: 16,
-    gap: 5,
+  catalogHero: {
+    marginHorizontal: 16,
+    padding: 18,
+    borderRadius: 28,
+    backgroundColor: COLORS.ink,
+    borderWidth: 1,
+    borderColor: COLORS.darkSoft,
+    gap: 18,
+    overflow: 'hidden',
   },
-  eyebrow: {
-    color: BRAND_COLORS.primary,
-    fontSize: 10,
-    lineHeight: 14,
+  heroGlowPink: {
+    position: 'absolute',
+    width: 190,
+    height: 190,
+    borderRadius: 95,
+    backgroundColor: 'rgba(249,115,22,0.24)',
+    right: -62,
+    top: -92,
+  },
+  heroGlowWhite: {
+    position: 'absolute',
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    left: -30,
+    bottom: -48,
+  },
+  catalogHeroTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  catalogHeroIcon: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: 'rgba(255,255,255,0.10)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.16)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  catalogHeroCopy: {
+    flex: 1,
+    minWidth: 0,
+    gap: 2,
+  },
+  heroEyebrow: {
+    color: '#FDBA74',
+    fontSize: 9,
+    lineHeight: 13,
     fontWeight: '900',
-    letterSpacing: 1.15,
+    letterSpacing: 1.4,
   },
-  introTitle: {
-    color: BRAND_COLORS.ink,
+  heroTitle: {
+    color: COLORS.white,
+    fontFamily: DISPLAY_FONT,
     fontSize: 24,
     lineHeight: 30,
-    fontWeight: '900',
-    letterSpacing: -0.4,
+    fontWeight: '700',
+    letterSpacing: -0.45,
   },
-  introDescription: {
-    maxWidth: 560,
-    color: BRAND_COLORS.muted,
-    fontSize: 13,
-    lineHeight: 19,
+  heroDescription: {
+    color: '#D4D4D8',
+    fontSize: 12,
+    lineHeight: 18,
     fontWeight: '500',
   },
-  audienceSection: {
-    gap: 9,
-  },
   audienceTabs: {
-    paddingHorizontal: 16,
-    paddingRight: 22,
+    paddingRight: 4,
     gap: 8,
   },
   audienceTab: {
     minHeight: 44,
-    minWidth: 72,
-    paddingHorizontal: 16,
-    borderRadius: 12,
+    minWidth: 68,
+    paddingHorizontal: 14,
+    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: BRAND_COLORS.surface,
+    backgroundColor: 'rgba(255,255,255,0.08)',
     borderWidth: 1,
-    borderColor: BRAND_COLORS.line,
+    borderColor: 'rgba(255,255,255,0.16)',
   },
   audienceTabActive: {
-    backgroundColor: BRAND_COLORS.primary,
-    borderColor: BRAND_COLORS.primary,
+    backgroundColor: COLORS.white,
+    borderColor: COLORS.white,
   },
   audienceTabText: {
-    color: BRAND_COLORS.ink,
+    color: '#E4E4E7',
     fontSize: 13,
     lineHeight: 18,
     fontWeight: '800',
   },
   audienceTabTextActive: {
-    color: BRAND_COLORS.surface,
+    color: COLORS.ink,
   },
   categorySection: {
-    gap: 12,
+    gap: 13,
   },
   sectionHeading: {
     gap: 3,
@@ -781,34 +1015,35 @@ const styles = StyleSheet.create({
   sectionHeadingRow: {
     paddingHorizontal: 16,
     flexDirection: 'row',
-    alignItems: 'flex-end',
+    alignItems: 'center',
     justifyContent: 'space-between',
     gap: 12,
   },
-  controlLabel: {
-    paddingHorizontal: 16,
-    color: BRAND_COLORS.muted,
-    fontSize: 11,
-    lineHeight: 15,
+  sectionEyebrow: {
+    color: COLORS.accent,
+    fontSize: 9,
+    lineHeight: 13,
     fontWeight: '800',
-    letterSpacing: 0.35,
-    textTransform: 'uppercase',
+    letterSpacing: 1.05,
   },
   sectionTitle: {
-    color: BRAND_COLORS.ink,
-    fontSize: 20,
-    lineHeight: 25,
-    fontWeight: '900',
-    letterSpacing: -0.25,
+    color: COLORS.ink,
+    fontFamily: DISPLAY_FONT,
+    fontSize: 22,
+    lineHeight: 28,
+    fontWeight: '700',
+    letterSpacing: -0.4,
   },
   clearCategory: {
     minHeight: 44,
     paddingHorizontal: 10,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 4,
   },
   clearCategoryText: {
-    color: BRAND_COLORS.primary,
+    color: COLORS.accent,
     fontSize: 13,
     lineHeight: 18,
     fontWeight: '800',
@@ -816,75 +1051,93 @@ const styles = StyleSheet.create({
   categoryList: {
     paddingHorizontal: 16,
     paddingRight: 22,
-    gap: 10,
+    gap: 14,
   },
   categoryCard: {
-    width: 116,
-    minHeight: 134,
-    borderRadius: 16,
-    backgroundColor: BRAND_COLORS.surface,
-    borderWidth: 1,
-    borderColor: BRAND_COLORS.line,
-    overflow: 'hidden',
-  },
-  categoryCardActive: {
-    borderColor: BRAND_COLORS.primary,
-    backgroundColor: '#FCFAFF',
+    width: 92,
+    minHeight: 118,
+    alignItems: 'center',
+    gap: 8,
   },
   categoryMedia: {
-    width: '100%',
-    height: 86,
+    width: 84,
+    height: 84,
+    borderRadius: 42,
     backgroundColor: '#F1F5F9',
     overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: COLORS.line,
+  },
+  categoryMediaActive: {
+    borderWidth: 2,
+    borderColor: COLORS.accent,
   },
   categoryFallback: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: BRAND_COLORS.primarySoft,
+    backgroundColor: COLORS.accentSoft,
+  },
+  categoryFallbackActive: {
+    backgroundColor: COLORS.accent,
+  },
+  categorySelectedBadge: {
+    position: 'absolute',
+    right: 6,
+    bottom: 6,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: COLORS.accent,
+    borderWidth: 2,
+    borderColor: COLORS.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   categoryCardLabel: {
-    flex: 1,
-    paddingHorizontal: 8,
-    paddingVertical: 9,
-    color: BRAND_COLORS.ink,
+    minHeight: 32,
+    paddingHorizontal: 2,
+    color: COLORS.ink,
     fontSize: 12,
-    lineHeight: 17,
+    lineHeight: 16,
     fontWeight: '800',
     textAlign: 'center',
   },
   categoryCardLabelActive: {
-    color: BRAND_COLORS.primaryDark,
+    color: COLORS.accentDeep,
   },
   categorySkeletonRow: {
     paddingHorizontal: 16,
     flexDirection: 'row',
-    gap: 10,
+    gap: 14,
   },
   categorySkeletonCard: {
-    width: 116,
-    minHeight: 134,
-    borderRadius: 16,
-    backgroundColor: BRAND_COLORS.surface,
-    borderWidth: 1,
-    borderColor: BRAND_COLORS.line,
-    overflow: 'hidden',
+    width: 92,
+    minHeight: 118,
     alignItems: 'center',
-    gap: 12,
+    gap: 9,
   },
   categorySkeletonImage: {
-    width: '100%',
-    height: 86,
+    width: 84,
+    height: 84,
+    borderRadius: 42,
     backgroundColor: '#E2E8F0',
   },
   categorySkeletonLine: {
-    width: 68,
+    width: 64,
     height: 10,
     borderRadius: 5,
     backgroundColor: '#E2E8F0',
   },
   subcategorySection: {
     gap: 8,
+  },
+  subcategoryLabel: {
+    paddingHorizontal: 16,
+    color: COLORS.muted,
+    fontSize: 11,
+    lineHeight: 15,
+    fontWeight: '800',
   },
   subcategoryList: {
     paddingHorizontal: 16,
@@ -896,29 +1149,29 @@ const styles = StyleSheet.create({
     minWidth: 64,
     borderRadius: 12,
     paddingHorizontal: 14,
-    backgroundColor: BRAND_COLORS.surface,
+    backgroundColor: COLORS.surface,
     borderWidth: 1,
-    borderColor: BRAND_COLORS.line,
+    borderColor: COLORS.line,
     alignItems: 'center',
     justifyContent: 'center',
   },
   subcategoryChipActive: {
-    backgroundColor: BRAND_COLORS.primarySoft,
-    borderColor: '#C4B5FD',
+    backgroundColor: COLORS.accentSoft,
+    borderColor: '#A78BFA',
   },
   subcategoryChipText: {
-    color: BRAND_COLORS.ink,
+    color: COLORS.ink,
     fontSize: 12,
     lineHeight: 17,
     fontWeight: '800',
   },
   subcategoryChipTextActive: {
-    color: BRAND_COLORS.primaryDark,
+    color: COLORS.accentDeep,
   },
   productsHeading: {
     paddingHorizontal: 16,
     flexDirection: 'row',
-    alignItems: 'flex-end',
+    alignItems: 'center',
     justifyContent: 'space-between',
     gap: 14,
   },
@@ -927,11 +1180,157 @@ const styles = StyleSheet.create({
     gap: 3,
   },
   productCount: {
-    color: BRAND_COLORS.muted,
-    fontSize: 12,
-    lineHeight: 17,
+    color: COLORS.accentDeep,
+    fontSize: 11,
+    lineHeight: 15,
+    fontWeight: '800',
+  },
+  productCountPill: {
+    minHeight: 32,
+    paddingHorizontal: 10,
+    borderRadius: 16,
+    backgroundColor: COLORS.accentSoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  editorialProductCard: {
+    backgroundColor: COLORS.surface,
+    borderRadius: 18,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: COLORS.line,
+  },
+  editorialProductMedia: {
+    width: '100%',
+    aspectRatio: 0.78,
+    backgroundColor: '#F4F4F5',
+    overflow: 'hidden',
+  },
+  productImagePressable: {
+    flex: 1,
+  },
+  productImageFallback: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  productImageFallbackText: {
+    color: COLORS.secondary,
+    fontSize: 9,
+    lineHeight: 13,
+    fontWeight: '900',
+    letterSpacing: 1.25,
+  },
+  editorialBadges: {
+    position: 'absolute',
+    left: 8,
+    top: 8,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 5,
+    maxWidth: '72%',
+  },
+  editorialBadge: {
+    minHeight: 24,
+    paddingHorizontal: 8,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  newBadge: {
+    backgroundColor: COLORS.ink,
+  },
+  newBadgeText: {
+    color: COLORS.white,
+    fontSize: 8,
+    lineHeight: 11,
+    fontWeight: '900',
+    letterSpacing: 0.8,
+  },
+  bestBadge: {
+    backgroundColor: COLORS.white,
+    borderWidth: 1,
+    borderColor: 'rgba(9,9,11,0.12)',
+  },
+  bestBadgeText: {
+    color: COLORS.ink,
+    fontSize: 8,
+    lineHeight: 11,
+    fontWeight: '900',
+    letterSpacing: 0.7,
+  },
+  saleBadge: {
+    backgroundColor: COLORS.warm,
+  },
+  saleBadgeText: {
+    color: COLORS.white,
+    fontSize: 8,
+    lineHeight: 11,
+    fontWeight: '900',
+    letterSpacing: 0.4,
+  },
+  editorialWishlist: {
+    position: 'absolute',
+    right: 8,
+    top: 8,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255,255,255,0.90)',
+    borderWidth: 1,
+    borderColor: 'rgba(9,9,11,0.10)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  editorialWishlistActive: {
+    backgroundColor: COLORS.accentSoft,
+    borderColor: '#C4B5FD',
+  },
+  editorialProductCopy: {
+    minHeight: 116,
+    paddingHorizontal: 11,
+    paddingTop: 11,
+    paddingBottom: 12,
+    gap: 5,
+  },
+  editorialProductCategory: {
+    color: COLORS.muted,
+    fontSize: 9,
+    lineHeight: 13,
+    fontWeight: '800',
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+  },
+  editorialProductName: {
+    minHeight: 38,
+    color: COLORS.ink,
+    fontSize: 13,
+    lineHeight: 18,
     fontWeight: '700',
-    paddingBottom: 3,
+  },
+  editorialPriceRow: {
+    marginTop: 'auto',
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  editorialPrice: {
+    color: COLORS.ink,
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: '900',
+  },
+  editorialOldPrice: {
+    color: COLORS.muted,
+    fontSize: 10,
+    lineHeight: 15,
+    fontWeight: '600',
+    textDecorationLine: 'line-through',
+  },
+  productPressed: {
+    opacity: 0.78,
   },
   productRow: {
     width: '100%',
@@ -954,9 +1353,9 @@ const styles = StyleSheet.create({
   },
   productSkeletonCard: {
     borderRadius: 16,
-    backgroundColor: BRAND_COLORS.surface,
+    backgroundColor: COLORS.surface,
     borderWidth: 1,
-    borderColor: BRAND_COLORS.line,
+    borderColor: COLORS.line,
     overflow: 'hidden',
   },
   productSkeletonImage: {
@@ -984,7 +1383,7 @@ const styles = StyleSheet.create({
     width: '50%',
     height: 14,
     borderRadius: 7,
-    backgroundColor: BRAND_COLORS.primarySoft,
+    backgroundColor: COLORS.accentSoft,
   },
   inlineState: {
     width: 'auto',
@@ -994,8 +1393,8 @@ const styles = StyleSheet.create({
     padding: 24,
     borderRadius: 18,
     borderWidth: 1,
-    borderColor: BRAND_COLORS.line,
-    backgroundColor: BRAND_COLORS.surface,
+    borderColor: COLORS.line,
+    backgroundColor: COLORS.surface,
     alignItems: 'center',
     gap: 8,
   },
@@ -1003,13 +1402,13 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 14,
-    backgroundColor: BRAND_COLORS.primarySoft,
+    backgroundColor: COLORS.accentSoft,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 2,
   },
   inlineStateTitle: {
-    color: BRAND_COLORS.ink,
+    color: COLORS.ink,
     fontSize: 18,
     lineHeight: 23,
     fontWeight: '900',
@@ -1017,7 +1416,7 @@ const styles = StyleSheet.create({
   },
   inlineStateDescription: {
     maxWidth: 380,
-    color: BRAND_COLORS.muted,
+    color: COLORS.muted,
     fontSize: 13,
     lineHeight: 19,
     textAlign: 'center',
@@ -1027,14 +1426,14 @@ const styles = StyleSheet.create({
     marginTop: 5,
     borderRadius: 12,
     paddingHorizontal: 16,
-    backgroundColor: BRAND_COLORS.primary,
+    backgroundColor: COLORS.accent,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 7,
   },
   inlineStateActionText: {
-    color: BRAND_COLORS.surface,
+    color: COLORS.surface,
     fontSize: 14,
     lineHeight: 19,
     fontWeight: '900',

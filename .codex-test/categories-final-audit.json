@@ -1,0 +1,66 @@
+{
+  "viewports": [
+    {
+      "width": 390,
+      "height": 844,
+      "innerWidth": 390,
+      "htmlScrollWidth": 390,
+      "bodyScrollWidth": 390,
+      "noHorizontalOverflow": true,
+      "consoleIssues": [
+        "warning: [Reanimated] Reduced motion setting is enabled on this device. This warning is visible only in the development mode. Some animations will be disabled by default. You can override the behavior for individual animations, see https://docs.swmansion.com/react-native-reanimated/docs/guides/troubleshooting#reduced-motion-setting-is-enabled-on-this-device.",
+        "warning: \"shadow*\" style props are deprecated. Use \"boxShadow\"."
+      ],
+      "pageErrors": [],
+      "httpErrors": [],
+      "requestFailures": []
+    },
+    {
+      "width": 393,
+      "height": 873,
+      "innerWidth": 393,
+      "htmlScrollWidth": 393,
+      "bodyScrollWidth": 393,
+      "noHorizontalOverflow": true,
+      "consoleIssues": [
+        "warning: [Reanimated] Reduced motion setting is enabled on this device. This warning is visible only in the development mode. Some animations will be disabled by default. You can override the behavior for individual animations, see https://docs.swmansion.com/react-native-reanimated/docs/guides/troubleshooting#reduced-motion-setting-is-enabled-on-this-device.",
+        "warning: \"shadow*\" style props are deprecated. Use \"boxShadow\"."
+      ],
+      "pageErrors": [],
+      "httpErrors": [],
+      "requestFailures": []
+    },
+    {
+      "width": 412,
+      "height": 915,
+      "innerWidth": 412,
+      "htmlScrollWidth": 412,
+      "bodyScrollWidth": 412,
+      "noHorizontalOverflow": true,
+      "consoleIssues": [
+        "warning: [Reanimated] Reduced motion setting is enabled on this device. This warning is visible only in the development mode. Some animations will be disabled by default. You can override the behavior for individual animations, see https://docs.swmansion.com/react-native-reanimated/docs/guides/troubleshooting#reduced-motion-setting-is-enabled-on-this-device.",
+        "warning: \"shadow*\" style props are deprecated. Use \"boxShadow\"."
+      ],
+      "pageErrors": [],
+      "httpErrors": [],
+      "requestFailures": []
+    }
+  ],
+  "interaction": {
+    "femaleVisible": true,
+    "afterFemaleCount": "27 sản phẩm",
+    "categoryVisible": true,
+    "afterCategoryCount": "27 sản phẩm",
+    "searchUrl": "http://localhost:8081/search",
+    "productLabel": "Xem Áo Polo Nam Pique Classic",
+    "productUrl": "http://localhost:8081/product/ao-polo-nam-pique-classic"
+  },
+  "states": {
+    "productEmptyVisible": true,
+    "productEmptyDescriptionVisible": true,
+    "productErrorVisible": true,
+    "productRetryVisible": true,
+    "categoryErrorVisible": true,
+    "categoryRetryVisible": true
+  }
+}

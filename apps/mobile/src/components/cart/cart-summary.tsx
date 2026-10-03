@@ -1,5 +1,6 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { AppIcon } from '@/components/ui/app-icon';
 import { BRAND_COLORS } from '@/constants/brand';
 import type { ComboDiscountResult } from '@/types/shopping';
 
@@ -25,10 +26,7 @@ export function CartSummary({
   return (
     <View style={styles.card}>
       <View style={styles.heading}>
-        <View>
-          <Text style={styles.eyebrow}>TẠM TÍNH</Text>
-          <Text style={styles.title}>Sản phẩm đã chọn</Text>
-        </View>
+        <Text style={styles.title}>Tóm tắt thanh toán</Text>
         <Text style={styles.count}>
           {selectedLines + ' dòng · ' + selectedQuantity + ' sản phẩm'}
         </Text>
@@ -52,12 +50,17 @@ export function CartSummary({
         </View>
       ) : null}
 
-      <Text style={styles.helper}>
-        Phí giao hàng, coupon và thanh toán sẽ được tính ở bước checkout.
-      </Text>
+      <View style={styles.helperRow}>
+        <AppIcon color={BRAND_COLORS.muted} name="shield" size={16} />
+        <Text style={styles.helper}>
+          Giá, tồn kho, phí giao hàng và ưu đãi được kiểm tra lại ở bước checkout.
+        </Text>
+      </View>
 
       <Pressable
         accessibilityLabel="Tiến hành thanh toán với các sản phẩm đã chọn"
+        accessibilityRole="button"
+        accessibilityState={{ disabled }}
         disabled={disabled}
         onPress={onCheckout}
         style={({ pressed }) => [
@@ -65,7 +68,7 @@ export function CartSummary({
           disabled && styles.checkoutDisabled,
           pressed && !disabled && styles.pressed,
         ]}>
-        <Text style={styles.checkoutText}>Tiến hành thanh toán</Text>
+        <Text style={styles.checkoutText}>Thanh toán</Text>
         <Text style={styles.checkoutAmount}>{formatPrice(subtotal)}</Text>
       </Pressable>
     </View>
@@ -74,35 +77,31 @@ export function CartSummary({
 
 const styles = StyleSheet.create({
   card: {
-    borderRadius: 22,
+    borderRadius: 16,
     backgroundColor: BRAND_COLORS.surface,
     borderWidth: 1,
     borderColor: BRAND_COLORS.line,
     padding: 16,
-    gap: 13,
+    gap: 14,
   },
   heading: {
     flexDirection: 'row',
-    alignItems: 'flex-end',
+    alignItems: 'baseline',
     justifyContent: 'space-between',
     gap: 12,
   },
-  eyebrow: {
-    color: BRAND_COLORS.primary,
-    fontSize: 8,
-    fontWeight: '900',
-    letterSpacing: 1,
-  },
   title: {
-    marginTop: 3,
+    flex: 1,
     color: BRAND_COLORS.ink,
     fontSize: 17,
+    lineHeight: 23,
     fontWeight: '900',
   },
   count: {
     color: BRAND_COLORS.muted,
-    fontSize: 9,
-    fontWeight: '700',
+    fontSize: 10,
+    lineHeight: 14,
+    fontWeight: '600',
     textAlign: 'right',
   },
   row: {
@@ -116,16 +115,19 @@ const styles = StyleSheet.create({
   },
   label: {
     color: BRAND_COLORS.muted,
-    fontSize: 11,
-    fontWeight: '700',
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: '600',
   },
   subtotal: {
     color: BRAND_COLORS.ink,
     fontSize: 20,
+    lineHeight: 26,
     fontWeight: '900',
+    textAlign: 'right',
   },
   combo: {
-    borderRadius: 16,
+    borderRadius: 12,
     backgroundColor: '#ECFDF5',
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: '#A7F3D0',
@@ -133,23 +135,31 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   comboTitle: {
-    color: '#047857',
-    fontSize: 10,
-    fontWeight: '900',
+    color: BRAND_COLORS.success,
+    fontSize: 11,
+    lineHeight: 15,
+    fontWeight: '800',
   },
   comboText: {
     color: '#065F46',
-    fontSize: 9,
-    lineHeight: 14,
+    fontSize: 10,
+    lineHeight: 15,
+  },
+  helperRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 9,
   },
   helper: {
+    flex: 1,
     color: BRAND_COLORS.muted,
-    fontSize: 9,
-    lineHeight: 14,
+    fontSize: 10,
+    lineHeight: 15,
+    fontWeight: '500',
   },
   checkout: {
-    minHeight: 54,
-    borderRadius: 17,
+    minHeight: 56,
+    borderRadius: 14,
     backgroundColor: BRAND_COLORS.primary,
     paddingHorizontal: 16,
     flexDirection: 'row',
@@ -158,16 +168,18 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   checkoutDisabled: {
-    backgroundColor: '#9CA3AF',
+    backgroundColor: '#D1D5DB',
   },
   checkoutText: {
     color: '#FFFFFF',
-    fontSize: 12,
+    fontSize: 13,
+    lineHeight: 18,
     fontWeight: '900',
   },
   checkoutAmount: {
-    color: '#EDE9FE',
-    fontSize: 11,
+    color: '#FFFFFF',
+    fontSize: 13,
+    lineHeight: 18,
     fontWeight: '900',
   },
   pressed: { opacity: 0.84 },

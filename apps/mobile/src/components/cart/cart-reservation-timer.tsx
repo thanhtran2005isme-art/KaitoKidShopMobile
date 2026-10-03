@@ -1,8 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
-import { BRAND_COLORS } from '@/constants/brand';
-
 function formatDuration(milliseconds: number) {
   const totalSeconds = Math.max(0, Math.floor(milliseconds / 1000));
   const hours = Math.floor(totalSeconds / 3600);
@@ -73,21 +71,19 @@ const styles = StyleSheet.create({
   wrap: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 9,
-    paddingVertical: 6,
-    borderRadius: 999,
-    backgroundColor: '#FFF7ED',
+    gap: 4,
     alignSelf: 'flex-start',
   },
   label: {
     color: '#9A3412',
-    fontSize: 9,
+    fontSize: 10,
+    lineHeight: 14,
     fontWeight: '700',
   },
   time: {
-    color: BRAND_COLORS.accent,
+    color: '#C2410C',
     fontSize: 10,
+    lineHeight: 14,
     fontWeight: '900',
     fontVariant: ['tabular-nums'],
   },

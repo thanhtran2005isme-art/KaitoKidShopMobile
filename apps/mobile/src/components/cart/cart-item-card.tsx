@@ -39,10 +39,11 @@ export function CartItemCard({
         accessibilityRole="checkbox"
         accessibilityState={{ checked: selected, disabled: busy }}
         disabled={busy}
-        hitSlop={11}
         onPress={onToggle}
-        style={[styles.checkbox, selected && styles.checkboxSelected]}>
-        {selected ? <AppIcon color="#FFFFFF" name="check" size={15} /> : null}
+        style={styles.checkboxHitbox}>
+        <View style={[styles.checkbox, selected && styles.checkboxSelected]}>
+          {selected ? <AppIcon color="#FFFFFF" name="check" size={15} /> : null}
+        </View>
       </Pressable>
 
       <View style={styles.media}>
@@ -66,22 +67,19 @@ export function CartItemCard({
             <Text numberOfLines={2} style={styles.name}>
               {item.name}
             </Text>
-            <View style={styles.variantRow}>
-              {item.size ? (
-                <View style={styles.chip}>
-                  <Text style={styles.chipText}>{'Size ' + item.size}</Text>
-                </View>
-              ) : null}
-              {item.color ? (
-                <View style={styles.chip}>
-                  <Text style={styles.chipText}>{item.color}</Text>
-                </View>
-              ) : null}
-            </View>
+            {item.size || item.color ? (
+              <Text numberOfLines={1} style={styles.variantText}>
+                {[item.size ? 'Size ' + item.size : '', item.color]
+                  .filter(Boolean)
+                  .join(' · ')}
+              </Text>
+            ) : null}
           </View>
 
           <Pressable
             accessibilityLabel={'Xóa ' + item.name + ' khỏi giỏ'}
+            accessibilityRole="button"
+            accessibilityState={{ disabled: busy }}
             disabled={busy}
             onPress={onRemove}
             hitSlop={8}
@@ -98,9 +96,7 @@ export function CartItemCard({
 
         <View style={styles.statusRow}>
           {item.isLowStock ? (
-            <View style={styles.lowStock}>
-              <Text style={styles.lowStockText}>Sắp hết hàng</Text>
-            </View>
+            <Text style={styles.lowStockText}>Tồn kho còn ít</Text>
           ) : null}
           <CartReservationTimer
             onExpired={onExpired}
@@ -146,6 +142,7 @@ export function CartItemCard({
                 ? 'Có thể thêm ' + item.availableStock
                 : 'Đã giữ tối đa hiện tại'}
             </Text>
+            <Text style={styles.totalLabel}>Thành tiền</Text>
             <Text style={styles.lineTotal}>
               {formatPrice(item.price * item.quantity)}
             </Text>
@@ -159,29 +156,35 @@ export function CartItemCard({
 const styles = StyleSheet.create({
   card: {
     backgroundColor: BRAND_COLORS.surface,
-    borderRadius: 20,
+    borderRadius: 16,
     borderWidth: 1,
     borderColor: BRAND_COLORS.line,
-    padding: 11,
+    padding: 12,
     flexDirection: 'row',
-    gap: 10,
+    gap: 12,
     position: 'relative',
   },
   cardSelected: {
     borderColor: '#C4B5FD',
     backgroundColor: '#FDFBFF',
   },
-  checkbox: {
+  checkboxHitbox: {
     position: 'absolute',
-    left: 17,
-    top: 17,
+    left: 6,
+    top: 6,
     zIndex: 3,
-    width: 23,
-    height: 23,
-    borderRadius: 8,
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  checkbox: {
+    width: 24,
+    height: 24,
+    borderRadius: 7,
     borderWidth: 1.5,
-    borderColor: '#CBD5E1',
-    backgroundColor: 'rgba(255,255,255,0.95)',
+    borderColor: '#B7BDC7',
+    backgroundColor: BRAND_COLORS.surface,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -189,15 +192,10 @@ const styles = StyleSheet.create({
     backgroundColor: BRAND_COLORS.primary,
     borderColor: BRAND_COLORS.primary,
   },
-  checkboxText: {
-    color: '#FFFFFF',
-    fontSize: 13,
-    fontWeight: '900',
-  },
   media: {
     width: 92,
-    height: 118,
-    borderRadius: 16,
+    height: 124,
+    borderRadius: 12,
     backgroundColor: '#F3F4F6',
     overflow: 'hidden',
     alignItems: 'center',
@@ -215,46 +213,32 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     gap: 8,
   },
-  titleWrap: { flex: 1, gap: 6 },
+  titleWrap: { flex: 1, gap: 4 },
   name: {
     color: BRAND_COLORS.ink,
-    fontSize: 13,
-    lineHeight: 18,
-    fontWeight: '900',
-  },
-  variantRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 5,
-  },
-  chip: {
-    borderRadius: 999,
-    backgroundColor: '#F3F4F6',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-  },
-  chipText: {
-    color: '#4B5563',
-    fontSize: 9,
+    fontSize: 14,
+    lineHeight: 19,
     fontWeight: '800',
   },
+  variantText: {
+    color: BRAND_COLORS.muted,
+    fontSize: 10,
+    lineHeight: 15,
+    fontWeight: '600',
+  },
   removeButton: {
-    width: 30,
-    height: 30,
-    borderRadius: 10,
-    backgroundColor: '#FEF2F2',
+    width: 44,
+    height: 44,
+    marginTop: -7,
+    marginRight: -7,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  removeText: {
-    color: BRAND_COLORS.danger,
-    fontSize: 22,
-    lineHeight: 23,
-    fontWeight: '700',
-  },
   price: {
-    color: BRAND_COLORS.primary,
-    fontSize: 14,
+    color: BRAND_COLORS.primaryDark,
+    fontSize: 15,
+    lineHeight: 20,
     fontWeight: '900',
   },
   statusRow: {
@@ -263,16 +247,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 6,
   },
-  lowStock: {
-    borderRadius: 999,
-    backgroundColor: '#FFFBEB',
-    paddingHorizontal: 9,
-    paddingVertical: 6,
-  },
   lowStockText: {
-    color: '#B45309',
-    fontSize: 9,
-    fontWeight: '900',
+    color: '#92400E',
+    fontSize: 10,
+    lineHeight: 14,
+    fontWeight: '800',
   },
   footer: {
     marginTop: 1,
@@ -283,7 +262,8 @@ const styles = StyleSheet.create({
   },
   quantityLabel: {
     color: BRAND_COLORS.muted,
-    fontSize: 8,
+    fontSize: 10,
+    lineHeight: 14,
     fontWeight: '700',
     marginBottom: 4,
   },
@@ -294,25 +274,28 @@ const styles = StyleSheet.create({
     borderColor: BRAND_COLORS.line,
     borderRadius: 12,
     overflow: 'hidden',
+    backgroundColor: BRAND_COLORS.surface,
   },
   quantityButton: {
     width: 44,
     height: 44,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#F9FAFB',
+    backgroundColor: BRAND_COLORS.surface,
   },
   quantityButtonDisabled: { opacity: 0.35 },
   quantityButtonText: {
     color: BRAND_COLORS.ink,
-    fontSize: 17,
+    fontSize: 18,
+    lineHeight: 22,
     fontWeight: '900',
   },
   quantity: {
-    minWidth: 32,
+    minWidth: 34,
     textAlign: 'center',
     color: BRAND_COLORS.ink,
-    fontSize: 11,
+    fontSize: 13,
+    lineHeight: 18,
     fontWeight: '900',
   },
   totalWrap: {
@@ -322,12 +305,21 @@ const styles = StyleSheet.create({
   },
   available: {
     color: BRAND_COLORS.muted,
-    fontSize: 8,
+    fontSize: 9,
+    lineHeight: 13,
     textAlign: 'right',
+  },
+  totalLabel: {
+    marginTop: 2,
+    color: BRAND_COLORS.muted,
+    fontSize: 9,
+    lineHeight: 12,
+    fontWeight: '700',
   },
   lineTotal: {
     color: BRAND_COLORS.ink,
-    fontSize: 12,
+    fontSize: 14,
+    lineHeight: 19,
     fontWeight: '900',
   },
   pressed: { opacity: 0.7 },

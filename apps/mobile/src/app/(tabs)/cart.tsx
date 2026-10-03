@@ -2,6 +2,7 @@ import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -226,6 +227,21 @@ export default function CartScreen() {
     }
   };
 
+  const confirmRemoveOne = (itemId: number) => {
+    Alert.alert(
+      'Xóa sản phẩm?',
+      'Sản phẩm sẽ được bỏ khỏi giỏ và phần giữ hàng tương ứng sẽ được cập nhật.',
+      [
+        { text: 'Giữ lại', style: 'cancel' },
+        {
+          text: 'Xóa',
+          style: 'destructive',
+          onPress: () => void removeOne(itemId),
+        },
+      ],
+    );
+  };
+
   const selectedArray = Array.from(selectedIds);
 
   const removeSelected = async () => {
@@ -247,6 +263,23 @@ export default function CartScreen() {
     } finally {
       setBusy(selectedArray, false);
     }
+  };
+
+  const confirmRemoveSelected = () => {
+    if (selectedArray.length === 0) return;
+
+    Alert.alert(
+      'Xóa sản phẩm đã chọn?',
+      'Bạn đang chọn ' + selectedArray.length + ' dòng sản phẩm để xóa khỏi giỏ.',
+      [
+        { text: 'Giữ lại', style: 'cancel' },
+        {
+          text: 'Xóa',
+          style: 'destructive',
+          onPress: () => void removeSelected(),
+        },
+      ],
+    );
   };
 
   const moveSelectedToWishlist = async () => {
@@ -333,7 +366,9 @@ export default function CartScreen() {
     return (
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.loading}>
-          <Text style={styles.errorMark}>!</Text>
+          <View style={styles.errorMark}>
+            <AppIcon color={BRAND_COLORS.danger} name="warning" size={24} />
+          </View>
           <Text style={styles.loadingTitle}>Không tải được giỏ hàng</Text>
           <Text style={styles.loadingText}>{cartError}</Text>
           <Pressable
@@ -360,16 +395,14 @@ export default function CartScreen() {
           />
         }>
         <View style={styles.header}>
-          <View>
-            <Text style={styles.eyebrow}>KAITOKID CART</Text>
+          <View style={styles.headerCopy}>
             <Text style={styles.title}>Giỏ hàng</Text>
             <Text style={styles.subtitle}>
               {typeof cartCount === 'number'
-                ? cartCount + ' sản phẩm đang được giữ'
-                : 'Đang đồng bộ số lượng'}
+                ? cartCount + ' sản phẩm đang được giữ cho bạn'
+                : 'Đang đồng bộ số lượng và tồn kho'}
             </Text>
           </View>
-
           <Pressable
             accessibilityLabel="Làm mới giỏ hàng"
             accessibilityRole="button"
@@ -378,7 +411,7 @@ export default function CartScreen() {
               styles.refreshButton,
               pressed && styles.pressed,
             ]}>
-            <AppIcon color={BRAND_COLORS.primary} name="refresh" size={23} />
+            <AppIcon color={BRAND_COLORS.ink} name="refresh" size={20} />
           </Pressable>
         </View>
 
@@ -413,63 +446,62 @@ export default function CartScreen() {
           <CartEmptyState onContinue={() => router.push('/')} />
         ) : (
           <>
-            <View style={styles.selectionBar}>
-              <Pressable
-                accessibilityLabel={allSelected ? 'Bỏ chọn tất cả sản phẩm' : 'Chọn tất cả sản phẩm'}
-                accessibilityRole="checkbox"
-                accessibilityState={{ checked: allSelected }}
-                onPress={toggleAll}
-                style={({ pressed }) => [
-                  styles.selectAll,
-                  pressed && styles.pressed,
-                ]}>
-                <View
-                  style={[
-                    styles.selectAllBox,
-                    allSelected && styles.selectAllBoxActive,
+            <View style={styles.selectionPanel}>
+              <View style={styles.selectionBar}>
+                <Pressable
+                  accessibilityLabel={allSelected ? 'Bỏ chọn tất cả sản phẩm' : 'Chọn tất cả sản phẩm'}
+                  accessibilityRole="checkbox"
+                  accessibilityState={{ checked: allSelected }}
+                  onPress={toggleAll}
+                  style={({ pressed }) => [
+                    styles.selectAll,
+                    pressed && styles.pressed,
                   ]}>
-                  <Text style={styles.selectAllCheck}>
-                    {allSelected ? '✓' : ''}
-                  </Text>
-                </View>
-                <Text style={styles.selectAllText}>
-                  {allSelected ? 'Bỏ chọn tất cả' : 'Chọn tất cả'}
-                </Text>
-              </Pressable>
+                  <View
+                    style={[
+                      styles.selectAllBox,
+                      allSelected && styles.selectAllBoxActive,
+                    ]}>
+                    {allSelected ? (
+                      <AppIcon color="#FFFFFF" name="check" size={14} />
+                    ) : null}
+                  </View>
+                  <View style={styles.selectionCopy}>
+                    <Text style={styles.selectAllText}>
+                      {allSelected ? 'Đã chọn tất cả' : 'Chọn tất cả'}
+                    </Text>
+                    <Text style={styles.selectionHint}>
+                      {selectedIds.size + '/' + cartItems.length + ' dòng · ' + selectedQuantity + ' sản phẩm'}
+                    </Text>
+                  </View>
+                </Pressable>
+              </View>
 
-              <Text accessibilityLiveRegion="polite" style={styles.selectedCount}>
-                {selectedIds.size + '/' + cartItems.length + ' dòng'}
-              </Text>
-            </View>
-
-            <View style={styles.bulkActions}>
-              <Pressable
-                accessibilityLabel="Chuyển sản phẩm đã chọn sang yêu thích"
-                accessibilityRole="button"
-                accessibilityState={{ disabled: selectedIds.size === 0 }}
-                disabled={selectedIds.size === 0}
-                onPress={() => void moveSelectedToWishlist()}
-                style={[
-                  styles.bulkButton,
-                  selectedIds.size === 0 && styles.bulkDisabled,
-                ]}>
-                <View style={styles.bulkContent}>
-                  <AppIcon color={BRAND_COLORS.primaryDark} name="heart" size={17} />
-                  <Text style={styles.bulkText}>Chuyển sang yêu thích</Text>
+              {selectedIds.size > 0 ? (
+                <View style={styles.bulkActions}>
+                  <Pressable
+                    accessibilityLabel="Chuyển sản phẩm đã chọn sang yêu thích"
+                    accessibilityRole="button"
+                    onPress={() => void moveSelectedToWishlist()}
+                    style={({ pressed }) => [
+                      styles.bulkButton,
+                      pressed && styles.pressed,
+                    ]}>
+                    <AppIcon color={BRAND_COLORS.primaryDark} name="heart" size={17} />
+                    <Text style={styles.bulkText}>Yêu thích</Text>
+                  </Pressable>
+                  <Pressable
+                    accessibilityLabel="Xóa các sản phẩm đã chọn"
+                    accessibilityRole="button"
+                    onPress={confirmRemoveSelected}
+                    style={({ pressed }) => [
+                      styles.bulkButtonDanger,
+                      pressed && styles.pressed,
+                    ]}>
+                    <Text style={styles.bulkDangerText}>Xóa đã chọn</Text>
+                  </Pressable>
                 </View>
-              </Pressable>
-              <Pressable
-                accessibilityLabel="Xóa các sản phẩm đã chọn"
-                accessibilityRole="button"
-                accessibilityState={{ disabled: selectedIds.size === 0 }}
-                disabled={selectedIds.size === 0}
-                onPress={() => void removeSelected()}
-                style={[
-                  styles.bulkButtonDanger,
-                  selectedIds.size === 0 && styles.bulkDisabled,
-                ]}>
-                <Text style={styles.bulkDangerText}>Xóa đã chọn</Text>
-              </Pressable>
+              ) : null}
             </View>
 
             <View style={styles.items}>
@@ -482,7 +514,7 @@ export default function CartScreen() {
                     void updateQuantity(item.id, quantity)
                   }
                   onExpired={handleReservationExpired}
-                  onRemove={() => void removeOne(item.id)}
+                  onRemove={() => confirmRemoveOne(item.id)}
                   onToggle={() => toggleItem(item.id)}
                   selected={selectedIds.has(item.id)}
                 />
@@ -516,43 +548,35 @@ const styles = StyleSheet.create({
   scroll: { flex: 1 },
   content: {
     width: '100%',
-    maxWidth: 760,
-    alignSelf: 'center',
     paddingHorizontal: 16,
-    paddingTop: 14,
-    gap: 14,
+    paddingTop: 16,
+    gap: 16,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    gap: 14,
+    gap: 12,
   },
-  eyebrow: {
-    color: BRAND_COLORS.primary,
-    fontSize: 10,
-    lineHeight: 14,
-    fontWeight: '900',
-    letterSpacing: 1.2,
-  },
+  headerCopy: { flex: 1, minWidth: 0 },
   title: {
     color: BRAND_COLORS.ink,
     fontSize: 28,
     lineHeight: 34,
     fontWeight: '900',
-    letterSpacing: -0.5,
+    letterSpacing: -0.6,
   },
   subtitle: {
-    marginTop: 2,
+    marginTop: 3,
     color: BRAND_COLORS.muted,
-    fontSize: 12,
-    lineHeight: 17,
-    fontWeight: '700',
+    fontSize: 13,
+    lineHeight: 19,
+    fontWeight: '500',
   },
   refreshButton: {
     width: 44,
     height: 44,
-    borderRadius: 14,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: BRAND_COLORS.line,
     backgroundColor: BRAND_COLORS.surface,
@@ -560,7 +584,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   feedback: {
-    borderRadius: 14,
+    borderRadius: 12,
     borderWidth: StyleSheet.hairlineWidth,
     paddingHorizontal: 12,
     paddingVertical: 10,
@@ -578,10 +602,10 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     fontWeight: '800',
   },
-  feedbackTextSuccess: { color: '#047857' },
+  feedbackTextSuccess: { color: BRAND_COLORS.success },
   feedbackTextError: { color: '#B91C1C' },
   inlineError: {
-    borderRadius: 14,
+    borderRadius: 12,
     backgroundColor: '#FEF2F2',
     padding: 11,
   },
@@ -590,29 +614,39 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 18,
   },
-  selectionBar: {
+  selectionPanel: {
     borderRadius: 16,
     backgroundColor: BRAND_COLORS.surface,
     borderWidth: 1,
     borderColor: BRAND_COLORS.line,
-    padding: 11,
+    padding: 12,
+    gap: 10,
+  },
+  selectionBar: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    gap: 10,
+    gap: 12,
   },
   selectAll: {
     minHeight: 44,
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 10,
+  },
+  selectionCopy: {
+    flex: 1,
+    minWidth: 0,
+    gap: 1,
   },
   selectAllBox: {
     width: 24,
     height: 24,
-    borderRadius: 8,
+    borderRadius: 7,
     borderWidth: 1.5,
-    borderColor: '#CBD5E1',
+    borderColor: '#B7BDC7',
+    backgroundColor: BRAND_COLORS.surface,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -620,79 +654,72 @@ const styles = StyleSheet.create({
     backgroundColor: BRAND_COLORS.primary,
     borderColor: BRAND_COLORS.primary,
   },
-  selectAllCheck: {
-    color: '#FFFFFF',
-    fontSize: 13,
-    fontWeight: '900',
-  },
   selectAllText: {
     color: BRAND_COLORS.ink,
-    fontSize: 13,
-    lineHeight: 18,
-    fontWeight: '900',
-  },
-  selectedCount: {
-    color: BRAND_COLORS.muted,
-    fontSize: 12,
-    lineHeight: 17,
+    fontSize: 14,
+    lineHeight: 19,
     fontWeight: '800',
+  },
+  selectionHint: {
+    color: BRAND_COLORS.muted,
+    fontSize: 11,
+    lineHeight: 16,
+    fontWeight: '500',
   },
   bulkActions: {
     flexDirection: 'row',
     gap: 8,
+    paddingTop: 2,
   },
   bulkButton: {
     flex: 1,
     minHeight: 44,
-    borderRadius: 14,
+    borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#DDD6FE',
-    backgroundColor: '#F5F3FF',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 10,
-  },
-  bulkButtonDanger: {
-    minHeight: 44,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: '#FECACA',
-    backgroundColor: '#FEF2F2',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 13,
-  },
-  bulkContent: {
+    borderColor: BRAND_COLORS.line,
+    backgroundColor: BRAND_COLORS.surface,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
+    paddingHorizontal: 10,
+  },
+  bulkButtonDanger: {
+    flex: 1,
+    minHeight: 44,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#FECACA',
+    backgroundColor: '#FFF7F7',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 10,
   },
   bulkText: {
     color: BRAND_COLORS.primaryDark,
     fontSize: 12,
     lineHeight: 17,
-    fontWeight: '900',
+    fontWeight: '800',
     textAlign: 'center',
   },
   bulkDangerText: {
     color: BRAND_COLORS.danger,
     fontSize: 12,
     lineHeight: 17,
-    fontWeight: '900',
+    fontWeight: '800',
   },
-  bulkDisabled: { opacity: 0.42 },
   items: { gap: 10 },
   guest: {
     flex: 1,
+    width: '100%',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 34,
-    gap: 11,
+    paddingHorizontal: 32,
+    gap: 12,
   },
   guestIconWrap: {
-    width: 82,
-    height: 82,
+    width: 72,
+    height: 72,
     borderRadius: 24,
     backgroundColor: BRAND_COLORS.primarySoft,
     alignItems: 'center',
@@ -700,8 +727,8 @@ const styles = StyleSheet.create({
   },
   guestTitle: {
     color: BRAND_COLORS.ink,
-    fontSize: 26,
-    lineHeight: 32,
+    fontSize: 24,
+    lineHeight: 30,
     fontWeight: '900',
   },
   guestDescription: {
@@ -709,13 +736,13 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 19,
     textAlign: 'center',
-    maxWidth: 360,
+    maxWidth: 340,
   },
   primaryButton: {
     minHeight: 48,
-    borderRadius: 14,
+    borderRadius: 12,
     backgroundColor: BRAND_COLORS.primary,
-    paddingHorizontal: 18,
+    paddingHorizontal: 22,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -727,6 +754,7 @@ const styles = StyleSheet.create({
   },
   loading: {
     flex: 1,
+    width: '100%',
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 30,
@@ -744,19 +772,16 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 19,
     textAlign: 'center',
-    maxWidth: 360,
+    maxWidth: 340,
   },
   errorMark: {
     width: 48,
     height: 48,
-    textAlign: 'center',
-    textAlignVertical: 'center',
-    borderRadius: 16,
+    borderRadius: 14,
     backgroundColor: '#FEF2F2',
-    color: BRAND_COLORS.danger,
-    fontSize: 24,
-    fontWeight: '900',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   pressed: { opacity: 0.72 },
-  bottomSpace: { height: 26 },
+  bottomSpace: { height: 24 },
 });

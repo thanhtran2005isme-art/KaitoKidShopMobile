@@ -10,10 +10,9 @@ export function CartCrossSell({ products }: { products: Product[] }) {
   return (
     <View style={styles.section}>
       <View style={styles.heading}>
-        <Text style={styles.eyebrow}>GỢI Ý THÊM</Text>
-        <Text style={styles.title}>Có thể bé cũng thích</Text>
+        <Text style={styles.title}>Gợi ý thêm</Text>
         <Text style={styles.helper}>
-          Mở sản phẩm để chọn đúng màu và size trước khi thêm vào giỏ.
+          Chọn sản phẩm để xem màu và size phù hợp.
         </Text>
       </View>
 
@@ -33,30 +32,27 @@ const styles = StyleSheet.create({
   section: {
     gap: 12,
     marginHorizontal: -16,
+    paddingTop: 2,
   },
   heading: {
     paddingHorizontal: 16,
     gap: 3,
   },
-  eyebrow: {
-    color: BRAND_COLORS.primary,
-    fontSize: 8,
-    fontWeight: '900',
-    letterSpacing: 1,
-  },
   title: {
     color: BRAND_COLORS.ink,
-    fontSize: 19,
+    fontSize: 18,
+    lineHeight: 24,
     fontWeight: '900',
+    letterSpacing: -0.2,
   },
   helper: {
     color: BRAND_COLORS.muted,
-    fontSize: 9,
-    lineHeight: 14,
+    fontSize: 11,
+    lineHeight: 16,
   },
   list: {
     paddingHorizontal: 16,
-    gap: 12,
-    paddingBottom: 4,
+    gap: 10,
+    paddingBottom: 6,
   },
 });

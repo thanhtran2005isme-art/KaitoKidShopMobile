@@ -7,11 +7,11 @@ export function CartEmptyState({ onContinue }: { onContinue: () => void }) {
   return (
     <View style={styles.wrap}>
       <View style={styles.iconWrap}>
-        <AppIcon color={BRAND_COLORS.primary} name="bag" size={36} />
+        <AppIcon color={BRAND_COLORS.primary} name="bag" size={34} />
       </View>
       <Text style={styles.title}>Giỏ hàng đang trống</Text>
       <Text style={styles.description}>
-        Khám phá sản phẩm phù hợp với phong cách của bạn để bắt đầu đơn hàng.
+        Chọn món bạn thích, thêm đúng màu và size rồi quay lại đây để thanh toán.
       </Text>
       <Pressable
         accessibilityLabel="Khám phá sản phẩm"
@@ -29,16 +29,17 @@ export function CartEmptyState({ onContinue }: { onContinue: () => void }) {
 
 const styles = StyleSheet.create({
   wrap: {
-    minHeight: 360,
+    minHeight: 300,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 32,
-    gap: 10,
+    paddingHorizontal: 28,
+    paddingVertical: 40,
+    gap: 11,
   },
   iconWrap: {
-    width: 78,
-    height: 78,
-    borderRadius: 27,
+    width: 72,
+    height: 72,
+    borderRadius: 24,
     backgroundColor: BRAND_COLORS.primarySoft,
     alignItems: 'center',
     justifyContent: 'center',
@@ -46,27 +47,30 @@ const styles = StyleSheet.create({
   title: {
     color: BRAND_COLORS.ink,
     fontSize: 22,
+    lineHeight: 28,
     fontWeight: '900',
+    letterSpacing: -0.4,
   },
   description: {
     maxWidth: 330,
     color: BRAND_COLORS.muted,
-    fontSize: 11,
-    lineHeight: 18,
+    fontSize: 13,
+    lineHeight: 19,
     textAlign: 'center',
   },
   button: {
-    minHeight: 46,
-    marginTop: 6,
-    borderRadius: 15,
+    minHeight: 48,
+    marginTop: 8,
+    borderRadius: 12,
     backgroundColor: BRAND_COLORS.primary,
-    paddingHorizontal: 20,
+    paddingHorizontal: 22,
     alignItems: 'center',
     justifyContent: 'center',
   },
   buttonText: {
     color: '#FFFFFF',
-    fontSize: 11,
+    fontSize: 13,
+    lineHeight: 18,
     fontWeight: '900',
   },
   pressed: { opacity: 0.82 },
