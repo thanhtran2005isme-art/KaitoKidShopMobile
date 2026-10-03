@@ -1,5 +1,6 @@
-import { LinearGradient } from 'expo-linear-gradient';
 import { Image } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import {
   Alert,
@@ -9,6 +10,9 @@ import {
   TextInput,
   View,
 } from 'react-native';
+
+import { AppIcon } from '@/components/ui/app-icon';
+import { releaseWebFocus } from '@/utils/web-focus';
 
 import { PAYMENT_METHOD_LOGO_URIS } from './payment-method-logo-uris';
 
@@ -32,11 +36,17 @@ function formatExpiry(value: string) {
 }
 
 export function CreditCardPaymentForm() {
+  const router = useRouter();
   const [holderName, setHolderName] = useState('');
   const [cardNumber, setCardNumber] = useState('');
   const [expiry, setExpiry] = useState('');
   const [cvv, setCvv] = useState('');
   const [focusedField, setFocusedField] = useState<FieldName>(null);
+
+  const goBack = () => {
+    releaseWebFocus();
+    router.back();
+  };
 
   const unavailableWallet = (name: string) => {
     Alert.alert(
@@ -78,6 +88,19 @@ export function CreditCardPaymentForm() {
   return (
     <View style={styles.modal}>
       <View style={styles.form}>
+        <Pressable
+          accessibilityLabel="Quay lại trang thanh toán"
+          accessibilityRole="button"
+          hitSlop={8}
+          onPress={goBack}
+          style={({ pressed }) => [
+            styles.backButton,
+            pressed && styles.pressed,
+          ]}>
+          <AppIcon color="#1B1B1B" name="arrowLeft" size={20} />
+          <Text style={styles.backButtonText}>Quay lại</Text>
+        </Pressable>
+
         <View style={styles.paymentOptions}>
           <Pressable
             accessibilityLabel="PayPal"
@@ -254,6 +277,24 @@ const styles = StyleSheet.create({
   form: {
     gap: 20,
     padding: 20,
+  },
+  backButton: {
+    alignSelf: 'flex-start',
+    minHeight: 44,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 7,
+    borderWidth: 1,
+    borderColor: '#E8E8E8',
+    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 12,
+  },
+  backButtonText: {
+    color: '#1B1B1B',
+    fontSize: 13,
+    fontWeight: '700',
   },
   paymentOptions: {
     flexDirection: 'row',
