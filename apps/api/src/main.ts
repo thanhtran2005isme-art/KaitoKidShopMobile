@@ -13,6 +13,12 @@ import {
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
+
+  // Admin settings có thể chứa QR ngân hàng dạng data URL/base64. Giới hạn mặc
+  // định ~100 KB của Express sẽ trả 413 trước khi request tới controller.
+  // Giữ một ngưỡng hữu hạn để hỗ trợ payload cấu hình thực tế mà không mở vô hạn.
+  app.useBodyParser("json", { limit: "16mb" });
+
   const origins = parseCorsOrigins(process.env.CORS_ORIGINS);
 
   app.enableCors({
