@@ -1,3 +1,4 @@
+import * as SecureStore from 'expo-secure-store';
 import {
   createContext,
   useCallback,
@@ -6,6 +7,7 @@ import {
   useMemo,
   useState,
 } from 'react';
+import { Platform } from 'react-native';
 
 import { useAuth } from '@/context/AuthContext';
 import { shoppingApi } from '@/services/shopping.api';
@@ -14,6 +16,8 @@ import type {
   CartItem,
   WishlistItem,
 } from '@/types/shopping';
+
+const CHECKOUT_ITEM_IDS_KEY = 'kaitokid_checkout_item_ids';
 
 type ShoppingContextValue = {
   cartItems: CartItem[];
@@ -43,23 +47,72 @@ function errorMessage(error: unknown, fallback: string) {
   return error instanceof Error && error.message ? error.message : fallback;
 }
 
+function normalizeCheckoutItemIds(value: unknown): number[] {
+  if (!Array.isArray(value)) return [];
+
+  return Array.from(
+    new Set(
+      value.filter(
+        (item): item is number =>
+          typeof item === 'number' && Number.isInteger(item) && item > 0,
+      ),
+    ),
+  );
+}
+
+async function readStoredCheckoutItemIds(): Promise<number[]> {
+  try {
+    const raw =
+      Platform.OS === 'web'
+        ? localStorage.getItem(CHECKOUT_ITEM_IDS_KEY)
+        : await SecureStore.getItemAsync(CHECKOUT_ITEM_IDS_KEY);
+
+    if (!raw) return [];
+    return normalizeCheckoutItemIds(JSON.parse(raw));
+  } catch {
+    return [];
+  }
+}
+
+async function writeStoredCheckoutItemIds(itemIds: number[]): Promise<void> {
+  const value = JSON.stringify(normalizeCheckoutItemIds(itemIds));
+
+  if (Platform.OS === 'web') {
+    localStorage.setItem(CHECKOUT_ITEM_IDS_KEY, value);
+    return;
+  }
+
+  await SecureStore.setItemAsync(CHECKOUT_ITEM_IDS_KEY, value);
+}
+
+async function clearStoredCheckoutItemIds(): Promise<void> {
+  if (Platform.OS === 'web') {
+    localStorage.removeItem(CHECKOUT_ITEM_IDS_KEY);
+    return;
+  }
+
+  await SecureStore.deleteItemAsync(CHECKOUT_ITEM_IDS_KEY);
+}
+
 export function ShoppingProvider({ children }: { children: React.ReactNode }) {
-  const { token } = useAuth();
+  const { token, loading: authLoading } = useAuth();
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [cartLoading, setCartLoading] = useState(false);
   const [cartLoaded, setCartLoaded] = useState(false);
   const [cartError, setCartError] = useState<string | null>(null);
   const [preparedCheckoutItemIds, setPreparedCheckoutItemIds] = useState<number[]>([]);
+  const [checkoutSelectionReady, setCheckoutSelectionReady] = useState(false);
   const [wishlistItems, setWishlistItems] = useState<WishlistItem[]>([]);
   const [wishlistLoading, setWishlistLoading] = useState(false);
 
   const refreshCart = useCallback(async () => {
+    if (authLoading) return;
+
     if (!token) {
       setCartItems([]);
       setCartError(null);
       setCartLoading(false);
       setCartLoaded(true);
-      setPreparedCheckoutItemIds([]);
       return;
     }
 
@@ -75,9 +128,11 @@ export function ShoppingProvider({ children }: { children: React.ReactNode }) {
       setCartLoading(false);
       setCartLoaded(true);
     }
-  }, [token]);
+  }, [authLoading, token]);
 
   const refreshWishlist = useCallback(async () => {
+    if (authLoading) return;
+
     if (!token) {
       setWishlistItems([]);
       setWishlistLoading(false);
@@ -92,18 +147,79 @@ export function ShoppingProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setWishlistLoading(false);
     }
-  }, [token]);
+  }, [authLoading, token]);
 
   useEffect(() => {
+    if (authLoading) {
+      setCheckoutSelectionReady(false);
+      return;
+    }
+
+    if (!token) {
+      setPreparedCheckoutItemIds([]);
+      setCheckoutSelectionReady(true);
+      void clearStoredCheckoutItemIds();
+      return;
+    }
+
+    let active = true;
+    setCheckoutSelectionReady(false);
+
+    void readStoredCheckoutItemIds().then((itemIds) => {
+      if (!active) return;
+      setPreparedCheckoutItemIds(itemIds);
+      setCheckoutSelectionReady(true);
+    });
+
+    return () => {
+      active = false;
+    };
+  }, [authLoading, token]);
+
+  useEffect(() => {
+    if (authLoading) return;
     void Promise.all([refreshCart(), refreshWishlist()]);
-  }, [refreshCart, refreshWishlist]);
+  }, [authLoading, refreshCart, refreshWishlist]);
 
   useEffect(() => {
+    if (
+      !token ||
+      !checkoutSelectionReady ||
+      !cartLoaded ||
+      cartError
+    ) {
+      return;
+    }
+
     const validIds = new Set(cartItems.map((item) => item.id));
-    setPreparedCheckoutItemIds((ids) => ids.filter((id) => validIds.has(id)));
-  }, [cartItems]);
+    setPreparedCheckoutItemIds((itemIds) => {
+      const nextItemIds = itemIds.filter((id) => validIds.has(id));
+      const unchanged =
+        nextItemIds.length === itemIds.length &&
+        nextItemIds.every((id, index) => id === itemIds[index]);
+
+      return unchanged ? itemIds : nextItemIds;
+    });
+  }, [
+    cartError,
+    cartItems,
+    cartLoaded,
+    checkoutSelectionReady,
+    token,
+  ]);
+
+  useEffect(() => {
+    if (authLoading || !token || !checkoutSelectionReady) return;
+    void writeStoredCheckoutItemIds(preparedCheckoutItemIds);
+  }, [
+    authLoading,
+    checkoutSelectionReady,
+    preparedCheckoutItemIds,
+    token,
+  ]);
 
   const cartCount = useMemo(() => {
+    if (authLoading) return null;
     if (!token) return 0;
     if (!cartLoaded && cartItems.length === 0) return null;
     if (cartError && cartItems.length === 0) return null;
@@ -112,7 +228,7 @@ export function ShoppingProvider({ children }: { children: React.ReactNode }) {
       (total, item) => total + Math.max(0, item.quantity || 0),
       0,
     );
-  }, [cartError, cartItems, cartLoaded, token]);
+  }, [authLoading, cartError, cartItems, cartLoaded, token]);
 
   const refreshCartCount = refreshCart;
 
