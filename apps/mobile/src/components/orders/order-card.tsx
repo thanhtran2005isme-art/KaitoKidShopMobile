@@ -3,6 +3,7 @@ import { memo, useMemo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { OrderStatusBadge } from '@/components/orders/order-status-badge';
+import { AppIcon } from '@/components/ui/app-icon';
 import { BRAND_COLORS } from '@/constants/brand';
 import { resolveMediaUrl } from '@/services/api-client';
 import type { CustomerOrder } from '@/types/orders';
@@ -43,7 +44,9 @@ function OrderCardBase({
       ]}>
       <View style={styles.topRow}>
         <View style={styles.codeBlock}>
-          <Text style={styles.code}>{order.orderCode}</Text>
+          <Text numberOfLines={1} style={styles.code}>
+            {order.orderCode}
+          </Text>
           <Text style={styles.date}>{formatDateTime(order.createdAt)}</Text>
         </View>
         <OrderStatusBadge status={order.status} />
@@ -78,21 +81,25 @@ function OrderCardBase({
 
       {hiddenCount > 0 ? (
         <Text style={styles.moreText}>
-          {'+' + hiddenCount + ' sản phẩm khác'}
+          {'+' + hiddenCount + ' sản phẩm khác trong đơn'}
         </Text>
       ) : null}
 
-      <View style={styles.footer}>
-        <View>
-          <Text style={styles.quantityLabel}>
-            {quantity + ' sản phẩm'}
-          </Text>
-          <Text style={styles.totalLabel}>Tổng thanh toán</Text>
+      <View style={styles.summaryRow}>
+        <View style={styles.quantityBlock}>
+          <Text style={styles.quantityLabel}>{quantity + ' sản phẩm'}</Text>
+          <Text style={styles.summaryHint}>Tổng thanh toán</Text>
         </View>
-        <View style={styles.totalBlock}>
-          <Text style={styles.total}>{formatMoney(order.total)}</Text>
-          <Text style={styles.detailAction}>Xem chi tiết ›</Text>
-        </View>
+        <Text style={styles.total}>{formatMoney(order.total)}</Text>
+      </View>
+
+      <View style={styles.detailRow}>
+        <Text style={styles.detailAction}>Xem chi tiết đơn hàng</Text>
+        <AppIcon
+          color={BRAND_COLORS.primary}
+          name="chevronRight"
+          size={18}
+        />
       </View>
     </Pressable>
   );
@@ -106,16 +113,20 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: BRAND_COLORS.line,
     backgroundColor: BRAND_COLORS.surface,
-    padding: 14,
-    gap: 12,
+    padding: 16,
+    gap: 14,
   },
   topRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     justifyContent: 'space-between',
-    gap: 10,
+    gap: 12,
   },
-  codeBlock: { flex: 1 },
+  codeBlock: {
+    flex: 1,
+    minWidth: 0,
+    paddingTop: 1,
+  },
   code: {
     color: BRAND_COLORS.ink,
     fontSize: 14,
@@ -123,78 +134,103 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
   date: {
-    marginTop: 2,
+    marginTop: 3,
     color: BRAND_COLORS.muted,
     fontSize: 12,
     lineHeight: 17,
     fontWeight: '500',
   },
-  items: { gap: 10 },
+  items: {
+    gap: 12,
+  },
   itemRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 12,
   },
   image: {
-    width: 52,
-    height: 66,
+    width: 64,
+    height: 80,
     borderRadius: 12,
     backgroundColor: '#F3F4F6',
   },
-  itemCopy: { flex: 1, minWidth: 0 },
+  itemCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
   itemName: {
     color: BRAND_COLORS.ink,
-    fontSize: 13,
-    lineHeight: 18,
+    fontSize: 14,
+    lineHeight: 19,
     fontWeight: '800',
   },
   itemMeta: {
-    marginTop: 3,
+    marginTop: 4,
     color: BRAND_COLORS.muted,
-    fontSize: 11,
-    lineHeight: 16,
+    fontSize: 12,
+    lineHeight: 17,
     fontWeight: '500',
   },
   moreText: {
+    marginTop: -2,
     color: BRAND_COLORS.primary,
-    fontSize: 11,
-    lineHeight: 16,
+    fontSize: 12,
+    lineHeight: 17,
     fontWeight: '800',
   },
-  footer: {
-    paddingTop: 11,
+  summaryRow: {
+    paddingTop: 13,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: BRAND_COLORS.line,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-end',
-    gap: 12,
+    gap: 16,
+  },
+  quantityBlock: {
+    flex: 1,
+    minWidth: 0,
   },
   quantityLabel: {
     color: BRAND_COLORS.muted,
-    fontSize: 11,
-    lineHeight: 16,
+    fontSize: 12,
+    lineHeight: 17,
     fontWeight: '700',
   },
-  totalLabel: {
+  summaryHint: {
     marginTop: 2,
     color: BRAND_COLORS.ink,
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: '800',
+  },
+  total: {
+    color: BRAND_COLORS.ink,
+    fontSize: 18,
+    lineHeight: 23,
+    fontWeight: '900',
+    textAlign: 'right',
+  },
+  detailRow: {
+    minHeight: 44,
+    marginTop: -4,
+    borderRadius: 12,
+    backgroundColor: BRAND_COLORS.primarySoft,
+    paddingHorizontal: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  detailAction: {
+    flex: 1,
+    color: BRAND_COLORS.primaryDark,
     fontSize: 12,
     lineHeight: 17,
     fontWeight: '900',
   },
-  totalBlock: { alignItems: 'flex-end', gap: 3 },
-  total: {
-    color: BRAND_COLORS.accent,
-    fontSize: 16,
-    lineHeight: 21,
-    fontWeight: '900',
+  pressed: {
+    opacity: 0.76,
+    borderColor: '#D1D5DB',
   },
-  detailAction: {
-    color: BRAND_COLORS.primary,
-    fontSize: 11,
-    lineHeight: 16,
-    fontWeight: '900',
-  },
-  pressed: { opacity: 0.72 },
 });
