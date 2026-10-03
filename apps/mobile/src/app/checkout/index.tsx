@@ -83,6 +83,7 @@ export default function CheckoutScreen() {
   const [providers, setProviders] = useState<ShippingProvider[]>([]);
   const [shippingOptions, setShippingOptions] = useState<ShippingQuoteOption[]>([]);
   const [reviewVisible, setReviewVisible] = useState(false);
+  const [cardSelected, setCardSelected] = useState(false);
   const [initialRetryKey, setInitialRetryKey] = useState(0);
   const [shippingRetryKey, setShippingRetryKey] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -94,6 +95,10 @@ export default function CheckoutScreen() {
     0,
     subtotal - couponDiscount - comboDiscount + shippingFee,
   );
+  const backendPaymentAvailable = Boolean(
+    paymentConfig?.supportedMethods.includes(paymentMethod),
+  );
+  const paymentSelectionAvailable = cardSelected || backendPaymentAvailable;
 
   useEffect(() => {
     if (!token) {
@@ -293,8 +298,9 @@ export default function CheckoutScreen() {
     [providers],
   );
 
-  const paymentLabel =
-    paymentMethod === 'ATM'
+  const paymentLabel = cardSelected
+    ? 'Thẻ tín dụng / thẻ ghi nợ'
+    : paymentMethod === 'ATM'
       ? paymentConfig?.vietQrConfigured
         ? 'Chuyển khoản ngân hàng / VietQR'
         : 'Chuyển khoản ngân hàng'
@@ -355,7 +361,8 @@ export default function CheckoutScreen() {
     }
     if (!selectedAddress) return 'Vui lòng chọn địa chỉ nhận hàng.';
     if (!selectedShipping) return 'Vui lòng chọn phương thức giao hàng.';
-    if (!paymentConfig?.supportedMethods.includes(paymentMethod)) {
+    if (cardSelected) return null;
+    if (!backendPaymentAvailable) {
       return 'Phương thức thanh toán hiện không khả dụng.';
     }
     return null;
@@ -369,6 +376,10 @@ export default function CheckoutScreen() {
     }
 
     setError(null);
+    if (cardSelected) {
+      router.push('/checkout/payment');
+      return;
+    }
     setReviewVisible(true);
   };
 
@@ -814,7 +825,7 @@ export default function CheckoutScreen() {
               <View style={styles.sectionCopy}>
                 <Text style={styles.sectionTitle}>Thanh toán</Text>
                 <Text style={styles.sectionHint}>
-                  Chỉ hiển thị phương thức backend đang cho phép.
+                  Chọn COD, chuyển khoản hoặc tiếp tục tới form thanh toán thẻ.
                 </Text>
               </View>
             </View>
@@ -824,20 +835,23 @@ export default function CheckoutScreen() {
                 <Pressable
                   accessibilityLabel="Thanh toán khi nhận hàng"
                   accessibilityRole="radio"
-                  accessibilityState={{ checked: paymentMethod === 'COD' }}
-                  onPress={() => setPaymentMethod('COD')}
+                  accessibilityState={{ checked: !cardSelected && paymentMethod === 'COD' }}
+                  onPress={() => {
+                    setCardSelected(false);
+                    setPaymentMethod('COD');
+                  }}
                   style={({ pressed }) => [
                     styles.optionCard,
-                    paymentMethod === 'COD' &&
+                    !cardSelected && paymentMethod === 'COD' &&
                       styles.optionCardSelected,
                     pressed && styles.pressed,
                   ]}>
                   <View
                     style={[
                       styles.radio,
-                      paymentMethod === 'COD' && styles.radioSelected,
+                      !cardSelected && paymentMethod === 'COD' && styles.radioSelected,
                     ]}>
-                    {paymentMethod === 'COD' ? (
+                    {!cardSelected && paymentMethod === 'COD' ? (
                       <View style={styles.radioDot} />
                     ) : null}
                   </View>
@@ -856,20 +870,23 @@ export default function CheckoutScreen() {
                 <Pressable
                   accessibilityLabel="Thanh toán chuyển khoản ngân hàng hoặc VietQR"
                   accessibilityRole="radio"
-                  accessibilityState={{ checked: paymentMethod === 'ATM' }}
-                  onPress={() => setPaymentMethod('ATM')}
+                  accessibilityState={{ checked: !cardSelected && paymentMethod === 'ATM' }}
+                  onPress={() => {
+                    setCardSelected(false);
+                    setPaymentMethod('ATM');
+                  }}
                   style={({ pressed }) => [
                     styles.optionCard,
-                    paymentMethod === 'ATM' &&
+                    !cardSelected && paymentMethod === 'ATM' &&
                       styles.optionCardSelected,
                     pressed && styles.pressed,
                   ]}>
                   <View
                     style={[
                       styles.radio,
-                      paymentMethod === 'ATM' && styles.radioSelected,
+                      !cardSelected && paymentMethod === 'ATM' && styles.radioSelected,
                     ]}>
-                    {paymentMethod === 'ATM' ? (
+                    {!cardSelected && paymentMethod === 'ATM' ? (
                       <View style={styles.radioDot} />
                     ) : null}
                   </View>
@@ -885,13 +902,40 @@ export default function CheckoutScreen() {
                   </View>
                 </Pressable>
               ) : null}
+
+              <Pressable
+                accessibilityLabel="Thanh toán bằng thẻ tín dụng hoặc thẻ ghi nợ"
+                accessibilityRole="radio"
+                accessibilityState={{ checked: cardSelected }}
+                onPress={() => setCardSelected(true)}
+                style={({ pressed }) => [
+                  styles.optionCard,
+                  cardSelected && styles.optionCardSelected,
+                  pressed && styles.pressed,
+                ]}>
+                <View
+                  style={[
+                    styles.radio,
+                    cardSelected && styles.radioSelected,
+                  ]}>
+                  {cardSelected ? <View style={styles.radioDot} /> : null}
+                </View>
+                <View style={styles.optionCopy}>
+                  <Text style={styles.optionTitle}>
+                    Thẻ tín dụng / thẻ ghi nợ
+                  </Text>
+                  <Text style={styles.optionMeta}>
+                    Nhập thông tin thẻ ở bước tiếp theo. Giao dịch thẻ thật chưa được backend xử lý.
+                  </Text>
+                </View>
+              </Pressable>
             </View>
 
             {paymentConfig &&
             paymentConfig.supportedMethods.length === 0 ? (
-              <View accessibilityRole="alert" style={styles.errorCard}>
-                <Text style={styles.errorText}>
-                  Shop chưa bật phương thức thanh toán khả dụng.
+              <View style={styles.infoCard}>
+                <Text style={styles.infoText}>
+                  COD và chuyển khoản đang tắt; form thanh toán thẻ vẫn có thể mở để tiếp tục giao diện thẻ.
                 </Text>
               </View>
             ) : null}
@@ -954,20 +998,24 @@ export default function CheckoutScreen() {
           />
 
           <Pressable
-            accessibilityLabel="Xem lại đơn hàng trước khi đặt"
+            accessibilityLabel={
+              cardSelected
+                ? 'Tiếp tục tới form thanh toán thẻ'
+                : 'Xem lại đơn hàng trước khi đặt'
+            }
             accessibilityRole="button"
             accessibilityState={{
               disabled:
                 submitting ||
                 !selectedAddress ||
                 !selectedShipping ||
-                !paymentConfig?.supportedMethods.includes(paymentMethod),
+                !paymentSelectionAvailable,
             }}
             disabled={
               submitting ||
               !selectedAddress ||
               !selectedShipping ||
-              !paymentConfig?.supportedMethods.includes(paymentMethod)
+              !paymentSelectionAvailable
             }
             onPress={openReview}
             style={({ pressed }) => [
@@ -976,13 +1024,17 @@ export default function CheckoutScreen() {
               (submitting ||
                 !selectedAddress ||
                 !selectedShipping ||
-                !paymentConfig?.supportedMethods.includes(paymentMethod)) &&
+                !paymentSelectionAvailable) &&
                 styles.submitButtonDisabled,
             ]}>
             <View style={styles.submitCopy}>
-              <Text style={styles.submitText}>Xem lại đơn hàng</Text>
+              <Text style={styles.submitText}>
+                {cardSelected ? 'Tiếp tục thanh toán thẻ' : 'Xem lại đơn hàng'}
+              </Text>
               <Text style={styles.submitHint}>
-                Backend sẽ kiểm tra lại toàn bộ giá trị
+                {cardSelected
+                  ? 'Mở form nhập thông tin thẻ ở bước tiếp theo'
+                  : 'Backend sẽ kiểm tra lại toàn bộ giá trị'}
               </Text>
             </View>
             <Text style={styles.submitTotal}>{money(total)}</Text>
