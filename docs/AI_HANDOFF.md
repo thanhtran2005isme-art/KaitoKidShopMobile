@@ -1,6 +1,6 @@
 # AI Handoff — Current State
 
-Last updated: 2026-10-01
+Last updated: 2026-10-04
 
 ## Repository
 
@@ -40,6 +40,8 @@ Legacy ASP.NET Core `backend/` đã retire trong retirement change. SQL/schema a
 - Expected current base-table contract: 52 tables
 - Secrets: `apps/api/.env` (gitignored)
 - Template: `apps/api/.env.example`
+- Local CORS cho phép loopback `localhost`/`127.0.0.1` dùng port dev động khi cùng scheme đã được allow; không mở rộng sang origin/LAN tùy ý.
+- JSON body limit hiện là 16 MB để admin có thể lưu cấu hình ngân hàng chứa QR base64 mà không bị HTTP 413.
 
 Node là background worker owner duy nhất; critical workers vẫn điều khiển bằng feature flags.
 
@@ -50,11 +52,16 @@ Node là background worker owner duy nhất; critical workers vẫn điều khi�
 - Android emulator fallback: `10.0.2.2:5300`
 - Physical device: LAN auto-detect hoặc ADB reverse `5300`
 - Google native login cần development/native build; Expo Go không chứa native Google module.
+- `ShoppingContext` phải chờ `AuthContext` restore session xong trước khi xử lý trạng thái no-token/logout.
+- Partial checkout giữ continuity qua reload bằng cách chỉ persist `CartItemIds` đã chọn: Expo Web dùng `localStorage`, native dùng `expo-secure-store`. Sau restore, Mobile tải cart thật từ backend rồi giữ các ID còn hợp lệ; logout xóa selection đã persist.
+- Không persist snapshot sản phẩm/giá/tồn kho/coupon/shipping làm source of truth ở checkout; backend vẫn authoritative theo D015 và D024.
+- Lựa chọn thẻ tín dụng/thẻ ghi nợ hiện chỉ nối tới form UI/local validation. Backend payment contract thực tế vẫn chỉ nhận các method được `PaymentConfig` bật (hiện COD/ATM); chưa được coi là card gateway thật.
 
 ### Web/Admin
 
 - React + Vite, thường `5173`
 - Customer + Staff/Admin cùng gọi Node `:5300`
+- Staff auth dùng chung `adminApiClient`; không fallback về legacy `localhost:5053`.
 - Chat realtime gọi Socket.IO Node `/chatHub`
 
 ## Database
@@ -114,6 +121,7 @@ Sau đó smoke Web customer + Admin + Mobile bằng **Node-only**. Không khởi
 
 - Cart reserve product + variant; available = stock - reserved.
 - Partial checkout theo selected `CartItemIds`.
+- Checkout selection có thể persist qua reload, nhưng chỉ lưu ID; dữ liệu commerce authoritative vẫn lấy lại từ backend.
 - Pricing/coupon/combo/shipping/payment authoritative ở backend.
 - Payment/order cancellation/restock idempotent dưới race.
 - Tracking/cancel/reorder owner-only.
@@ -131,3 +139,4 @@ Sau đó smoke Web customer + Admin + Mobile bằng **Node-only**. Không khởi
 4. Inspect current `main` + recent Git history.
 5. Do not infer a C# fallback from old migration docs; `apps/api` is the current backend source of truth.
 6. One task/fix/phase = one aggregate commit by default; AI commit descriptions in Vietnamese.
+7. Khi một fix làm thay đổi architecture, operations hoặc durable behavior, cập nhật docs liên quan trong cùng task/PR; cosmetic-only fix không cần tạo quyết định mới.
