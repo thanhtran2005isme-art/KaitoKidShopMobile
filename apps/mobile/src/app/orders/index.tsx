@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -26,6 +26,60 @@ import {
 function messageFrom(error: unknown, fallback: string) {
   return error instanceof Error && error.message ? error.message : fallback;
 }
+
+function OrderSeparator() {
+  return <View style={styles.separator} />;
+}
+
+const OrderFilterChip = memo(function OrderFilterChip({
+  item,
+  count,
+  active,
+  onSelect,
+}: {
+  item: (typeof ORDER_FILTERS)[number];
+  count: number;
+  active: boolean;
+  onSelect: (filter: OrderFilter) => void;
+}) {
+  const handlePress = useCallback(() => {
+    onSelect(item.key);
+  }, [item.key, onSelect]);
+
+  return (
+    <Pressable
+      accessibilityLabel={`${item.label}, ${count} đơn`}
+      accessibilityRole="button"
+      accessibilityState={{ selected: active }}
+      onPress={handlePress}
+      style={({ pressed }) => [
+        styles.filterChip,
+        active && styles.filterChipActive,
+        pressed && styles.pressed,
+      ]}>
+      <Text
+        style={[
+          styles.filterText,
+          active && styles.filterTextActive,
+        ]}>
+        {item.label}
+      </Text>
+      <View
+        style={[
+          styles.filterCount,
+          active && styles.filterCountActive,
+        ]}>
+        <Text
+          style={[
+            styles.filterCountText,
+            active && styles.filterCountTextActive,
+          ]}>
+          {count}
+        </Text>
+      </View>
+    </Pressable>
+  );
+});
 
 export default function OrdersScreen() {
   const router = useRouter();
@@ -83,6 +137,11 @@ export default function OrdersScreen() {
     return map;
   }, [orders]);
 
+  const activeFilterLabel = useMemo(
+    () => ORDER_FILTERS.find((item) => item.key === filter)?.label || 'Tất cả',
+    [filter],
+  );
+
   const openOrder = useCallback(
     (order: CustomerOrder) => {
       router.push({
@@ -99,6 +158,10 @@ export default function OrdersScreen() {
     ),
     [openOrder],
   );
+
+  const selectFilter = useCallback((nextFilter: OrderFilter) => {
+    setFilter(nextFilter);
+  }, []);
 
   if (authLoading) {
     return (
@@ -131,7 +194,10 @@ export default function OrdersScreen() {
                 params: { redirect: '/orders' },
               })
             }
-            style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed]}>
+            style={({ pressed }) => [
+              styles.primaryButton,
+              pressed && styles.pressed,
+            ]}>
             <Text style={styles.primaryButtonText}>Đăng nhập</Text>
           </Pressable>
         </View>
@@ -158,53 +224,37 @@ export default function OrdersScreen() {
             <Text style={styles.eyebrow}>ĐƠN HÀNG CỦA TÔI</Text>
             <Text style={styles.title}>Lịch sử mua hàng</Text>
             <Text style={styles.subtitle}>
-              Theo dõi xử lý, vận chuyển và mua lại đơn cũ.
+              Theo dõi trạng thái, vận chuyển và xem lại đơn đã mua.
             </Text>
           </View>
         </View>
 
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.filters}>
-          {ORDER_FILTERS.map((item) => {
-            const active = filter === item.key;
-            return (
-              <Pressable
-                accessibilityLabel={`${item.label}, ${counts.get(item.key) || 0} đơn`}
-                accessibilityRole="button"
-                accessibilityState={{ selected: active }}
+        <View style={styles.filterSection}>
+          <View style={styles.filterHeading}>
+            <Text style={styles.filterHeadingText}>Trạng thái đơn hàng</Text>
+            {!loading ? (
+              <Text style={styles.resultCount}>
+                {filteredOrders.length + ' đơn · ' + activeFilterLabel}
+              </Text>
+            ) : null}
+          </View>
+
+          <ScrollView
+            horizontal
+            style={styles.filterScroller}
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.filters}>
+            {ORDER_FILTERS.map((item) => (
+              <OrderFilterChip
+                active={filter === item.key}
+                count={counts.get(item.key) || 0}
+                item={item}
                 key={item.key}
-                onPress={() => setFilter(item.key)}
-                style={({ pressed }) => [
-                  styles.filterChip,
-                  active && styles.filterChipActive,
-                  pressed && styles.pressed,
-                ]}>
-                <Text
-                  style={[
-                    styles.filterText,
-                    active && styles.filterTextActive,
-                  ]}>
-                  {item.label}
-                </Text>
-                <View
-                  style={[
-                    styles.filterCount,
-                    active && styles.filterCountActive,
-                  ]}>
-                  <Text
-                    style={[
-                      styles.filterCountText,
-                      active && styles.filterCountTextActive,
-                    ]}>
-                    {counts.get(item.key) || 0}
-                  </Text>
-                </View>
-              </Pressable>
-            );
-          })}
-        </ScrollView>
+                onSelect={selectFilter}
+              />
+            ))}
+          </ScrollView>
+        </View>
 
         {error ? (
           <View style={styles.errorCard} accessibilityRole="alert">
@@ -216,7 +266,10 @@ export default function OrdersScreen() {
               accessibilityLabel="Thử tải lại đơn hàng"
               accessibilityRole="button"
               onPress={() => void loadOrders('initial')}
-              style={({ pressed }) => [styles.retryButton, pressed && styles.pressed]}>
+              style={({ pressed }) => [
+                styles.retryButton,
+                pressed && styles.pressed,
+              ]}>
               <Text style={styles.retryText}>Thử lại</Text>
             </Pressable>
           </View>
@@ -248,7 +301,7 @@ export default function OrdersScreen() {
                 </Text>
                 <Text style={styles.emptyText}>
                   {orders.length === 0
-                    ? 'Khi checkout thành công, đơn hàng sẽ xuất hiện tại đây.'
+                    ? 'Khi thanh toán thành công, đơn hàng sẽ xuất hiện tại đây.'
                     : 'Chọn bộ lọc khác để xem các đơn còn lại.'}
                 </Text>
                 {orders.length === 0 ? (
@@ -256,10 +309,11 @@ export default function OrdersScreen() {
                     accessibilityLabel="Tiếp tục mua sắm"
                     accessibilityRole="button"
                     onPress={() => router.replace('/')}
-                    style={({ pressed }) => [styles.emptyButton, pressed && styles.pressed]}>
-                    <Text style={styles.emptyButtonText}>
-                      Tiếp tục mua sắm
-                    </Text>
+                    style={({ pressed }) => [
+                      styles.emptyButton,
+                      pressed && styles.pressed,
+                    ]}>
+                    <Text style={styles.emptyButtonText}>Tiếp tục mua sắm</Text>
                   </Pressable>
                 ) : null}
               </View>
@@ -273,7 +327,7 @@ export default function OrdersScreen() {
             }
             renderItem={renderOrder}
             showsVerticalScrollIndicator={false}
-            ItemSeparatorComponent={() => <View style={styles.separator} />}
+            ItemSeparatorComponent={OrderSeparator}
             initialNumToRender={8}
             windowSize={7}
           />
@@ -298,9 +352,9 @@ const styles = StyleSheet.create({
   },
   header: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: 12,
-    marginBottom: 14,
+    marginBottom: 18,
   },
   backButton: {
     width: 44,
@@ -311,8 +365,9 @@ const styles = StyleSheet.create({
     backgroundColor: BRAND_COLORS.surface,
     alignItems: 'center',
     justifyContent: 'center',
+    marginTop: 2,
   },
-  headerCopy: { flex: 1 },
+  headerCopy: { flex: 1, minWidth: 0 },
   eyebrow: {
     color: BRAND_COLORS.primary,
     fontSize: 10,
@@ -333,12 +388,45 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     fontWeight: '500',
   },
+  filterSection: {
+    marginBottom: 14,
+  },
+  filterHeading: {
+    minHeight: 22,
+    marginBottom: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  filterHeadingText: {
+    color: BRAND_COLORS.ink,
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: '800',
+  },
+  resultCount: {
+    flexShrink: 1,
+    color: BRAND_COLORS.muted,
+    fontSize: 11,
+    lineHeight: 16,
+    fontWeight: '600',
+    textAlign: 'right',
+  },
+  filterScroller: {
+    flexGrow: 0,
+    flexShrink: 0,
+    maxHeight: 44,
+    marginHorizontal: -16,
+  },
   filters: {
+    alignItems: 'center',
     gap: 8,
-    paddingBottom: 14,
+    paddingHorizontal: 16,
   },
   filterChip: {
-    minHeight: 44,
+    height: 44,
+    alignSelf: 'center',
     borderRadius: 12,
     borderWidth: 1,
     borderColor: BRAND_COLORS.line,
@@ -346,6 +434,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 7,
   },
   filterChipActive: {
@@ -383,14 +472,15 @@ const styles = StyleSheet.create({
   filterCountTextActive: { color: '#FFFFFF' },
   list: { flex: 1 },
   listContent: {
-    paddingBottom: 34,
+    paddingBottom: 40,
   },
   listContentEmpty: {
     flexGrow: 1,
     justifyContent: 'center',
   },
-  separator: { height: 10 },
+  separator: { height: 12 },
   loadingCard: {
+    flex: 1,
     minHeight: 180,
     borderRadius: 18,
     borderWidth: 1,
