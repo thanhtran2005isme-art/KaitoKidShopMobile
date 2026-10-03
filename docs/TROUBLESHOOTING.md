@@ -88,6 +88,25 @@ USB launcher hiện reverse:
 
 `scripts/run-mobile.bat` kiểm tra `apps/mobile/node_modules/.bin/expo.cmd`. Nếu thiếu, script chạy `npm install`.
 
+## Mobile `/checkout` mất sản phẩm sau F5/reload
+
+Cart thật nằm ở backend; danh sách item được chọn cho partial checkout là state riêng. Từ D024, Mobile chỉ persist `CartItemIds` đã chọn để giữ continuity qua reload:
+
+- Expo Web: key `kaitokid_checkout_item_ids` trong `localStorage`;
+- Android/iOS: `expo-secure-store`;
+- sau Auth hydrate, Mobile tải cart thật từ API rồi chỉ giữ các ID vẫn còn hợp lệ;
+- logout chủ động xóa checkout selection đã persist.
+
+Nếu `/checkout` vẫn báo “Chưa có sản phẩm để thanh toán” sau reload:
+
+1. xác nhận phiên đăng nhập đã được restore và không bị logout;
+2. ở Expo Web, kiểm tra `localStorage.getItem('kaitokid_checkout_item_ids')` có danh sách ID sau khi bấm checkout từ Cart;
+3. xác nhận API cart vẫn trả các item tương ứng;
+4. nếu cart API lỗi tạm thời, không xóa selection để tránh mất dữ liệu do network transient;
+5. nếu item đã bị xóa/checkout ở nơi khác, ID stale sẽ bị loại khi đối chiếu với cart server.
+
+Không sửa lỗi này bằng cách persist toàn bộ Product/Cart snapshot, giá, tồn kho, coupon, shipping fee hoặc payment state làm nguồn dữ liệu chính. Các giá trị commerce phải được lấy/validate lại từ backend.
+
 ## Product/Lookbook media lỗi
 
 Node mount shared `apps/web/public` và giữ branded fallback cho `/products/*` và `/lookbook/*`. Nếu media mới vẫn 404:
