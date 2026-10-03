@@ -6,21 +6,18 @@ import Footer from './Footer';
 import RecentlyViewedStrip from './RecentlyViewedStrip';
 import { ChatProvider } from '../../context/ChatContext';
 import ChatWidget from '../chat/ChatWidget';
-import '../../styles/customer-design-system.css';
 
 export default function MainLayout() {
   return (
     <ChatProvider>
-      <div className="customer-shell">
-        <Header />
-        <main className="customer-main">
-          <Outlet />
-        </main>
-        <RecentlyViewedStrip />
-        <Footer />
-        {/* Widget chat tự xây thay cho Facebook Messenger plugin (tránh trùng 2 bong bóng) */}
-        <ChatWidget />
-      </div>
+      <Header />
+      <main>
+        <Outlet />
+      </main>
+      <RecentlyViewedStrip />
+      <Footer />
+      {/* Widget chat tự xây thay cho Facebook Messenger plugin (tránh trùng 2 bong bóng) */}
+      <ChatWidget />
     </ChatProvider>
   );
 }
