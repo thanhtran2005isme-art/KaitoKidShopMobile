@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { CreditCardPaymentForm } from '@/components/checkout/credit-card-payment-form';
 import { CheckoutStepper } from '@/components/checkout/checkout-stepper';
 import { BRAND_COLORS } from '@/constants/brand';
 import { useAuth } from '@/context/AuthContext';
@@ -284,18 +285,13 @@ export default function CheckoutPaymentScreen() {
 
   if (!orderCode) {
     return (
-      <SafeAreaView style={styles.safeArea}>
-        <View style={styles.centerState}>
-          <Text style={styles.stateTitle}>Không có đơn chờ thanh toán</Text>
-          <Text style={styles.stateText}>
-            Mã đơn không tồn tại trong phiên checkout hiện tại.
-          </Text>
-          <Pressable
-            onPress={() => router.replace('/cart')}
-            style={styles.primaryButton}>
-            <Text style={styles.primaryButtonText}>Về giỏ hàng</Text>
-          </Pressable>
-        </View>
+      <SafeAreaView edges={['top']} style={styles.cardPaymentSafeArea}>
+        <ScrollView
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.cardPaymentContent}>
+          <CreditCardPaymentForm />
+        </ScrollView>
       </SafeAreaView>
     );
   }
@@ -547,6 +543,18 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: BRAND_COLORS.canvas,
+  },
+  cardPaymentSafeArea: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+  },
+  cardPaymentContent: {
+    flexGrow: 1,
+    width: '100%',
+    paddingHorizontal: 16,
+    paddingVertical: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   content: {
     width: '100%',
