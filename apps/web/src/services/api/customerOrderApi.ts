@@ -27,9 +27,13 @@ export interface CustomerOrderDTO {
   couponCode?: string;
   paymentMethod: string;
   status: string; // 'pending' | 'confirmed' | 'shipping' | 'completed' | 'cancelled'
+  canCancel: boolean;
   shippingStatus?: string;
   trackingCode?: string;
+  trackingUrl?: string;
   shippingProvider?: string;
+  shippingServiceCode?: string;
+  leadTimeHours?: number | null;
   note?: string;
   createdAt: string;
   items: CustomerOrderItemDTO[];
