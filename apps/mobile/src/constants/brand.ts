@@ -7,9 +7,9 @@ export const BRAND = {
 } as const;
 
 export const BRAND_COLORS = {
-  primary: '#7C3AED',
-  primaryDark: '#5B21B6',
-  primarySoft: '#EDE9FE',
+  primary: '#111111',
+  primaryDark: '#000000',
+  primarySoft: '#F3F4F6',
   accent: '#F97316',
   accentSoft: '#FFF7ED',
   ink: '#111827',
