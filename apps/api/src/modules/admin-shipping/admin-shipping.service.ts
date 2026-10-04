@@ -91,8 +91,17 @@ export class AdminShippingService {
         "https://rest.sandbox.lalamove.com",
       lalamoveMarket:
         str(raw, "LalamoveMarket") || process.env.LALAMOVE_MARKET || "VN",
+      lalamoveServiceType:
+        str(raw, "LalamoveServiceType") ||
+        process.env.LALAMOVE_SERVICE_TYPE ||
+        "MOTORCYCLE",
       lalamoveApiKeyConfigured: Boolean(lalamoveApiKey),
       lalamoveApiSecretConfigured: Boolean(lalamoveApiSecret),
+      pickupAddress:
+        str(raw, "PickupAddress") || process.env.LALAMOVE_PICKUP_ADDRESS || "",
+      pickupName: str(raw, "PickupName"),
+      pickupPhone: str(raw, "PickupPhone"),
+      defaultWeightGram: num(raw, "DefaultWeightGram", 300),
       kaitoKidBranches: Array.isArray(ci(raw, "KaitoKidBranches"))
         ? ci(raw, "KaitoKidBranches")
         : [],
