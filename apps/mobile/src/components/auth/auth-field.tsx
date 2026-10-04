@@ -66,9 +66,9 @@ export const AuthField = forwardRef<TextInput, AuthFieldProps>(function AuthFiel
 
   const frameStyle = useAnimatedStyle(() => {
     const idleBorder = dark ? '#374151' : BRAND_COLORS.line;
-    const focusBorder = dark ? '#A78BFA' : BRAND_COLORS.primary;
+    const focusBorder = dark ? '#FFFFFF' : BRAND_COLORS.primary;
     const idleBackground = dark ? '#111827' : '#F9FAFB';
-    const focusBackground = dark ? '#151D2D' : '#FCFAFF';
+    const focusBackground = dark ? '#151D2D' : '#FFFFFF';
 
     const borderColor =
       errorProgress.value > 0.05
@@ -103,7 +103,7 @@ export const AuthField = forwardRef<TextInput, AuthFieldProps>(function AuthFiel
               color={
                 focused
                   ? dark
-                    ? '#A78BFA'
+                    ? '#FFFFFF'
                     : BRAND_COLORS.primary
                   : dark
                     ? '#9CA3AF'
