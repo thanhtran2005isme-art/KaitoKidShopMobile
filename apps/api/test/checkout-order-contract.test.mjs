@@ -137,8 +137,9 @@ test("customer receipt is explicit and starts the seven-day return window", () =
   assert.match(afterSalesSource, /không tự động hoàn tiền|không tự hủy|đối soát/i);
 });
 
-test("review requires customer-confirmed receipt timestamp", () => {
-  assert.match(reviewsSource, /TrangThai = 'completed'/);
+test("review requires customer receipt and remains available while return is pending", () => {
+  assert.match(reviewsSource, /TrangThai IN \('completed','return_requested'\)/);
   assert.match(reviewsSource, /NgayHoanThanh IS NOT NULL/);
   assert.match(reviewsSource, /khách chưa xác nhận đã nhận hàng/);
+  assert.match(afterSalesSource, /\["completed", "return_requested"\]\.includes\(status\)/);
 });
