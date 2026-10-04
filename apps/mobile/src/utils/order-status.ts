@@ -4,7 +4,7 @@ import type {
   StatusTone,
 } from '@/types/orders';
 
-export const ORDER_FILTERS: Array<{ key: OrderFilter; label: string }> = [
+export const ORDER_FILTERS: { key: OrderFilter; label: string }[] = [
   { key: 'all', label: 'Tất cả' },
   { key: 'processing', label: 'Chờ xử lý' },
   { key: 'shipping', label: 'Đang giao' },
