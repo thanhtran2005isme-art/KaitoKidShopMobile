@@ -23,8 +23,8 @@ const BENEFITS: {
     icon: 'bag',
     title: 'Theo dõi đơn hàng',
     description: 'Xem trạng thái xử lý, vận chuyển và lịch sử mua sắm.',
-    background: '#EDE9FE',
-    color: '#6D28D9',
+    background: '#F3F4F6',
+    color: '#111111',
   },
   {
     icon: 'heart',
