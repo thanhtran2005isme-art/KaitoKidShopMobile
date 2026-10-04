@@ -378,6 +378,14 @@ function ConfigTab() {
               style={inputStyle}
             />
           </Field>
+          <Field label="Service Type" hint="Sandbox Việt Nam thường dùng MOTORCYCLE cho đơn nhỏ">
+            <input
+              value={config.lalamoveServiceType || 'MOTORCYCLE'}
+              onChange={(e) => update({ lalamoveServiceType: e.target.value.toUpperCase() })}
+              placeholder="MOTORCYCLE"
+              style={inputStyle}
+            />
+          </Field>
         </Row>
         <div style={{ padding: 12, background: '#f8fafc', borderRadius: 6, fontSize: 13, color: '#475569' }}>
           <div style={{ fontWeight: 600, color: '#0f172a', marginBottom: 6 }}>Credentials backend</div>
@@ -480,6 +488,9 @@ function ConfigTab() {
       </Card>
 
       <Card title="Địa chỉ kho lấy hàng & Mặc định" icon="fa-map-marker-alt">
+        <p style={{ marginTop: 0, color: '#64748b', fontSize: 12 }}>
+          Với Lalamove, nên nhập địa chỉ kho đầy đủ gồm số nhà, phường/xã, quận/huyện và tỉnh/thành để Sandbox định vị chính xác.
+        </p>
         <Row>
           <Field label="Tên kho">
             <input value={config.pickupName || ''} onChange={(e) => update({ pickupName: e.target.value })} style={inputStyle} placeholder="Kho KaitoKid HN" />
@@ -497,8 +508,8 @@ function ConfigTab() {
           </Field>
         </Row>
         <Row>
-          <Field label="Địa chỉ chi tiết kho">
-            <input value={config.pickupAddress || ''} onChange={(e) => update({ pickupAddress: e.target.value })} style={inputStyle} placeholder="Số 1, đường ABC, phường XYZ..." />
+          <Field label="Địa chỉ đầy đủ kho lấy hàng">
+            <input value={config.pickupAddress || ''} onChange={(e) => update({ pickupAddress: e.target.value })} style={inputStyle} placeholder="Số nhà, phường/xã, quận/huyện, tỉnh/thành" />
           </Field>
         </Row>
       </Card>
