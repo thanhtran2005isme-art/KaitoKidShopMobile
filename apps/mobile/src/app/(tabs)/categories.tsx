@@ -29,8 +29,8 @@ const COLORS = {
   background: BRAND_COLORS.canvas,
   surface: BRAND_COLORS.surface,
   ink: BRAND_COLORS.ink,
-  dark: '#24113D',
-  darkSoft: '#3B1B63',
+  dark: '#111111',
+  darkSoft: '#374151',
   secondary: '#4B5563',
   muted: BRAND_COLORS.muted,
   line: BRAND_COLORS.line,
@@ -648,7 +648,7 @@ export default function CategoriesScreen() {
 
   const listHeader = (
     <View style={styles.listHeader}>
-      <LinearGradient colors={['#2E1065', '#4C1D95', '#24113D']} style={styles.catalogHero}>
+      <LinearGradient colors={['#000000', '#111111', '#1F2937']} style={styles.catalogHero}>
         <View pointerEvents="none" style={styles.heroGlowPink} />
         <View pointerEvents="none" style={styles.heroGlowWhite} />
 
@@ -1157,7 +1157,7 @@ const styles = StyleSheet.create({
   },
   subcategoryChipActive: {
     backgroundColor: COLORS.accentSoft,
-    borderColor: '#A78BFA',
+    borderColor: '#9CA3AF',
   },
   subcategoryChipText: {
     color: COLORS.ink,
@@ -1285,7 +1285,7 @@ const styles = StyleSheet.create({
   },
   editorialWishlistActive: {
     backgroundColor: COLORS.accentSoft,
-    borderColor: '#C4B5FD',
+    borderColor: '#D1D5DB',
   },
   editorialProductCopy: {
     minHeight: 116,
