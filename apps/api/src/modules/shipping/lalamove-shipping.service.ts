@@ -36,8 +36,10 @@ interface OrderRow {
   userId: unknown;
   customerName: string;
   customerPhone: string;
+  customerAddress: string;
   note: string | null;
   status: string;
+  shippingFee: unknown;
   trackingCode: string | null;
   trackingUrl: string | null;
   shippingStatus: string | null;
@@ -70,7 +72,9 @@ function apiMessage(value: unknown, fallback: string): string {
 
 @Injectable()
 export class LalamoveShippingService extends ShippingService {
-  private readonly webhookPath = "/api/shipping/lalamove/webhook";
+  private readonly webhookPath =
+    process.env.LALAMOVE_WEBHOOK_PATH?.trim() ||
+    "/api/shipping/lalamove/webhook";
 
   constructor(private readonly db: PrismaService) {
     super(db);
@@ -82,7 +86,9 @@ export class LalamoveShippingService extends ShippingService {
       const options = await this.quoteLalamoveLifecycle(req);
       return {
         success: options.length > 0,
-        message: options.length ? null : "Không tính được phí Lalamove cho địa chỉ này.",
+        message: options.length
+          ? null
+          : "Không tính được phí Lalamove cho địa chỉ này.",
         options,
       };
     }
@@ -126,12 +132,19 @@ export class LalamoveShippingService extends ShippingService {
       userId,
     );
     const order = rows[0];
-    if (
-      order?.shippingProvider?.toLowerCase() === "lalamove" &&
-      order.trackingCode
-    ) {
-      await this.syncLalamoveOrder(toNumber(order.id), order.trackingCode)
-        .catch(() => undefined);
+    if (order?.shippingProvider?.toLowerCase() === "lalamove") {
+      if (order.trackingCode) {
+        await this.syncLalamoveOrder(toNumber(order.id), order.trackingCode)
+          .catch(() => undefined);
+      } else if (order.shippingServiceCode) {
+        // Place Order có thể thất bại tạm thời sau khi KaitoKid đã commit đơn.
+        // Tracking là một điểm retry idempotent an toàn: nếu MaVanDon đã có thì
+        // placeLalamoveOrder trả ngay và không tạo vận đơn thứ hai.
+        await this.placeLalamoveOrder(
+          toNumber(order.id),
+          order.shippingServiceCode,
+        ).catch(() => undefined);
+      }
     }
     return super.track(userId, orderCode);
   }
@@ -175,7 +188,10 @@ export class LalamoveShippingService extends ShippingService {
     const payload = await this.safeJson(response);
     if (response.status === 409) {
       throw new BadRequestException(
-        apiMessage(payload, "Lalamove không cho phép hủy vận đơn ở trạng thái hiện tại."),
+        apiMessage(
+          payload,
+          "Lalamove không cho phép hủy vận đơn ở trạng thái hiện tại.",
+        ),
       );
     }
     throw new ServiceUnavailableException(
@@ -271,34 +287,18 @@ export class LalamoveShippingService extends ShippingService {
     if (!cfg.pickupAddress || !dropoff) return [];
 
     try {
-      const response = await lalamoveRequest(
-        this.requestConfig(cfg),
-        "POST",
-        "/v3/quotations",
-        {
-          data: {
-            serviceType: cfg.serviceType,
-            language: "vi_VN",
-            stops: [
-              { address: cfg.pickupAddress },
-              { address: dropoff },
-            ],
-          },
-        },
-      );
-      if (!response.ok) return [];
-      const data = record(record(await response.json()).data);
-      const quotationId = text(data.quotationId);
-      const fee = Number(record(data.priceBreakdown).total ?? 0);
-      const serviceType = text(data.serviceType) ?? cfg.serviceType;
-      if (!quotationId || !Number.isFinite(fee) || fee <= 0) return [];
+      const quotation = await this.createQuotation(cfg, dropoff);
+      if (!quotation) return [];
       return [{
         provider: "lalamove",
-        serviceCode: quotationId,
-        serviceName: serviceType.toUpperCase() === "MOTORCYCLE"
+        // serviceCode phải ổn định để lần re-quote server-authoritative trong
+        // OrdersService vẫn đối chiếu được lựa chọn của client. quotationId
+        // không được client làm authority; Place Order sẽ lấy quotation mới.
+        serviceCode: quotation.serviceType,
+        serviceName: quotation.serviceType.toUpperCase() === "MOTORCYCLE"
           ? "Lalamove · Xe máy"
-          : `Lalamove · ${serviceType}`,
-        fee,
+          : `Lalamove · ${quotation.serviceType}`,
+        fee: quotation.fee,
         insuranceFee: 0,
         leadTimeHours: 2,
         deliveryType: "on_demand",
@@ -308,9 +308,35 @@ export class LalamoveShippingService extends ShippingService {
     }
   }
 
+  private async createQuotation(cfg: RuntimeConfig, dropoffAddress: string) {
+    if (!cfg.pickupAddress) return null;
+    const response = await lalamoveRequest(
+      this.requestConfig(cfg),
+      "POST",
+      "/v3/quotations",
+      {
+        data: {
+          serviceType: cfg.serviceType,
+          language: "vi_VN",
+          stops: [
+            { address: cfg.pickupAddress },
+            { address: dropoffAddress },
+          ],
+        },
+      },
+    );
+    if (!response.ok) return null;
+    const data = record(record(await response.json()).data);
+    const quotationId = text(data.quotationId);
+    const fee = Number(record(data.priceBreakdown).total ?? 0);
+    const serviceType = text(data.serviceType) ?? cfg.serviceType;
+    if (!quotationId || !Number.isFinite(fee) || fee <= 0) return null;
+    return { quotationId, fee, serviceType, data };
+  }
+
   private async placeLalamoveOrder(
     orderId: number,
-    quotationId: string,
+    requestedServiceType: string,
   ): Promise<string> {
     const rows = await this.db.$queryRawUnsafe<OrderRow[]>(
       `${this.lalamoveOrderSelect()} WHERE Id = ? LIMIT 1`,
@@ -324,22 +350,46 @@ export class LalamoveShippingService extends ShippingService {
 
     const cfg = await this.requireConfig();
     if (!cfg.pickupPhone) {
-      throw new Error("Lalamove cần số điện thoại điểm lấy hàng trong Admin Shipping.");
-    }
-
-    const quoteResponse = await lalamoveRequest(
-      this.requestConfig(cfg),
-      "GET",
-      `/v3/quotations/${encodeURIComponent(quotationId)}`,
-    );
-    const quotePayload = await this.safeJson(quoteResponse);
-    if (!quoteResponse.ok) {
       throw new Error(
-        apiMessage(quotePayload, "Quotation Lalamove đã hết hạn hoặc không hợp lệ."),
+        "Lalamove cần số điện thoại điểm lấy hàng trong Admin Shipping.",
       );
     }
-    const quotation = record(record(quotePayload).data);
-    const stops = Array.isArray(quotation.stops) ? quotation.stops.map(record) : [];
+    if (
+      requestedServiceType &&
+      requestedServiceType.toUpperCase() !== cfg.serviceType.toUpperCase()
+    ) {
+      throw new Error("Dịch vụ Lalamove đã thay đổi; cần tính lại phí.");
+    }
+
+    // Quotation dùng để Place Order luôn được backend tạo mới từ địa chỉ đã
+    // persist trong DonHang; không dùng quotationId do client giữ.
+    const quotation = await this.createQuotation(cfg, order.customerAddress);
+    if (!quotation) throw new Error("Không tạo được quotation Lalamove cho đơn.");
+
+    // Không âm thầm tạo shipment nếu giá carrier đã đổi so với giá backend
+    // vừa chốt ở checkout. Cho phép sai số 1 VND do kiểu số/rounding.
+    if (Math.abs(quotation.fee - toNumber(order.shippingFee)) > 1) {
+      throw new Error(
+        "Phí Lalamove đã thay đổi sau checkout; cần tính lại trước khi tạo vận đơn.",
+      );
+    }
+
+    const detailResponse = await lalamoveRequest(
+      this.requestConfig(cfg),
+      "GET",
+      `/v3/quotations/${encodeURIComponent(quotation.quotationId)}`,
+    );
+    const detailPayload = await this.safeJson(detailResponse);
+    if (!detailResponse.ok) {
+      throw new Error(
+        apiMessage(
+          detailPayload,
+          "Quotation Lalamove đã hết hạn hoặc không hợp lệ.",
+        ),
+      );
+    }
+    const detail = record(record(detailPayload).data);
+    const stops = Array.isArray(detail.stops) ? detail.stops.map(record) : [];
     const pickupStopId = text(stops[0]?.stopId);
     const dropoffStopId = text(stops[stops.length - 1]?.stopId);
     if (!pickupStopId || !dropoffStopId || stops.length < 2) {
@@ -352,7 +402,7 @@ export class LalamoveShippingService extends ShippingService {
       "/v3/orders",
       {
         data: {
-          quotationId,
+          quotationId: quotation.quotationId,
           sender: {
             stopId: pickupStopId,
             name: cfg.pickupName,
@@ -362,7 +412,9 @@ export class LalamoveShippingService extends ShippingService {
             stopId: dropoffStopId,
             name: order.customerName,
             phone: this.normalizePhone(order.customerPhone, cfg.market),
-            ...(order.note?.trim() ? { remarks: order.note.trim().slice(0, 200) } : {}),
+            ...(order.note?.trim()
+              ? { remarks: order.note.trim().slice(0, 200) }
+              : {}),
           }],
           isPODEnabled: true,
           metadata: {
@@ -380,11 +432,16 @@ export class LalamoveShippingService extends ShippingService {
     const externalOrderId = text(data.orderId);
     if (!externalOrderId) throw new Error("Lalamove không trả orderId.");
 
-    await this.applyState(orderId, data, quotationId, externalOrderId);
+    await this.applyState(
+      orderId,
+      data,
+      quotation.quotationId,
+      externalOrderId,
+    );
     await this.appendHistory(
       orderId,
       this.mapCarrierStatus(text(data.status)).shippingStatus,
-      `Đã tạo vận đơn Lalamove ${externalOrderId} từ quotation ${quotationId}`,
+      `Đã tạo vận đơn Lalamove ${externalOrderId} từ quotation ${quotation.quotationId}`,
       "Lalamove",
     );
     return externalOrderId;
@@ -452,7 +509,10 @@ export class LalamoveShippingService extends ShippingService {
   private mapCarrierStatus(status: string | null) {
     switch ((status ?? "").toUpperCase()) {
       case "ASSIGNING_DRIVER":
-        return { shippingStatus: "ready_to_pick", orderStatus: null as string | null };
+        return {
+          shippingStatus: "ready_to_pick",
+          orderStatus: null as string | null,
+        };
       case "ON_GOING":
         return { shippingStatus: "lalamove_on_going", orderStatus: "confirmed" };
       case "PICKED_UP":
@@ -460,12 +520,18 @@ export class LalamoveShippingService extends ShippingService {
       case "COMPLETED":
         return { shippingStatus: "delivered", orderStatus: "completed" };
       case "CANCELED":
-        return { shippingStatus: "cancelled", orderStatus: null as string | null };
+        return {
+          shippingStatus: "cancelled",
+          orderStatus: null as string | null,
+        };
       case "REJECTED":
       case "EXPIRED":
         return { shippingStatus: "failed", orderStatus: null as string | null };
       default:
-        return { shippingStatus: "ready_to_pick", orderStatus: null as string | null };
+        return {
+          shippingStatus: "ready_to_pick",
+          orderStatus: null as string | null,
+        };
     }
   }
 
@@ -569,7 +635,9 @@ export class LalamoveShippingService extends ShippingService {
   }
 
   private requestConfig(cfg: RuntimeConfig) {
-    if (!cfg.apiKey || !cfg.apiSecret) throw new Error("Thiếu Lalamove API credentials.");
+    if (!cfg.apiKey || !cfg.apiSecret) {
+      throw new Error("Thiếu Lalamove API credentials.");
+    }
     return {
       baseUrl: cfg.baseUrl,
       market: cfg.market,
@@ -580,7 +648,9 @@ export class LalamoveShippingService extends ShippingService {
 
   private normalizePhone(value: string, market: string) {
     const source = value.trim();
-    if (source.startsWith("+")) return `+${source.slice(1).replace(/\D/g, "")}`;
+    if (source.startsWith("+")) {
+      return `+${source.slice(1).replace(/\D/g, "")}`;
+    }
     const digits = source.replace(/\D/g, "");
     if (market.toUpperCase() === "VN") {
       if (digits.startsWith("84")) return `+${digits}`;
@@ -603,8 +673,10 @@ export class LalamoveShippingService extends ShippingService {
     return `SELECT
       Id AS id, MaDonHang AS orderCode, NguoiDungId AS userId,
       TenNguoiNhan AS customerName, SoDienThoai AS customerPhone,
-      GhiChu AS note, TrangThai AS status, MaVanDon AS trackingCode,
-      LinkTracking AS trackingUrl, TrangThaiVanChuyen AS shippingStatus,
+      DiaChiGiao AS customerAddress, GhiChu AS note,
+      TrangThai AS status, PhiVanChuyen AS shippingFee,
+      MaVanDon AS trackingCode, LinkTracking AS trackingUrl,
+      TrangThaiVanChuyen AS shippingStatus,
       NhaVanChuyen AS shippingProvider,
       MaDichVuVanChuyen AS shippingServiceCode
     FROM DonHang`;
