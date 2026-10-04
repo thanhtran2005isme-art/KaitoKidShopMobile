@@ -31,8 +31,7 @@ function normalized(value: string | null | undefined): string {
  * Lalamove COMPLETED chỉ cho phép vận chuyển đi tới `delivered`. Business order
  * vẫn ở `shipping` cho tới khi khách gọi confirm-received. Sau khi khách đã
  * xác nhận/khiếu nại, polling hoặc webhook của carrier không được phép ghi đè
- * state do khách tạo. Yêu cầu hoàn hàng được lưu ở shipping history nên không
- * cần tạo thêm giá trị enum cho DonHang.TrangThai.
+ * state do khách tạo. Yêu cầu hoàn hàng lưu ở shipping history, không cần tạo thêm giá trị enum cho DonHang.TrangThai.
  */
 @Injectable()
 export class ReceiptAwareLalamoveShippingService extends HardenedLalamoveShippingService {
