@@ -55,8 +55,17 @@ export class OrderAfterSalesService {
       userId,
       ...ids,
     );
+    const returnRows = await this.db.$queryRawUnsafe<Array<{ orderId: unknown }>>(
+      `SELECT DISTINCT DonHangId AS orderId
+       FROM LichSuTrangThaiVanChuyen
+       WHERE DonHangId IN (${marks}) AND TrangThai = 'return_requested'`,
+      ...ids,
+    );
+    const openReturnIds = new Set(returnRows.map((row) => toNumber(row.orderId)));
     const byId = new Map(rows.map((row) => [toNumber(row.id), row]));
-    return orders.map((order) => this.decorate(order, byId.get(order.id)));
+    return orders.map((order) =>
+      this.decorate(order, byId.get(order.id), openReturnIds.has(order.id)),
+    );
   }
 
   async decorateOne<T extends { id: number; status: string }>(
@@ -79,7 +88,7 @@ export class OrderAfterSalesService {
           "Chỉ có thể xác nhận đã nhận hàng sau khi đơn vị vận chuyển báo đã giao.",
         );
       }
-      if (["cancelled", "returned", "return_requested"].includes(normalized(order.status))) {
+      if (["cancelled", "returned"].includes(normalized(order.status))) {
         throw new BadRequestException("Đơn hàng không còn ở trạng thái có thể xác nhận nhận hàng.");
       }
 
@@ -174,11 +183,7 @@ export class OrderAfterSalesService {
 
     const result = await this.db.$transaction(async (tx) => {
       const order = await this.lockOrder(tx, userId, orderId);
-      const status = normalized(order.status);
-      if (status === "return_requested") {
-        return { changed: false, deadline: this.returnDeadline(order.completedAt) };
-      }
-      if (status !== "completed") {
+      if (normalized(order.status) !== "completed") {
         throw new BadRequestException("Chỉ đơn hàng đã nhận mới có thể yêu cầu hoàn hàng.");
       }
 
@@ -193,15 +198,13 @@ export class OrderAfterSalesService {
         throw new BadRequestException("Đã quá thời hạn hoàn hàng 7 ngày kể từ lúc nhận hàng.");
       }
 
-      await tx.$executeRawUnsafe(
-        `UPDATE DonHang
-         SET TrangThai = 'return_requested', NgayCapNhat = ?
-         WHERE Id = ? AND NguoiDungId = ?`,
-        new Date(),
+      const duplicate = await tx.$queryRawUnsafe<Array<{ id: unknown }>>(
+        `SELECT Id AS id FROM LichSuTrangThaiVanChuyen
+         WHERE DonHangId = ? AND TrangThai = 'return_requested'
+         LIMIT 1 FOR UPDATE`,
         orderId,
-        userId,
       );
-      return { changed: true, deadline };
+      return { changed: duplicate.length === 0, deadline };
     });
 
     if (result.changed) {
@@ -223,7 +226,8 @@ export class OrderAfterSalesService {
 
   private decorate<T extends { id: number; status: string }>(
     order: T,
-    row?: AfterSalesRow,
+    row: AfterSalesRow | undefined,
+    returnRequested: boolean,
   ) {
     if (!row) return order;
 
@@ -237,25 +241,26 @@ export class OrderAfterSalesService {
     const returnDeadline = completedAt
       ? new Date(completedAt.getTime() + RETURN_WINDOW_MS)
       : null;
+    const hasOpenReturn = returnRequested && status !== "returned";
     const canRequestReturn =
       status === "completed" &&
       Boolean(completedAt) &&
+      !hasOpenReturn &&
       Boolean(returnDeadline && Date.now() <= returnDeadline.getTime());
-    const canReview =
-      Boolean(completedAt) && ["completed", "return_requested"].includes(status);
+    const canReview = Boolean(completedAt) && status === "completed";
 
     return {
       ...order,
       status: effectiveStatus,
       canConfirmReceived:
-        waitingCustomerReceipt && !["cancelled", "returned", "return_requested"].includes(status),
+        waitingCustomerReceipt && !["cancelled", "returned"].includes(status),
       canReportNotReceived:
         !completedAt && shippingStatus === "delivered" && !["cancelled", "returned"].includes(status),
       deliveryIssueReported: shippingStatus === "delivery_disputed",
       customerReceiptConfirmed: Boolean(completedAt),
       canReview,
       canRequestReturn,
-      returnRequested: status === "return_requested",
+      returnRequested: hasOpenReturn,
       receivedAt: completedAt,
       returnDeadline,
       returnWindowDays: 7,
