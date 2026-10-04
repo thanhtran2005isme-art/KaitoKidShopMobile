@@ -99,7 +99,7 @@ export class ReviewsService {
         `SELECT Id AS id
          FROM DonHang
          WHERE Id = ? AND NguoiDungId = ?
-           AND TrangThai = 'completed'
+           AND TrangThai IN ('completed','return_requested')
            AND NgayHoanThanh IS NOT NULL
          LIMIT 1`,
         orderId,
