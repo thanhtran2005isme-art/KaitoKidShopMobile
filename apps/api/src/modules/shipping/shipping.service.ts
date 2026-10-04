@@ -124,7 +124,11 @@ export class ShippingService {
 
     // Không được giả thành Mock khi user đã chọn một carrier thật nhưng carrier lỗi.
     // Với provider=all, Mock đã được tính ngay trong vòng lặp nếu được bật.
-    if (options.length === 0 && requested !== "all" && requested === "mock") {
+    if (
+      options.length === 0 &&
+      requested === "mock" &&
+      cfg.mockEnabled
+    ) {
       options.push(...calculateMockQuote(req, cfg));
     }
 
