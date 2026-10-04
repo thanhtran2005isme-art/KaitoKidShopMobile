@@ -13,10 +13,13 @@ Thay đổi durable trên branch `feat/admin-lalamove-carrier`:
 - `POST /v3/orders` dùng quotation + stopId thật, bật POD và metadata KaitoKid;
 - persist `orderId`, `shareLink`, `quotationId`, provider/status vào các cột shipping hiện có của `DonHang`; không đổi schema/table count;
 - thêm `POST /api/shipping/lalamove/webhook`, verify HMAC, dedupe bằng `eventId` trong shipping history và chống out-of-order state regression;
-- owner tracking sync `GET /v3/orders/{id}` và có retry idempotent Place Order khi carrier call lỗi tạm sau commerce commit;
+- owner tracking sync `GET /v3/orders/{id}` khi đã có `MaVanDon`;
+- hardening Place Order bằng atomic claim `lalamove_placing`; nếu outcome của request không xác định thì chuyển `lalamove_place_unknown` và khóa auto-retry để tránh tạo hai vận đơn thật;
+- tracking không còn tự phát lại Place Order khi `MaVanDon` rỗng;
+- webhook cùng Lalamove order được serialize trong Node process trước duplicate/stale guard; nếu runtime scale nhiều writer thì phải nâng lên DB/distributed idempotency trước;
 - customer cancel gọi Lalamove trước, chỉ hủy KaitoKid/restore stock-coupon khi carrier cho phép;
 - shipping simulator loại trừ `NhaVanChuyen=lalamove`;
-- thêm contract test cho HMAC, quotation, Place Order, persistence, tracking, cancel, webhook và simulator guard;
+- thêm contract test cho HMAC, quotation, Place Order, persistence, tracking, cancel, webhook, duplicate-order guard và simulator guard;
 - quyết định chi tiết: `docs/decisions/D025-lalamove-shipment-lifecycle.md`.
 
 ## Gate còn mở
