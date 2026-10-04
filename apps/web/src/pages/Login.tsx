@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 
+import GoogleLoginButton from '../components/GoogleLoginButton.jsx';
 import MonkeyLoginForm from '../components/MonkeyLoginForm.jsx';
 import { useAuth } from '../context/AuthContext';
 import { useFocusTrap } from '../hooks/useFocusTrap';
@@ -55,18 +56,47 @@ async function getRecaptchaToken(action: string): Promise<string> {
   });
 }
 
+type GoogleIdentity = {
+  accounts: {
+    id: {
+      initialize: (config: {
+        client_id: string;
+        callback: (response: { credential: string }) => void;
+        ux_mode?: 'popup';
+        auto_select?: boolean;
+      }) => void;
+      renderButton: (
+        element: HTMLElement,
+        options: {
+          theme: string;
+          size: string;
+          width: number;
+          text: string;
+          shape: string;
+          logo_alignment: string;
+        },
+      ) => void;
+      prompt: () => void;
+    };
+  };
+};
+
 export default function Login() {
   const navigate = useNavigate();
   const { login } = useAuth();
   const pageRef = useRef<HTMLDivElement>(null);
+  const googleButtonRef = useRef<HTMLDivElement>(null);
   const twoFaDialogRef = useRef<HTMLDivElement>(null);
 
   const [loading, setLoading] = useState(false);
+  const [googleReady, setGoogleReady] = useState(false);
   const [twoFaState, setTwoFaState] = useState<{
     identifier: string;
     password: string;
   } | null>(null);
   const [twoFaCode, setTwoFaCode] = useState('');
+
+  const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined;
 
   useFocusTrap(twoFaDialogRef, !!twoFaState, () => setTwoFaState(null));
 
@@ -86,6 +116,74 @@ export default function Login() {
     submitButton.textContent = loading ? 'Đang xử lý...' : 'Submit';
     submitButton.setAttribute('aria-busy', loading ? 'true' : 'false');
   }, [loading]);
+
+  const handleGoogleCredential = useCallback(async (response: { credential: string }) => {
+    if (!response?.credential) return;
+
+    setLoading(true);
+    try {
+      const result = await authApi.loginWithGoogle(response.credential);
+      if (!result.success) {
+        toast.error(result.error || 'Đăng nhập Google thất bại');
+        return;
+      }
+
+      toast.success('Đăng nhập Google thành công');
+      window.location.href = '/';
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!googleClientId || !googleButtonRef.current) return;
+
+    let cancelled = false;
+    const w = window as unknown as { google?: GoogleIdentity };
+
+    const initGoogle = () => {
+      if (cancelled || !w.google?.accounts?.id || !googleButtonRef.current) return;
+
+      w.google.accounts.id.initialize({
+        client_id: googleClientId,
+        callback: handleGoogleCredential,
+        ux_mode: 'popup',
+        auto_select: false,
+      });
+
+      googleButtonRef.current.innerHTML = '';
+      w.google.accounts.id.renderButton(googleButtonRef.current, {
+        theme: 'outline',
+        size: 'large',
+        width: 320,
+        text: 'continue_with',
+        shape: 'rectangular',
+        logo_alignment: 'left',
+      });
+      setGoogleReady(true);
+    };
+
+    if (w.google?.accounts?.id) {
+      initGoogle();
+    } else {
+      const existing = document.querySelector<HTMLScriptElement>('script[data-gsi]');
+      if (existing) {
+        existing.addEventListener('load', initGoogle, { once: true });
+      } else {
+        const script = document.createElement('script');
+        script.src = 'https://accounts.google.com/gsi/client';
+        script.async = true;
+        script.defer = true;
+        script.dataset.gsi = '1';
+        script.onload = initGoogle;
+        document.head.appendChild(script);
+      }
+    }
+
+    return () => {
+      cancelled = true;
+    };
+  }, [googleClientId, handleGoogleCredential]);
 
   const handleLogin = async () => {
     if (loading) return;
@@ -168,6 +266,23 @@ export default function Login() {
     if (target.closest('.frg_pss a')) {
       event.preventDefault();
       navigate('/forgot-password');
+      return;
+    }
+
+    if (target.closest('.button')) {
+      event.preventDefault();
+      if (!googleClientId) {
+        toast.error('Google OAuth chưa được cấu hình.');
+        return;
+      }
+
+      if (!googleReady) {
+        toast('Google Sign-In đang tải...');
+        return;
+      }
+
+      const w = window as unknown as { google?: GoogleIdentity };
+      w.google?.accounts?.id.prompt();
     }
   };
 
@@ -184,13 +299,33 @@ export default function Login() {
       style={{
         minHeight: 'calc(100vh - 200px)',
         display: 'flex',
+        flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
+        gap: 16,
         padding: '48px 20px',
         background: '#f5f5f5',
       }}
     >
       <MonkeyLoginForm />
+
+      <div style={{ position: 'relative', display: 'inline-flex' }}>
+        <GoogleLoginButton />
+        {googleClientId && (
+          <div
+            ref={googleButtonRef}
+            aria-hidden="true"
+            style={{
+              position: 'absolute',
+              inset: 0,
+              zIndex: 2,
+              overflow: 'hidden',
+              opacity: 0,
+              pointerEvents: googleReady && !loading ? 'auto' : 'none',
+            }}
+          />
+        )}
+      </div>
 
       {twoFaState && (
         <div
