@@ -1,6 +1,6 @@
 import { Module } from "@nestjs/common";
-import { HardenedLalamoveShippingService } from "./lalamove-shipping-hardened.service.js";
 import { LalamoveShippingService } from "./lalamove-shipping.service.js";
+import { ReceiptAwareLalamoveShippingService } from "./lalamove-shipping-receipt-aware.service.js";
 import { ShippingController } from "./shipping.controller.js";
 import { ShippingService } from "./shipping.service.js";
 import { ShippingStatusSimulatorService } from "./shipping-status-simulator.service.js";
@@ -10,7 +10,7 @@ import { ShippingStatusSimulatorService } from "./shipping-status-simulator.serv
   providers: [
     {
       provide: LalamoveShippingService,
-      useClass: HardenedLalamoveShippingService,
+      useClass: ReceiptAwareLalamoveShippingService,
     },
     {
       provide: ShippingService,
