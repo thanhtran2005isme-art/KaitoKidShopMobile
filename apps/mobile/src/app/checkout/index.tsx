@@ -1150,8 +1150,8 @@ const styles = StyleSheet.create({
   selectedCard: {
     borderRadius: 18,
     borderWidth: 1.5,
-    borderColor: '#C4B5FD',
-    backgroundColor: '#FDFBFF',
+    borderColor: '#9CA3AF',
+    backgroundColor: '#F9FAFB',
     padding: 14,
     gap: 9,
   },
@@ -1194,7 +1194,7 @@ const styles = StyleSheet.create({
     minHeight: 44,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#DDD6FE',
+    borderColor: '#D1D5DB',
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 12,
@@ -1210,7 +1210,7 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     borderWidth: 1.5,
     borderStyle: 'dashed',
-    borderColor: '#C4B5FD',
+    borderColor: '#9CA3AF',
     backgroundColor: BRAND_COLORS.surface,
     alignItems: 'center',
     justifyContent: 'center',
@@ -1252,7 +1252,7 @@ const styles = StyleSheet.create({
   optionCardSelected: {
     borderWidth: 1.5,
     borderColor: BRAND_COLORS.primary,
-    backgroundColor: '#FDFBFF',
+    backgroundColor: '#F9FAFB',
   },
   radio: {
     width: 24,
@@ -1452,7 +1452,7 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
   submitHint: {
-    color: '#EDE9FE',
+    color: '#F3F4F6',
     fontSize: 11,
     lineHeight: 16,
   },
