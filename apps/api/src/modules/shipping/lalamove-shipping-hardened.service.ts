@@ -1,12 +1,25 @@
 import { Injectable, ServiceUnavailableException } from "@nestjs/common";
 import { PrismaService } from "../../database/prisma.service.js";
+import { lalamoveRequest } from "./lalamove.client.js";
 import { LalamoveShippingService } from "./lalamove-shipping.service.js";
+import { valueCaseInsensitive } from "./shipping.helpers.js";
 import { ShippingService } from "./shipping.service.js";
 
 interface ShipmentGuardRow {
   trackingCode: string | null;
   shippingStatus: string | null;
   shippingProvider: string | null;
+}
+
+interface TrackingStateRow {
+  shippingStatus: string | null;
+}
+
+interface TrackingCarrierConfig {
+  baseUrl: string;
+  market: string;
+  apiKey: string;
+  apiSecret: string;
 }
 
 function record(value: unknown): Record<string, unknown> {
@@ -17,6 +30,44 @@ function record(value: unknown): Record<string, unknown> {
 
 function text(value: unknown): string | null {
   return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function carrierMessage(value: unknown, fallback: string): string {
+  const body = record(value);
+  const errors = body.errors;
+  if (Array.isArray(errors)) {
+    for (const item of errors) {
+      const message = text(record(item).message);
+      if (message) return message;
+    }
+  }
+  return text(body.message) ?? text(record(errors).message) ?? fallback;
+}
+
+function mapCarrierStatusStrict(status: string) {
+  switch (status.toUpperCase()) {
+    case "ASSIGNING_DRIVER":
+      return {
+        shippingStatus: "ready_to_pick",
+        orderStatus: null as string | null,
+      };
+    case "ON_GOING":
+      return { shippingStatus: "lalamove_on_going", orderStatus: "confirmed" };
+    case "PICKED_UP":
+      return { shippingStatus: "delivering", orderStatus: "shipping" };
+    case "COMPLETED":
+      return { shippingStatus: "delivered", orderStatus: "completed" };
+    case "CANCELED":
+      return {
+        shippingStatus: "cancelled",
+        orderStatus: null as string | null,
+      };
+    case "REJECTED":
+    case "EXPIRED":
+      return { shippingStatus: "failed", orderStatus: null as string | null };
+    default:
+      return null;
+  }
 }
 
 /**
@@ -132,13 +183,20 @@ export class HardenedLalamoveShippingService extends LalamoveShippingService {
     );
     const current = rows[0];
 
-    if (
-      current?.shippingProvider?.toLowerCase() === "lalamove" &&
-      !current.trackingCode
-    ) {
-      // Bypass LalamoveShippingService.track(), which historically retried
-      // Place Order when MaVanDon was empty. An empty tracking code after an
-      // ambiguous request must never trigger a second POST /v3/orders.
+    if (current?.shippingProvider?.toLowerCase() === "lalamove") {
+      if (!current.trackingCode) {
+        // Never retry Place Order from tracking when the external id is empty.
+        return ShippingService.prototype.track.call(this, userId, orderCode);
+      }
+
+      // Known real Lalamove order: always synchronize carrier state before
+      // returning tracking data. Do not swallow carrier/auth/HTTP errors and
+      // silently return a stale PICKED_UP/delivering state.
+      await this.syncKnownLalamoveOrder(
+        current.trackingCode,
+        orderCode,
+        userId,
+      );
       return ShippingService.prototype.track.call(this, userId, orderCode);
     }
 
@@ -155,6 +213,143 @@ export class HardenedLalamoveShippingService extends LalamoveShippingService {
       externalOrderId,
       () => super.handleWebhook(body),
     );
+  }
+
+  private async syncKnownLalamoveOrder(
+    trackingCode: string,
+    orderCode: string,
+    userId: number,
+  ) {
+    const config = await this.loadTrackingCarrierConfig();
+    const response = await lalamoveRequest(
+      config,
+      "GET",
+      `/v3/orders/${encodeURIComponent(trackingCode)}`,
+    );
+    const payload = await this.readJson(response);
+
+    if (!response.ok) {
+      throw new ServiceUnavailableException(
+        `Không đồng bộ được trạng thái Lalamove (HTTP ${response.status}): ${carrierMessage(
+          payload,
+          "Lalamove Get Order Details thất bại.",
+        )}`,
+      );
+    }
+
+    const carrier = record(payload.data);
+    const rawStatus = text(carrier.status);
+    if (!rawStatus) {
+      throw new ServiceUnavailableException(
+        "Lalamove Get Order Details không trả trường status; từ chối trả trạng thái cũ.",
+      );
+    }
+
+    const mapped = mapCarrierStatusStrict(rawStatus);
+    if (!mapped) {
+      throw new ServiceUnavailableException(
+        `Lalamove trả trạng thái chưa được hỗ trợ: ${rawStatus}`,
+      );
+    }
+
+    const orderRows = await this.hardenedDb.$queryRawUnsafe<
+      Array<{ id: unknown; shippingStatus: string | null }>
+    >(
+      `SELECT Id AS id, TrangThaiVanChuyen AS shippingStatus
+       FROM DonHang
+       WHERE MaDonHang = ? AND NguoiDungId = ?
+         AND LOWER(COALESCE(NhaVanChuyen,'')) = 'lalamove'
+         AND MaVanDon = ?
+       LIMIT 1`,
+      orderCode,
+      userId,
+      trackingCode,
+    );
+    const order = orderRows[0];
+    if (!order) {
+      throw new ServiceUnavailableException(
+        "Không tìm thấy vận đơn Lalamove tương ứng để đồng bộ.",
+      );
+    }
+
+    const orderId = Number(order.id);
+    if (!Number.isFinite(orderId)) {
+      throw new ServiceUnavailableException("ID đơn hàng không hợp lệ khi đồng bộ Lalamove.");
+    }
+
+    await this.hardenedDb.$executeRawUnsafe(
+      `UPDATE DonHang
+       SET LinkTracking = COALESCE(?, LinkTracking),
+           TrangThaiVanChuyen = ?,
+           TrangThai = CASE
+             WHEN ? = 'completed' AND TrangThai <> 'cancelled' THEN 'completed'
+             WHEN ? = 'shipping' AND TrangThai <> 'cancelled' THEN 'shipping'
+             WHEN ? = 'confirmed' AND TrangThai = 'pending' THEN 'confirmed'
+             ELSE TrangThai
+           END,
+           NgayCapNhat = ?
+       WHERE Id = ?`,
+      text(carrier.shareLink),
+      mapped.shippingStatus,
+      mapped.orderStatus,
+      mapped.orderStatus,
+      mapped.orderStatus,
+      new Date(),
+      orderId,
+    );
+
+    if (mapped.shippingStatus !== (order.shippingStatus ?? null)) {
+      await this.appendHistory(
+        orderId,
+        mapped.shippingStatus,
+        `Đồng bộ Lalamove: ${rawStatus.toUpperCase()}`,
+        "Lalamove",
+      );
+    }
+  }
+
+  private async loadTrackingCarrierConfig(): Promise<TrackingCarrierConfig> {
+    const apiKey = process.env.LALAMOVE_API_KEY?.trim() ?? "";
+    const apiSecret = process.env.LALAMOVE_API_SECRET?.trim() ?? "";
+    if (!apiKey || !apiSecret) {
+      throw new ServiceUnavailableException(
+        "Backend thiếu LALAMOVE_API_KEY/LALAMOVE_API_SECRET để đồng bộ tracking.",
+      );
+    }
+
+    const rows = await this.hardenedDb.$queryRawUnsafe<Array<{ value: string }>>(
+      `SELECT GiaTri AS value FROM CauHinhCuaHang
+       WHERE NhomCauHinh = 'shipping' AND MaCauHinh = 'config' LIMIT 1`,
+    );
+    let raw: Record<string, unknown> = {};
+    try {
+      raw = rows[0]?.value ? record(JSON.parse(rows[0].value)) : {};
+    } catch {
+      raw = {};
+    }
+
+    return {
+      baseUrl:
+        text(valueCaseInsensitive(raw, "LalamoveBaseUrl"))
+        ?? process.env.LALAMOVE_BASE_URL?.trim()
+        ?? "https://rest.sandbox.lalamove.com",
+      market:
+        text(valueCaseInsensitive(raw, "LalamoveMarket"))
+        ?? process.env.LALAMOVE_MARKET?.trim()
+        ?? "VN",
+      apiKey,
+      apiSecret,
+    };
+  }
+
+  private async readJson(response: Response): Promise<Record<string, unknown>> {
+    const body = await response.text();
+    if (!body) return {};
+    try {
+      return record(JSON.parse(body));
+    } catch {
+      return { message: body.slice(0, 500) };
+    }
   }
 
   private async withWebhookQueue<T>(
