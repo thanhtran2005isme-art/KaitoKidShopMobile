@@ -78,6 +78,14 @@ export default tseslint.config(
     },
   },
 
+  // Mẫu UI do người dùng cung cấp được giữ nguyên, kể cả import React kiểu classic.
+  {
+    files: ['src/components/MonkeyLoginForm.jsx'],
+    rules: {
+      'no-unused-vars': 'off',
+    },
+  },
+
   // 4) Service Worker globals
   {
     files: ['**/*.sw.{js,ts}', 'public/sw.js'],
