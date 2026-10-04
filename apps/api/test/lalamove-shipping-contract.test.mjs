@@ -74,15 +74,23 @@ test("Place Order is claimed atomically and ambiguous outcomes fail closed", () 
   assert.match(hardenedSource, /khóa auto-retry để tránh tạo trùng vận đơn/);
 });
 
-test("tracking syncs known Lalamove orders but never retries an ambiguous empty tracking code", () => {
-  assert.match(
-    lifecycleSource,
-    /`\/v3\/orders\/\$\{encodeURIComponent\(externalOrderId\)\}`/,
-  );
-  assert.match(lifecycleSource, /syncLalamoveOrder/);
-  assert.match(hardenedSource, /!current\.trackingCode/);
+test("tracking strictly refreshes a known Lalamove order and never retries an empty tracking code", () => {
+  assert.match(hardenedSource, /if \(!current\.trackingCode\)/);
   assert.match(hardenedSource, /ShippingService\.prototype\.track\.call/);
-  assert.match(hardenedSource, /must never trigger a second POST \/v3\/orders/);
+  assert.match(hardenedSource, /syncKnownLalamoveOrder/);
+  assert.match(
+    hardenedSource,
+    /`\/v3\/orders\/\$\{encodeURIComponent\(trackingCode\)\}`/,
+  );
+  assert.match(hardenedSource, /if \(!response\.ok\)/);
+  assert.match(hardenedSource, /Get Order Details không trả trường status/);
+  assert.match(hardenedSource, /case "COMPLETED"/);
+  assert.match(hardenedSource, /shippingStatus: "delivered", orderStatus: "completed"/);
+  assert.match(hardenedSource, /Đồng bộ Lalamove: \$\{rawStatus\.toUpperCase\(\)\}/);
+  assert.doesNotMatch(
+    hardenedSource,
+    /syncKnownLalamoveOrder\([\s\S]*?\)\.catch\(\(\) => undefined\)/,
+  );
 });
 
 test("customer cancel asks Lalamove first and propagates forbidden cancellation", () => {
