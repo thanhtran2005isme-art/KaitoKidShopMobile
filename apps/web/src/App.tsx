@@ -89,10 +89,12 @@ function App() {
         <StaffAuthProvider>
           <BrowserRouter>
           <Routes>
+            {/* Login customer là auth screen toàn màn hình, không dùng Header/Footer */}
+            <Route path="/login" element={<Login />} />
+
             {/* Trang khách hàng - dùng chung Header + Footer */}
             <Route element={<MainLayout />}>
               <Route path="/" element={<Home />} />
-              <Route path="/login" element={<Login />} />
               <Route path="/forgot-password" element={<ForgotPassword />} />
               <Route path="/reset-password" element={<ResetPassword />} />
               <Route path="/verify-email" element={<VerifyEmail />} />
