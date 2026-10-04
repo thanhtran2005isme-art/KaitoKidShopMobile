@@ -20,10 +20,23 @@ The page follows the user-provided Auth UI sample:
 - `/login` is outside `MainLayout` so Header/Footer do not break the full-screen composition.
 - Sign in continues to use `AuthContext.login` and the Node Auth API.
 - Sign up continues to use the real pending-registration/email-verification flow.
-- Google continues through Google Identity Services + `authApi.loginWithGoogle`.
+- Google uses Google Identity Services in Vite Web to obtain an **ID token**; Web never treats Google profile data as a KaitoKid session by itself.
+- Google ID token is posted to Node `POST /api/Auth/google`; backend verifies token audience/expiry and is the trust boundary before issuing KaitoKid JWT.
+- Vite Web uses `VITE_GOOGLE_CLIENT_ID` when provided; otherwise it uses the same committed default Google Web Client ID as Mobile and Node API.
+- Customer auth defaults to Node `http://localhost:5300`; do not restore legacy auth fallbacks to `:5053` or other retired C# ports.
 - Existing reCAPTCHA and 2FA behavior remains functional.
 - Email/phone identifier login is preserved even though the visual reference labels the field as Email.
 - No fake auth data and no local commerce/auth source of truth is introduced.
+
+## Google local-development requirement
+
+The OAuth Web Client in Google Cloud must allow the exact browser origin. For the normal Vite workflow add at least:
+
+```text
+http://localhost:5173
+```
+
+If development uses `127.0.0.1`, another port, or production domain, that exact origin must also be registered in Google Cloud.
 
 ## Responsive/accessibility
 
