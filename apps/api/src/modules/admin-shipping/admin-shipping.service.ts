@@ -1,3 +1,4 @@
+import { createHmac, randomUUID } from "node:crypto";
 import { Injectable } from "@nestjs/common";
 import { PrismaService } from "../../database/prisma.service.js";
 import { toNumber } from "../../common/db-value.js";
@@ -43,10 +44,13 @@ export class AdminShippingService {
 
   async getConfig(maskSecrets = true) {
     const raw = await this.rawConfig();
+    const lalamoveApiKey = process.env.LALAMOVE_API_KEY?.trim() ?? "";
+    const lalamoveApiSecret = process.env.LALAMOVE_API_SECRET?.trim() ?? "";
     const result = {
       mockEnabled: bool(raw, "MockEnabled", true),
       ghnEnabled: bool(raw, "GhnEnabled", true),
       ghtkEnabled: bool(raw, "GhtkEnabled", true),
+      lalamoveEnabled: bool(raw, "LalamoveEnabled", false),
       ghnBaseUrl:
         str(raw, "GhnBaseUrl") ||
         process.env.GHN_BASE_URL ||
@@ -81,6 +85,14 @@ export class AdminShippingService {
         str(raw, "GhtkPickDistrict") ||
         process.env.GHTK_PICK_DISTRICT ||
         "",
+      lalamoveBaseUrl:
+        str(raw, "LalamoveBaseUrl") ||
+        process.env.LALAMOVE_BASE_URL ||
+        "https://rest.sandbox.lalamove.com",
+      lalamoveMarket:
+        str(raw, "LalamoveMarket") || process.env.LALAMOVE_MARKET || "VN",
+      lalamoveApiKeyConfigured: Boolean(lalamoveApiKey),
+      lalamoveApiSecretConfigured: Boolean(lalamoveApiSecret),
       kaitoKidBranches: Array.isArray(ci(raw, "KaitoKidBranches"))
         ? ci(raw, "KaitoKidBranches")
         : [],
@@ -110,9 +122,19 @@ export class AdminShippingService {
 
   async updateConfig(input: Record<string, unknown>) {
     const current = await this.getConfig(false);
+    const {
+      lalamoveApiKeyConfigured: _lalamoveApiKeyConfigured,
+      lalamoveApiSecretConfigured: _lalamoveApiSecretConfigured,
+      ...currentPersisted
+    } = current;
+    const {
+      lalamoveApiKeyConfigured: _inputLalamoveApiKeyConfigured,
+      lalamoveApiSecretConfigured: _inputLalamoveApiSecretConfigured,
+      ...safeInput
+    } = input;
     const next = {
-      ...current,
-      ...input,
+      ...currentPersisted,
+      ...safeInput,
       ghnToken: this.keepSecret(input.ghnToken, current.ghnToken),
       ghtkToken: this.keepSecret(input.ghtkToken, current.ghtkToken),
     };
@@ -220,6 +242,61 @@ export class AdminShippingService {
           status: 200,
           message: "GHTK OK",
           baseUrl: cfg.ghtkBaseUrl,
+        };
+      } catch (error) {
+        return {
+          ok: false,
+          message: error instanceof Error ? error.message : String(error),
+        };
+      }
+    }
+    if (provider === "lalamove") {
+      const apiKey = process.env.LALAMOVE_API_KEY?.trim() ?? "";
+      const apiSecret = process.env.LALAMOVE_API_SECRET?.trim() ?? "";
+      if (!apiKey || !apiSecret) {
+        return {
+          ok: false,
+          badRequest: true,
+          message:
+            "Chưa cấu hình LALAMOVE_API_KEY/LALAMOVE_API_SECRET trong môi trường backend.",
+        };
+      }
+      try {
+        const base = cfg.lalamoveBaseUrl.replace(/\/+$/, "");
+        const path = "/v3/cities";
+        const timestamp = Date.now().toString();
+        const rawSignature = `${timestamp}\r\nGET\r\n${path}\r\n\r\n`;
+        const signature = createHmac("sha256", apiSecret)
+          .update(rawSignature)
+          .digest("hex");
+        const response = await fetch(`${base}${path}`, {
+          headers: {
+            Authorization: `hmac ${apiKey}:${timestamp}:${signature}`,
+            Market: cfg.lalamoveMarket,
+            "Request-ID": randomUUID(),
+          },
+          signal: AbortSignal.timeout(15_000),
+        });
+        const text = await response.text();
+        if (!response.ok) {
+          return {
+            ok: false,
+            status: response.status,
+            message: text,
+          };
+        }
+        let count = 0;
+        try {
+          const parsed = JSON.parse(text);
+          count = Array.isArray(parsed?.data) ? parsed.data.length : 0;
+        } catch {
+          count = 0;
+        }
+        return {
+          ok: true,
+          status: 200,
+          message: `Lalamove OK — ${count} khu vực cho market ${cfg.lalamoveMarket}`,
+          baseUrl: cfg.lalamoveBaseUrl,
         };
       } catch (error) {
         return {
