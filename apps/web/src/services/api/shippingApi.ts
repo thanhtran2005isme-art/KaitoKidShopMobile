@@ -9,7 +9,7 @@ export interface ShippingProvider {
 }
 
 export interface ShippingQuoteRequest {
-  provider?: 'mock' | 'ghtk' | 'ghn' | 'all';
+  provider?: 'mock' | 'ghtk' | 'ghn' | 'lalamove' | 'all';
   toProvince: string;
   toDistrict: string;
   toWard?: string;
