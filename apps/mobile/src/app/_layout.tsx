@@ -7,6 +7,7 @@ import { AuthProvider } from '@/context/AuthContext';
 import { CheckoutProvider } from '@/context/CheckoutContext';
 import { NotificationsProvider } from '@/context/NotificationsContext';
 import { ShoppingProvider } from '@/context/ShoppingContext';
+import { releaseWebFocus } from '@/utils/web-focus';
 import { installWebWarningFilter } from '@/utils/web-warning-filter';
 
 installWebWarningFilter();
@@ -22,28 +23,30 @@ export default function RootLayout() {
           <CheckoutProvider>
             <ThemeProvider
               value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-              <Stack screenOptions={{ headerShown: false }}>
-              <Stack.Screen name="(tabs)" />
-              <Stack.Screen name="product/[slug]" />
-              <Stack.Screen name="wishlist" />
-              <Stack.Screen name="search" />
-              <Stack.Screen name="checkout/index" />
-              <Stack.Screen name="checkout/address" />
-              <Stack.Screen name="checkout/payment" />
-              <Stack.Screen name="order-success/[orderCode]" />
-              <Stack.Screen name="orders/index" />
-              <Stack.Screen name="orders/[id]" />
-              <Stack.Screen name="orders/[id]/tracking" />
-              <Stack.Screen name="review/create" />
-              <Stack.Screen name="notifications" />
-              <Stack.Screen name="collections/index" />
-              <Stack.Screen name="collections/[id]" />
-              <Stack.Screen name="lookbooks/index" />
-              <Stack.Screen name="lookbooks/[id]" />
-              <Stack.Screen name="account/profile" />
-              <Stack.Screen name="account/points" />
-              <Stack.Screen name="account/vouchers" />
-              <Stack.Screen name="account/delete" />
+              <Stack
+                screenListeners={{ transitionStart: releaseWebFocus }}
+                screenOptions={{ headerShown: false }}>
+                <Stack.Screen name="(tabs)" />
+                <Stack.Screen name="product/[slug]" />
+                <Stack.Screen name="wishlist" />
+                <Stack.Screen name="search" />
+                <Stack.Screen name="checkout/index" />
+                <Stack.Screen name="checkout/address" />
+                <Stack.Screen name="checkout/payment" />
+                <Stack.Screen name="order-success/[orderCode]" />
+                <Stack.Screen name="orders/index" />
+                <Stack.Screen name="orders/[id]" />
+                <Stack.Screen name="orders/[id]/tracking" />
+                <Stack.Screen name="review/create" />
+                <Stack.Screen name="notifications" />
+                <Stack.Screen name="collections/index" />
+                <Stack.Screen name="collections/[id]" />
+                <Stack.Screen name="lookbooks/index" />
+                <Stack.Screen name="lookbooks/[id]" />
+                <Stack.Screen name="account/profile" />
+                <Stack.Screen name="account/points" />
+                <Stack.Screen name="account/vouchers" />
+                <Stack.Screen name="account/delete" />
               </Stack>
               <AnimatedSplashOverlay />
             </ThemeProvider>
