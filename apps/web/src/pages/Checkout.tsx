@@ -26,6 +26,7 @@ import OrderCompleted from '../components/checkout/OrderCompleted';
 import { EMPTY_ADDRESS_FORM, type BankAccount, type CheckoutAddressForm } from '../components/checkout/types';
 
 type PaymentMethod = 'atm' | 'cod';
+type ShippingProviderCode = 'mock' | 'ghn' | 'ghtk' | 'lalamove' | 'all';
 
 export default function Checkout() {
   const { cart, subtotal, clearCart } = useCart();
@@ -50,7 +51,7 @@ export default function Checkout() {
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
 
   // Shipping
-  const [shippingProvider, setShippingProvider] = useState<'mock' | 'ghn' | 'ghtk' | 'all'>('all');
+  const [shippingProvider, setShippingProvider] = useState<ShippingProviderCode>('all');
   const [shippingOptions, setShippingOptions] = useState<ShippingQuoteOption[]>([]);
   const [selectedShipping, setSelectedShipping] = useState<ShippingQuoteOption | null>(null);
   const [shippingLoading, setShippingLoading] = useState(false);
