@@ -80,7 +80,10 @@ export default tseslint.config(
 
   // Mẫu UI do người dùng cung cấp được giữ nguyên, kể cả import React kiểu classic.
   {
-    files: ['src/components/MonkeyLoginForm.jsx'],
+    files: [
+      'src/components/MonkeyLoginForm.jsx',
+      'src/components/GoogleLoginButton.jsx',
+    ],
     rules: {
       'no-unused-vars': 'off',
     },
