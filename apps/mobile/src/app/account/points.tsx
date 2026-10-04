@@ -412,7 +412,7 @@ const styles = StyleSheet.create({
   },
   balanceTier: {
     marginTop: 4,
-    color: '#C4B5FD',
+    color: '#D1D5DB',
     fontSize: 9,
     fontWeight: '800',
   },
