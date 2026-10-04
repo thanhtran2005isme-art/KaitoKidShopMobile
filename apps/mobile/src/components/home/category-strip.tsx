@@ -8,7 +8,7 @@ import { resolveMediaUrl } from '@/services/api-client';
 import type { Category, Product } from '@/types/shop';
 import { releaseWebFocus } from '@/utils/web-focus';
 
-const NEUTRAL_BACKGROUNDS = ['#F4F4F5', '#E4E4E7', '#F5F5F5', '#E5E7EB'];
+const PASTELS = ['#EDE9FE', '#DBEAFE', '#FEF3C7', '#FCE7F3', '#DCFCE7', '#FFE4E6'];
 
 function normalizeCategoryText(value?: string | null) {
   return (value || '')
@@ -103,7 +103,7 @@ export function CategoryStrip({
               accessibilityRole="button"
               onPress={() => openCategory(item)}
               style={({ pressed }) => [styles.item, pressed && styles.pressed]}>
-              <View style={[styles.imageWrap, { backgroundColor: NEUTRAL_BACKGROUNDS[index % NEUTRAL_BACKGROUNDS.length] }]}>
+              <View style={[styles.imageWrap, { backgroundColor: PASTELS[index % PASTELS.length] }]}>
                 {image ? (
                   <Image
                     accessibilityLabel={`Ảnh đại diện danh mục ${item.name}`}
@@ -115,7 +115,7 @@ export function CategoryStrip({
                   />
                 ) : (
                   <View accessibilityLabel={`${item.name} chưa có ảnh đại diện`} style={styles.missingMedia}>
-                    <AppIcon color={BRAND_COLORS.ink} name="image" size={26} />
+                    <AppIcon color={BRAND_COLORS.primaryDark} name="image" size={26} />
                   </View>
                 )}
               </View>

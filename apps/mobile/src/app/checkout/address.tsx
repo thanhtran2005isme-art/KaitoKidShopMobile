@@ -639,7 +639,7 @@ export default function CheckoutAddressScreen() {
                   value={form.isDefault}
                   trackColor={{
                     false: '#D1D5DB',
-                    true: '#C4B5FD',
+                    true: '#9CA3AF',
                   }}
                   thumbColor={
                     form.isDefault
@@ -804,7 +804,7 @@ const styles = StyleSheet.create({
   addressCardSelected: {
     borderWidth: 1.5,
     borderColor: BRAND_COLORS.primary,
-    backgroundColor: '#FDFBFF',
+    backgroundColor: '#F9FAFB',
   },
   addressMain: {
     minHeight: 100,
@@ -914,8 +914,8 @@ const styles = StyleSheet.create({
     borderRadius: 17,
     borderWidth: 1.5,
     borderStyle: 'dashed',
-    borderColor: '#C4B5FD',
-    backgroundColor: '#FDFBFF',
+    borderColor: '#9CA3AF',
+    backgroundColor: '#F9FAFB',
     alignItems: 'center',
     justifyContent: 'center',
   },

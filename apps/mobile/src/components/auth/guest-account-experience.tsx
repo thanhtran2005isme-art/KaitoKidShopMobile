@@ -30,15 +30,15 @@ const BENEFITS: {
     icon: 'heart',
     title: 'Đồng bộ yêu thích',
     description: 'Lưu lại sản phẩm bạn quan tâm và quay lại bất cứ lúc nào.',
-    background: '#F3F4F6',
-    color: '#111111',
+    background: '#FCE7F3',
+    color: '#BE185D',
   },
   {
     icon: 'gift',
     title: 'Điểm & voucher',
     description: 'Theo dõi quyền lợi thành viên và voucher đang sử dụng.',
-    background: '#F3F4F6',
-    color: '#111111',
+    background: '#FFF7ED',
+    color: '#C2410C',
   },
 ];
 
@@ -129,7 +129,7 @@ export function GuestAccountExperience({
           <View style={styles.trustRow}>
             <View style={styles.trustIcon}>
               <AppIcon
-                color={BRAND_COLORS.ink}
+                color={BRAND_COLORS.success}
                 name="shield"
                 size={18}
               />
@@ -257,7 +257,7 @@ const styles = StyleSheet.create({
   },
   trustRow: {
     borderRadius: 18,
-    backgroundColor: '#F3F4F6',
+    backgroundColor: '#F0FDF4',
     padding: 12,
     flexDirection: 'row',
     alignItems: 'center',
@@ -267,13 +267,13 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 12,
-    backgroundColor: '#E5E7EB',
+    backgroundColor: '#DCFCE7',
     alignItems: 'center',
     justifyContent: 'center',
   },
   trustText: {
     flex: 1,
-    color: '#374151',
+    color: '#166534',
     fontSize: 11,
     lineHeight: 16,
     fontWeight: '700',

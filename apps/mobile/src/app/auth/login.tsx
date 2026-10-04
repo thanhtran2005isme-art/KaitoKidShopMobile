@@ -47,7 +47,7 @@ const LOGIN_COLORS = {
   border: '#1F2937',
   text: '#F3F4F6',
   muted: '#9CA3AF',
-  accent: '#A78BFA',
+  accent: '#FFFFFF',
   success: '#86EFAC',
   successBackground: '#13251D',
   successBorder: '#1F5135',

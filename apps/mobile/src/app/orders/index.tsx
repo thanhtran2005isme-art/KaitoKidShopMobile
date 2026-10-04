@@ -438,7 +438,7 @@ const styles = StyleSheet.create({
     gap: 7,
   },
   filterChipActive: {
-    borderColor: '#A1A1AA',
+    borderColor: '#9CA3AF',
     backgroundColor: BRAND_COLORS.primarySoft,
   },
   filterText: {

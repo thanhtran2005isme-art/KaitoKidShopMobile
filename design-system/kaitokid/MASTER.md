@@ -9,16 +9,12 @@ Generated/synthesized from `skill/.codex/skills/ui-ux-pro-max/` before the UI re
 - Style intent: modern, clean, youthful, practical fashion, moderate premium, easy to shop, not AI-looking, not decorative-heavy.
 - Surfaces: Expo React Native Mobile + React/Vite Web.
 
-## Active surface override
-
-For `apps/mobile` only, `design-system/kaitokid/pages/mobile-monochrome.md` overrides the palette rules below: Mobile/Expo chrome is black/white/neutral gray. `apps/web` keeps the global brand palette in this Master file.
-
 ## Skill result and project override
 
 The skill classifies the product as **E-commerce** with a **Feature-Rich Showcase** conversion pattern. Generic e-commerce reasoning suggests Vibrant & Block-based styling, success green and urgency orange. KaitoKid's durable brand rules override generic palette/style choices:
 
-- Keep existing brand purple as the primary action/focus color on Web; Mobile follows the monochrome override above.
-- Keep orange only as a controlled accent on Web, not a page-wide dominant color.
+- Keep existing brand purple as the primary action/focus color.
+- Keep orange only as a controlled accent, not a page-wide dominant color.
 - Product photography is the strongest visual element; UI chrome stays neutral.
 - Use the clarity, whitespace, grid discipline and restrained motion of **Minimalism & Swiss Style** instead of neon/vibrant block styling.
 - Moderate premium comes from image quality, typography, rhythm and restraint — not gold, glassmorphism, neon or AI purple/pink gradients.
@@ -37,7 +33,7 @@ The skill classifies the product as **E-commerce** with a **Feature-Rich Showcas
 
 ## Color tokens
 
-Global/Web KaitoKid brand tokens remain:
+Existing KaitoKid brand tokens remain source of truth:
 
 - Primary: `#7C3AED`
 - Primary dark: `#5B21B6`
@@ -52,7 +48,7 @@ Global/Web KaitoKid brand tokens remain:
 - Success: `#047857`
 - Danger: `#DC2626`
 
-Usage rules on Web:
+Usage rules:
 
 - Purple = primary action, selected state, link/focus.
 - Orange = small merchandising accent only.
@@ -60,8 +56,6 @@ Usage rules on Web:
 - Red = destructive/error/discount only.
 - Neutral surfaces should dominate the viewport.
 - Never use color alone to communicate state; pair with text/icon.
-
-For Mobile/Expo, use the monochrome override instead of the purple/orange chrome rules.
 
 ## Typography
 
@@ -110,8 +104,7 @@ Mobile horizontal page gutter: 16px. Web container should use a consistent max w
 ## Buttons
 
 Primary:
-- Web: purple background, white label.
-- Mobile: black background, white label per monochrome override.
+- Purple background, white label.
 - 44px+ touch height on Mobile.
 - Clear pressed/focus/loading/disabled states.
 
@@ -157,7 +150,7 @@ Size selection, quantity and full Add-to-Cart belong to Product Detail unless a 
 ## Navigation
 
 - Preserve current information architecture and business routes.
-- Active state uses the surface's primary token + text/icon, not color alone; on Mobile this is black/neutral, on Web it remains purple.
+- Active state uses purple + text/icon, not color alone.
 - Mobile bottom navigation keeps 44px+ interactive targets and safe-area spacing.
 - Web navigation gets visible keyboard focus and stable hover feedback.
 

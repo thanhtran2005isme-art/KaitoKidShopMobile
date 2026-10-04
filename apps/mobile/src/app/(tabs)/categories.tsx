@@ -30,7 +30,7 @@ const COLORS = {
   surface: BRAND_COLORS.surface,
   ink: BRAND_COLORS.ink,
   dark: '#111111',
-  darkSoft: '#27272A',
+  darkSoft: '#374151',
   secondary: '#4B5563',
   muted: BRAND_COLORS.muted,
   line: BRAND_COLORS.line,
@@ -648,13 +648,13 @@ export default function CategoriesScreen() {
 
   const listHeader = (
     <View style={styles.listHeader}>
-      <LinearGradient colors={['#09090B', '#18181B', '#27272A']} style={styles.catalogHero}>
+      <LinearGradient colors={['#000000', '#111111', '#1F2937']} style={styles.catalogHero}>
         <View pointerEvents="none" style={styles.heroGlowPink} />
         <View pointerEvents="none" style={styles.heroGlowWhite} />
 
         <View style={styles.catalogHeroTop}>
           <View style={styles.catalogHeroIcon}>
-            <AppIcon color={COLORS.white} name="sparkles" size={22} />
+            <AppIcon color={COLORS.accent} name="sparkles" size={22} />
           </View>
           <View style={styles.catalogHeroCopy}>
             <Text style={styles.heroEyebrow}>KAITOKID / DANH MỤC</Text>
@@ -924,7 +924,7 @@ const styles = StyleSheet.create({
     width: 190,
     height: 190,
     borderRadius: 95,
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    backgroundColor: 'rgba(249,115,22,0.24)',
     right: -62,
     top: -92,
   },
@@ -958,7 +958,7 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   heroEyebrow: {
-    color: '#E5E7EB',
+    color: '#FDBA74',
     fontSize: 9,
     lineHeight: 13,
     fontWeight: '900',
@@ -1157,7 +1157,7 @@ const styles = StyleSheet.create({
   },
   subcategoryChipActive: {
     backgroundColor: COLORS.accentSoft,
-    borderColor: '#A1A1AA',
+    borderColor: '#9CA3AF',
   },
   subcategoryChipText: {
     color: COLORS.ink,

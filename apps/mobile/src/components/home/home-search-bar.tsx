@@ -41,13 +41,13 @@ export function HomeSearchBar() {
       <View pointerEvents="none" style={[styles.glow, styles.rightGlow, focused && styles.focusedGlow]} />
 
       <LinearGradient
-        colors={['#52525B', '#0A0A0A', '#0A0A0A', '#A1A1AA']}
+        colors={['#6B7280', '#111111', '#111111', '#D1D5DB']}
         end={{ x: 1, y: 0.65 }}
         start={{ x: 0, y: 0.35 }}
         style={styles.border}>
         <View style={styles.main}>
           <View pointerEvents="none" style={styles.searchIcon}>
-            <AppIcon color="#D4D4D8" name="search" size={24} />
+            <AppIcon color="#D1D5DB" name="search" size={24} />
           </View>
 
           <TextInput
@@ -58,7 +58,7 @@ export function HomeSearchBar() {
             onFocus={() => setFocused(true)}
             onSubmitEditing={submitSearch}
             placeholder="Tìm kiếm..."
-            placeholderTextColor="#A1A1AA"
+            placeholderTextColor="#9CA3AF"
             returnKeyType="search"
             selectionColor="#FFFFFF"
             style={styles.input}
@@ -68,7 +68,7 @@ export function HomeSearchBar() {
           <View pointerEvents="none" style={styles.filterBorder}>
             <Animated.View style={[styles.filterRotor, { transform: [{ rotate: filterRotation }] }]}>
               <LinearGradient
-                colors={['rgba(0,0,0,0)', '#71717A', 'rgba(0,0,0,0)', '#D4D4D8', 'rgba(0,0,0,0)']}
+                colors={['rgba(0,0,0,0)', '#6B7280', 'rgba(0,0,0,0)', '#D1D5DB', 'rgba(0,0,0,0)']}
                 end={{ x: 1, y: 1 }}
                 start={{ x: 0, y: 0 }}
                 style={StyleSheet.absoluteFill}
@@ -77,7 +77,7 @@ export function HomeSearchBar() {
           </View>
 
           <LinearGradient
-            colors={['#18181B', '#000000', '#27272A']}
+            colors={['#1F2937', '#000000', '#111827']}
             end={{ x: 0.5, y: 1 }}
             start={{ x: 0.5, y: 0 }}
             style={styles.filterFrame}>
@@ -86,7 +86,7 @@ export function HomeSearchBar() {
               accessibilityRole="button"
               onPress={() => router.push('/categories')}
               style={({ pressed }) => [styles.filterButton, pressed && styles.pressed]}>
-              <AppIcon color="#F4F4F5" name="filter" size={27} />
+              <AppIcon color="#F3F4F6" name="filter" size={27} />
             </Pressable>
           </LinearGradient>
         </View>
@@ -97,26 +97,26 @@ export function HomeSearchBar() {
 
 const styles = StyleSheet.create({
   stage: { height: 70, position: 'relative', alignItems: 'center', justifyContent: 'center', overflow: 'visible' },
-  glow: { position: 'absolute', top: 7, width: 92, height: 56, borderRadius: 18, opacity: 0.52 },
+  glow: { position: 'absolute', top: 7, width: 92, height: 56, borderRadius: 18, opacity: 0.5 },
   leftGlow: {
     left: -4,
-    backgroundColor: 'rgba(0,0,0,0.10)',
-    shadowColor: '#000000',
+    backgroundColor: 'rgba(17,24,39,0.10)',
+    shadowColor: '#111827',
     shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.45,
+    shadowOpacity: 0.55,
     shadowRadius: 18,
-    elevation: 9,
+    elevation: 7,
   },
   rightGlow: {
     right: -4,
-    backgroundColor: 'rgba(255,255,255,0.10)',
-    shadowColor: '#52525B',
+    backgroundColor: 'rgba(209,213,219,0.12)',
+    shadowColor: '#9CA3AF',
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.45,
     shadowRadius: 18,
-    elevation: 9,
+    elevation: 7,
   },
-  focusedGlow: { opacity: 0.8 },
+  focusedGlow: { opacity: 0.78 },
   border: { position: 'absolute', left: 5, right: 5, height: 60, borderRadius: 12, padding: 2 },
   main: { flex: 1, borderRadius: 10, backgroundColor: '#010201', overflow: 'hidden', position: 'relative' },
   input: {
@@ -142,9 +142,9 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: 'rgba(161,161,170,0.78)',
+    borderColor: 'rgba(156,163,175,0.72)',
     zIndex: 3,
-    shadowColor: '#000000',
+    shadowColor: '#111827',
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.35,
     shadowRadius: 6,

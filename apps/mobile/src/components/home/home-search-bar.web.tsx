@@ -32,32 +32,13 @@ const WEB_SEARCH_CSS = `
   pointer-events: none;
 }
 .kks-glow {
-  width: calc(100% + 40px);
-  height: 70px;
-  left: -20px;
-  top: 0;
-  filter: blur(30px);
+  width: calc(100% + 28px);
+  height: 68px;
+  left: -14px;
+  top: 1px;
+  filter: blur(24px);
   opacity: .28;
-}
-.kks-glow::before {
-  content: '';
-  z-index: -2;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%) rotate(60deg);
-  position: absolute;
-  width: 999px;
-  height: 999px;
-  background-image: conic-gradient(
-    #000 0%,
-    #52525b 5%,
-    #000 38%,
-    #000 50%,
-    #a1a1aa 60%,
-    #000 87%,
-    #000 100%
-  );
-  transition: all 2s;
+  background: linear-gradient(90deg, rgba(17,17,17,.5), rgba(209,213,219,.6));
 }
 .kks-dark-border-bg {
   width: calc(100% - 2px);
@@ -65,26 +46,7 @@ const WEB_SEARCH_CSS = `
   top: 2.5px;
   border-radius: 12px;
   filter: blur(3px);
-}
-.kks-dark-border-bg::before {
-  content: '';
-  z-index: -2;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%) rotate(82deg);
-  position: absolute;
-  width: 600px;
-  height: 600px;
-  background-image: conic-gradient(
-    rgba(0,0,0,0) 0%,
-    #3f3f46 5%,
-    rgba(0,0,0,0) 10%,
-    rgba(0,0,0,0) 50%,
-    #71717a 56%,
-    rgba(0,0,0,0) 60%,
-    rgba(0,0,0,0) 100%
-  );
-  transition: all 2s;
+  background: linear-gradient(90deg, #111111, #6b7280, #111111);
 }
 .kks-white {
   width: calc(100% - 7px);
@@ -92,27 +54,7 @@ const WEB_SEARCH_CSS = `
   top: 3.5px;
   border-radius: 10px;
   filter: blur(2px);
-}
-.kks-white::before {
-  content: '';
-  z-index: -2;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%) rotate(83deg);
-  position: absolute;
-  width: 600px;
-  height: 600px;
-  filter: brightness(1.3);
-  background-image: conic-gradient(
-    rgba(0,0,0,0) 0%,
-    #d4d4d8 4%,
-    rgba(0,0,0,0) 8%,
-    rgba(0,0,0,0) 50%,
-    #ffffff 54%,
-    rgba(0,0,0,0) 58%,
-    rgba(0,0,0,0) 100%
-  );
-  transition: all 2s;
+  background: linear-gradient(90deg, #d1d5db, #ffffff, #9ca3af);
 }
 .kks-border {
   width: calc(100% - 11px);
@@ -120,55 +62,7 @@ const WEB_SEARCH_CSS = `
   top: 5.5px;
   border-radius: 11px;
   filter: blur(.5px);
-}
-.kks-border::before {
-  content: '';
-  z-index: -2;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%) rotate(70deg);
-  position: absolute;
-  width: 600px;
-  height: 600px;
-  filter: brightness(1.2);
-  background-image: conic-gradient(
-    #18181b 0%,
-    #52525b 5%,
-    #18181b 14%,
-    #18181b 50%,
-    #a1a1aa 60%,
-    #18181b 64%,
-    #18181b 100%
-  );
-  transition: all 2s;
-}
-.kks-poda:hover > .kks-dark-border-bg::before {
-  transform: translate(-50%, -50%) rotate(-98deg);
-}
-.kks-poda:hover > .kks-glow::before {
-  transform: translate(-50%, -50%) rotate(-120deg);
-}
-.kks-poda:hover > .kks-white::before {
-  transform: translate(-50%, -50%) rotate(-97deg);
-}
-.kks-poda:hover > .kks-border::before {
-  transform: translate(-50%, -50%) rotate(-110deg);
-}
-.kks-poda:focus-within > .kks-dark-border-bg::before {
-  transform: translate(-50%, -50%) rotate(442deg);
-  transition: all 4s;
-}
-.kks-poda:focus-within > .kks-glow::before {
-  transform: translate(-50%, -50%) rotate(420deg);
-  transition: all 4s;
-}
-.kks-poda:focus-within > .kks-white::before {
-  transform: translate(-50%, -50%) rotate(443deg);
-  transition: all 4s;
-}
-.kks-poda:focus-within > .kks-border::before {
-  transform: translate(-50%, -50%) rotate(430deg);
-  transition: all 4s;
+  background: linear-gradient(90deg, #111111, #9ca3af, #111111);
 }
 .kks-search-main {
   width: calc(100% - 13px);
@@ -191,8 +85,12 @@ const WEB_SEARCH_CSS = `
   outline: none;
 }
 .kks-search-input::placeholder {
-  color: #a1a1aa;
+  color: #9ca3af;
   opacity: 1;
+}
+.kks-search-input:focus-visible {
+  outline: 2px solid #ffffff;
+  outline-offset: 2px;
 }
 .kks-input-mask {
   pointer-events: none;
@@ -208,20 +106,7 @@ const WEB_SEARCH_CSS = `
   display: none;
 }
 .kks-pink-mask {
-  pointer-events: none;
-  width: 30px;
-  height: 20px;
-  position: absolute;
-  background: #71717a;
-  top: 10px;
-  left: 5px;
-  filter: blur(20px);
-  opacity: .55;
-  transition: all 2s;
-  z-index: 4;
-}
-.kks-search-main:hover > .kks-pink-mask {
-  opacity: 0;
+  display: none;
 }
 .kks-search-icon {
   position: absolute;
@@ -242,24 +127,7 @@ const WEB_SEARCH_CSS = `
   border-radius: 10px;
   z-index: 5;
   pointer-events: none;
-}
-.kks-filter-border::before {
-  content: '';
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%) rotate(90deg);
-  position: absolute;
-  width: 600px;
-  height: 600px;
-  filter: brightness(1.2);
-  background-image: conic-gradient(
-    rgba(0,0,0,0) 0%,
-    #52525b 25%,
-    rgba(0,0,0,0) 50%,
-    #d4d4d8 75%,
-    rgba(0,0,0,0) 100%
-  );
-  animation: kks-rotate 4s linear infinite;
+  background: linear-gradient(135deg, #ffffff, #6b7280, #ffffff);
 }
 .kks-filter-button {
   box-sizing: border-box;
@@ -275,19 +143,21 @@ const WEB_SEARCH_CSS = `
   isolation: isolate;
   overflow: hidden;
   border-radius: 10px;
-  background: linear-gradient(180deg, #18181b, #000, #27272a);
-  border: 1px solid transparent;
+  background: linear-gradient(180deg, #1f2937, #000000, #111827);
+  border: 1px solid #6b7280;
   padding: 0;
   cursor: pointer;
-  box-shadow: 0 0 8px rgba(0,0,0,.45);
+  box-shadow: 0 0 8px rgba(17,24,39,.35);
+}
+.kks-filter-button:hover {
+  border-color: #d1d5db;
+}
+.kks-filter-button:focus-visible {
+  outline: 2px solid #ffffff;
+  outline-offset: 2px;
 }
 .kks-filter-button:active {
   transform: scale(.96);
-}
-@keyframes kks-rotate {
-  100% {
-    transform: translate(-50%, -50%) rotate(450deg);
-  }
 }
 `;
 
@@ -311,8 +181,6 @@ export function HomeSearchBar() {
       <style>{WEB_SEARCH_CSS}</style>
       <div className="kks-poda">
         <div className="kks-glow" />
-        <div className="kks-dark-border-bg" />
-        <div className="kks-dark-border-bg" />
         <div className="kks-dark-border-bg" />
         <div className="kks-white" />
         <div className="kks-border" />
@@ -339,7 +207,7 @@ export function HomeSearchBar() {
             <svg preserveAspectRatio="none" height="27" width="27" viewBox="4.8 4.56 14.832 15.408" fill="none">
               <path
                 d="M8.16 6.65002H15.83C16.47 6.65002 16.99 7.17002 16.99 7.81002V9.09002C16.99 9.56002 16.7 10.14 16.41 10.43L13.91 12.64C13.56 12.93 13.33 13.51 13.33 13.98V16.48C13.33 16.83 13.1 17.29 12.81 17.47L12 17.98C11.24 18.45 10.2 17.92 10.2 16.99V13.91C10.2 13.5 9.97 12.98 9.73 12.69L7.52 10.36C7.23 10.08 7 9.55002 7 9.20002V7.87002C7 7.17002 7.52 6.65002 8.16 6.65002Z"
-                stroke="#f4f4f5"
+                stroke="#f3f4f6"
                 strokeWidth="1"
                 strokeMiterlimit="10"
                 strokeLinecap="round"
@@ -354,12 +222,12 @@ export function HomeSearchBar() {
               <line stroke="url(#kks-search-line-gradient)" y2="16.65" y1="22" x2="16.65" x1="22" />
               <defs>
                 <linearGradient gradientTransform="rotate(50)" id="kks-search-gradient">
-                  <stop stopColor="#f4f4f5" offset="0%" />
-                  <stop stopColor="#a1a1aa" offset="50%" />
+                  <stop stopColor="#ffffff" offset="0%" />
+                  <stop stopColor="#9ca3af" offset="100%" />
                 </linearGradient>
                 <linearGradient id="kks-search-line-gradient">
-                  <stop stopColor="#d4d4d8" offset="0%" />
-                  <stop stopColor="#71717a" offset="50%" />
+                  <stop stopColor="#d1d5db" offset="0%" />
+                  <stop stopColor="#6b7280" offset="100%" />
                 </linearGradient>
               </defs>
             </svg>

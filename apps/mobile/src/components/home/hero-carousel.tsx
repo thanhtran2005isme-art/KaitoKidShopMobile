@@ -218,7 +218,7 @@ const styles = StyleSheet.create({
     maxWidth: '86%',
   },
   subtitle: {
-    color: '#E5E7EB',
+    color: '#FDE68A',
     fontSize: 10,
     fontWeight: '900',
     letterSpacing: 1.1,

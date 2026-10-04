@@ -53,7 +53,7 @@ export function AuthPrimaryButton({
         <LinearGradient
           colors={
             blocked
-              ? ['#A1A1AA', '#71717A']
+              ? ['#6B7280', '#4B5563']
               : [BRAND_COLORS.primaryDark, BRAND_COLORS.primary]
           }
           end={{ x: 1, y: 0.75 }}

@@ -305,9 +305,9 @@ const styles = StyleSheet.create({
   },
   tipCard: {
     borderRadius: 18,
-    backgroundColor: '#F5F3FF',
+    backgroundColor: '#F9FAFB',
     borderWidth: 1,
-    borderColor: '#DDD6FE',
+    borderColor: '#D1D5DB',
     padding: 12,
     flexDirection: 'row',
     alignItems: 'flex-start',

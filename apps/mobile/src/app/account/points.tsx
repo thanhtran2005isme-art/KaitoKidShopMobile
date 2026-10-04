@@ -396,14 +396,14 @@ const styles = StyleSheet.create({
   },
   balanceCard: {
     borderRadius: 22,
-    backgroundColor: '#111111',
+    backgroundColor: '#111827',
     padding: 15,
     flexDirection: 'row',
     gap: 12,
     marginBottom: 10,
   },
   balanceCopy: { flex: 1, justifyContent: 'center' },
-  balanceLabel: { color: '#A1A1AA', fontSize: 8, fontWeight: '700' },
+  balanceLabel: { color: '#9CA3AF', fontSize: 8, fontWeight: '700' },
   balanceValue: {
     marginTop: 3,
     color: '#FFFFFF',
@@ -412,14 +412,14 @@ const styles = StyleSheet.create({
   },
   balanceTier: {
     marginTop: 4,
-    color: '#D4D4D8',
+    color: '#D1D5DB',
     fontSize: 9,
     fontWeight: '800',
   },
   redeemBox: {
     width: 142,
     borderRadius: 16,
-    backgroundColor: '#27272A',
+    backgroundColor: '#1F2937',
     padding: 10,
     gap: 6,
   },
