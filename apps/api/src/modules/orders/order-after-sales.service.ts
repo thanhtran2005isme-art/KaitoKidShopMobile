@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable } from "@nestjs/common";
 import { toNumber } from "../../common/db-value.js";
+import type { SqlClient } from "../../common/sql-client.js";
 import { PrismaService } from "../../database/prisma.service.js";
 import { ShippingService } from "../shipping/shipping.service.js";
 
@@ -265,11 +266,11 @@ export class OrderAfterSalesService {
   }
 
   private async lockOrder(
-    tx: { $queryRawUnsafe: Function },
+    tx: SqlClient,
     userId: number,
     orderId: number,
   ): Promise<LockedAfterSalesRow> {
-    const rows = await tx.$queryRawUnsafe(
+    const rows = await tx.$queryRawUnsafe<LockedAfterSalesRow[]>(
       `SELECT Id AS id, NguoiDungId AS userId, TrangThai AS status,
               TrangThaiVanChuyen AS shippingStatus,
               NgayHoanThanh AS completedAt
@@ -278,7 +279,7 @@ export class OrderAfterSalesService {
        LIMIT 1 FOR UPDATE`,
       orderId,
       userId,
-    ) as LockedAfterSalesRow[];
+    );
     if (!rows[0]) {
       throw new BadRequestException("Đơn hàng không tồn tại hoặc không thuộc tài khoản này.");
     }
