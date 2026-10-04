@@ -5,11 +5,56 @@ import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { AppIcon } from '@/components/ui/app-icon';
 import { BRAND_COLORS } from '@/constants/brand';
 import { resolveMediaUrl } from '@/services/api-client';
-import type { Category } from '@/types/shop';
+import type { Category, Product } from '@/types/shop';
 
 const PASTELS = ['#EDE9FE', '#DBEAFE', '#FEF3C7', '#FCE7F3', '#DCFCE7', '#FFE4E6'];
 
-export function CategoryStrip({ categories }: { categories: Category[] }) {
+function normalizeCategoryText(value?: string | null) {
+  return (value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/g, 'd')
+    .replace(/Đ/g, 'D')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+}
+
+function matchesCategory(category: Category, product: Product) {
+  const categoryTerms = [category.name, category.slug]
+    .map(normalizeCategoryText)
+    .filter(Boolean);
+  const productTerms = [product.category, product.subcategory, product.name]
+    .map(normalizeCategoryText)
+    .filter(Boolean);
+
+  return categoryTerms.some((categoryTerm) =>
+    productTerms.some(
+      (productTerm) =>
+        productTerm === categoryTerm ||
+        productTerm.startsWith(`${categoryTerm} `) ||
+        productTerm.includes(` ${categoryTerm} `),
+    ),
+  );
+}
+
+function resolveCategoryMedia(category: Category, products: Product[]) {
+  const categoryImage = resolveMediaUrl(category.image);
+  if (categoryImage) return categoryImage;
+
+  const representative = products.find(
+    (product) => matchesCategory(category, product) && Boolean(resolveMediaUrl(product.image)),
+  );
+  return resolveMediaUrl(representative?.image);
+}
+
+export function CategoryStrip({
+  categories,
+  products = [],
+}: {
+  categories: Category[];
+  products?: Product[];
+}) {
   const router = useRouter();
 
   const rootCategories = categories.filter((item) => !item.parentId);
@@ -24,7 +69,11 @@ export function CategoryStrip({ categories }: { categories: Category[] }) {
           <Text style={styles.eyebrow}>DANH MỤC</Text>
           <Text style={styles.heading}>Khám phá danh mục</Text>
         </View>
-        <Pressable onPress={() => router.push('/categories')}>
+        <Pressable
+          accessibilityLabel="Xem tất cả danh mục"
+          accessibilityRole="button"
+          hitSlop={8}
+          onPress={() => router.push('/categories')}>
           <Text style={styles.more}>Xem tất cả</Text>
         </Pressable>
       </View>
@@ -35,11 +84,11 @@ export function CategoryStrip({ categories }: { categories: Category[] }) {
         horizontal
         keyExtractor={(item) => String(item.id)}
         renderItem={({ item, index }) => {
-          const image = resolveMediaUrl(item.image);
+          const image = resolveCategoryMedia(item, products);
 
           return (
             <Pressable
-              accessibilityLabel={item.name}
+              accessibilityLabel={`Mở danh mục ${item.name}`}
               accessibilityRole="button"
               onPress={() =>
                 router.push({ pathname: '/categories', params: { category: item.slug || item.name } })
@@ -48,13 +97,17 @@ export function CategoryStrip({ categories }: { categories: Category[] }) {
               <View style={[styles.imageWrap, { backgroundColor: PASTELS[index % PASTELS.length] }]}>
                 {image ? (
                   <Image
+                    accessibilityLabel={`Ảnh đại diện danh mục ${item.name}`}
+                    cachePolicy="memory-disk"
                     contentFit="cover"
                     source={{ uri: image }}
                     style={styles.image}
                     transition={180}
                   />
                 ) : (
-                  <AppIcon color={BRAND_COLORS.primaryDark} name="clothing" size={30} />
+                  <View accessibilityLabel={`${item.name} chưa có ảnh đại diện`} style={styles.missingMedia}>
+                    <AppIcon color={BRAND_COLORS.primaryDark} name="image" size={26} />
+                  </View>
                 )}
               </View>
               <Text numberOfLines={2} style={styles.label}>
@@ -113,6 +166,12 @@ const styles = StyleSheet.create({
     borderColor: '#E5E7EB',
   },
   image: { width: '100%', height: '100%' },
+  missingMedia: {
+    width: '100%',
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   label: {
     color: '#374151',
     fontSize: 11,
