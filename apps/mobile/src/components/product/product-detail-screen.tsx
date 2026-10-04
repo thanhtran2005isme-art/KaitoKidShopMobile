@@ -280,10 +280,16 @@ export default function ProductDetailScreen() {
     selectedColor && selectedSize
       ? variants.find((item) => item.color === selectedColor && item.size === selectedSize)
       : undefined;
+  const aggregateAvailableStock = hasVariantInventory
+    ? variantInventory.reduce(
+        (total, item) => total + Math.max(0, item.available || 0),
+        0,
+      )
+    : Math.max(0, product?.availableStock ?? product?.stock ?? 0);
   const availableStock = (() => {
     if (!product) return 0;
     if (hasVariantInventory && selectedColor && selectedSize) return selectedInventory?.available || 0;
-    return Math.max(0, product.availableStock ?? product.stock);
+    return aggregateAvailableStock;
   })();
 
   useEffect(() => {
@@ -338,11 +344,23 @@ export default function ProductDetailScreen() {
   const discount = product.oldPrice && product.oldPrice > product.price
     ? Math.round((1 - product.price / product.oldPrice) * 100)
     : 0;
-  const productAvailableStock = Math.max(0, product.availableStock ?? product.stock);
+  const productAvailableStock = aggregateAvailableStock;
   const isOutOfStock = productAvailableStock <= 0 || product.status === 'out-of-stock';
   const isLowStock = !isOutOfStock && availableStock > 0 && availableStock <= 5;
   const selectionComplete = (!colors.length || Boolean(selectedColor)) && (!sizes.length || Boolean(selectedSize));
   const selectedOutOfStock = selectionComplete && availableStock <= 0;
+  const stockDisplayText = isOutOfStock
+    ? 'Hết hàng'
+    : hasVariantInventory && !selectionComplete
+      ? `Tổng còn ${productAvailableStock} sản phẩm`
+      : `Còn ${availableStock} sản phẩm`;
+  const quantityStockText = selectionComplete
+    ? availableStock > 0
+      ? `Tồn kho khả dụng: ${availableStock} sản phẩm ở lựa chọn này`
+      : 'Lựa chọn này đang hết hàng'
+    : hasVariantInventory
+      ? `Tổng còn ${productAvailableStock} sản phẩm · chọn đủ màu và size để xem tồn kho biến thể`
+      : `Tồn kho khả dụng: ${productAvailableStock} sản phẩm`;
   const canShowSizeGuide = supportsKidSizeGuide(sizes);
   const currentSku = selectedVariant?.sku || product.sku;
   const wished = isWishlisted(product.id);
@@ -522,8 +540,10 @@ export default function ProductDetailScreen() {
                 <Text style={styles.reviewCount}>({reviewCount} đánh giá)</Text>
                 <Text style={styles.sold}>· {product.soldCount} đã bán</Text>
               </View>
-              <Text style={[styles.stockText, isLowStock && styles.stockLow, isOutOfStock && styles.stockOut]}>
-                {isOutOfStock ? 'Hết hàng' : isLowStock ? `Còn ${availableStock}` : 'Còn hàng'}
+              <Text
+                accessibilityLiveRegion="polite"
+                style={[styles.stockText, isLowStock && styles.stockLow, isOutOfStock && styles.stockOut]}>
+                {stockDisplayText}
               </Text>
             </View>
 
@@ -546,10 +566,8 @@ export default function ProductDetailScreen() {
             <View style={styles.quantityRow}>
               <View style={styles.quantityCopy}>
                 <Text style={styles.quantityLabel}>Số lượng</Text>
-                <Text style={styles.quantityHelper}>
-                  {selectionComplete
-                    ? availableStock > 0 ? `Còn ${availableStock} sản phẩm ở lựa chọn này` : 'Lựa chọn này đang hết hàng'
-                    : 'Chọn đủ biến thể để xem tồn kho chính xác'}
+                <Text accessibilityLiveRegion="polite" style={styles.quantityHelper}>
+                  {quantityStockText}
                 </Text>
               </View>
               <View style={styles.stepper}>
@@ -677,7 +695,7 @@ const styles = StyleSheet.create({
   rating: { color: '#FFFFFF', fontSize: 13, lineHeight: 18, fontWeight: '900' },
   reviewCount: { color: '#C5C8CE', fontSize: 12, lineHeight: 17 },
   sold: { color: '#A4A8B0', fontSize: 12, lineHeight: 17 },
-  stockText: { color: '#34D399', fontSize: 12, lineHeight: 17, fontWeight: '800' },
+  stockText: { maxWidth: 170, color: '#34D399', fontSize: 12, lineHeight: 17, fontWeight: '800', textAlign: 'right' },
   stockLow: { color: '#FBBF24' },
   stockOut: { color: '#F87171' },
   priceRow: { flexDirection: 'row', alignItems: 'baseline', flexWrap: 'wrap', gap: 8 },
