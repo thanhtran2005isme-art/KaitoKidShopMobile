@@ -31,12 +31,12 @@ Sau live UI test, phát hiện `Lalamove COMPLETED` đang đẩy `DonHang.TrangT
 - carrier `COMPLETED` chỉ được coi là `delivered`; Customer API trình bày đơn là đang chờ xác nhận nếu `NgayHoanThanh IS NULL`;
 - thêm `POST /api/orders/:id/confirm-received`; chỉ hành động này mới ghi `NgayHoanThanh`, chuyển `received_by_customer` và bắt đầu cửa sổ hoàn hàng 7 ngày;
 - thêm `POST /api/orders/:id/report-not-received`; ghi `delivery_disputed`, giữ order ở `shipping`, không tự hủy/hoàn tồn/coupon/refund;
-- thêm `POST /api/orders/:id/return-request`; chỉ cho phép trong 7 ngày từ `NgayHoanThanh`, ghi `return_requested` và lý do vào lịch sử;
-- wrapper receipt-aware giữ `delivery_disputed`, `received_by_customer`, `return_requested`, `returned` khỏi bị polling/webhook carrier ghi đè;
-- review yêu cầu `NgayHoanThanh IS NOT NULL`; vẫn cho review khi return request đang xử lý;
+- thêm `POST /api/orders/:id/return-request`; chỉ cho phép trong 7 ngày từ `NgayHoanThanh`, ghi marker `return_requested` + lý do vào `LichSuTrangThaiVanChuyen` trong transaction, không đổi enum `DonHang.TrangThai`;
+- wrapper receipt-aware giữ `delivery_disputed`, `received_by_customer` và `returned` khỏi bị polling/webhook carrier ghi đè; yêu cầu hoàn được giữ độc lập bằng history marker;
+- review yêu cầu `NgayHoanThanh IS NOT NULL` và `DonHang.TrangThai=completed`; vẫn đánh giá được khi yêu cầu hoàn đang chờ vì order không bị đổi sang status giả;
 - Customer Web có action trực tiếp `Đã nhận hàng`, `Chưa nhận được hàng`, `Đánh giá`, `Hoàn hàng`; tracking reload danh sách ngay sau sync;
 - dữ liệu cũ `completed + delivered + NgayHoanThanh NULL` được tương thích bằng effective state, không reset DB;
-- không thêm bảng/cột mới; quyết định durable ở `docs/decisions/D026-customer-receipt-return-window.md`.
+- không thêm bảng/cột/enum mới; quyết định durable ở `docs/decisions/D026-customer-receipt-return-window.md`.
 
 ## Gate còn mở
 
