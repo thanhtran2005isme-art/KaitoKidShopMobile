@@ -39,6 +39,12 @@ export function shippingStatusMeta(status?: string | null): {
   switch ((status || '').toLowerCase()) {
     case 'order_placed':
       return { label: 'Đã đặt hàng', tone: 'primary' };
+    case 'lalamove_placing':
+      return { label: 'Đang tạo vận đơn Lalamove', tone: 'warning' };
+    case 'lalamove_place_unknown':
+      return { label: 'Cần đối soát vận đơn Lalamove', tone: 'warning' };
+    case 'lalamove_place_failed':
+      return { label: 'Tạo vận đơn Lalamove thất bại', tone: 'danger' };
     case 'ready_to_pick':
       return { label: 'Đã tạo vận đơn', tone: 'primary' };
     case 'picking':
