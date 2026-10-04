@@ -201,20 +201,21 @@ export class OrderAfterSalesService {
       const duplicate = await tx.$queryRawUnsafe<Array<{ id: unknown }>>(
         `SELECT Id AS id FROM LichSuTrangThaiVanChuyen
          WHERE DonHangId = ? AND TrangThai = 'return_requested'
-         LIMIT 1 FOR UPDATE`,
+         LIMIT 1`,
         orderId,
       );
-      return { changed: duplicate.length === 0, deadline };
-    });
+      if (duplicate.length > 0) return { changed: false, deadline };
 
-    if (result.changed) {
-      await this.shipping.appendHistory(
+      await tx.$executeRawUnsafe(
+        `INSERT INTO LichSuTrangThaiVanChuyen
+           (DonHangId, TrangThai, MoTa, ViTri, ThoiGian)
+         VALUES (?, 'return_requested', ?, 'Khách hàng', ?)`,
         orderId,
-        "return_requested",
         `Khách hàng yêu cầu hoàn hàng: ${reason}`,
-        "Khách hàng",
+        new Date(),
       );
-    }
+      return { changed: true, deadline };
+    });
 
     return {
       message: result.changed
