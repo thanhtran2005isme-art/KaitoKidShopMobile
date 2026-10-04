@@ -707,7 +707,7 @@ const styles = StyleSheet.create({
   optionLabel: { color: '#D1D5DB', fontSize: 13, lineHeight: 18, fontWeight: '800' },
   optionSelected: { color: '#A4A8B0', fontSize: 11, lineHeight: 16 },
   optionActionButton: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 4 },
-  optionAction: { color: '#C4B5FD', fontSize: 12, lineHeight: 17, fontWeight: '800' },
+  optionAction: { color: '#F3F4F6', fontSize: 12, lineHeight: 17, fontWeight: '800' },
   optionRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   colorButton: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: 'transparent' },
   colorButtonActive: { borderColor: '#FFFFFF' },
