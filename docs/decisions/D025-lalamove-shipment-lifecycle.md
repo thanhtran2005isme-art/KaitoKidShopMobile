@@ -12,7 +12,8 @@ Lalamove được tích hợp như một carrier thật trong Node backend, khô
 - `serviceCode` public của Lalamove là service type ổn định, ví dụ `MOTORCYCLE`; không dùng `quotationId` do client giữ làm authority.
 - Khi `POST /api/orders`, `OrdersService` vẫn re-quote server-side theo D015. Fee được lấy từ quotation mới của backend, không lấy `shippingFee` client.
 - Sau khi order KaitoKid đã commit, `LalamoveShippingService` tạo một quotation mới từ địa chỉ đã persist trong `DonHang`, kiểm tra carrier fee không lệch fee server vừa chốt, rồi dùng quotation đó để `POST /v3/orders`.
-- Nếu Place Order lỗi tạm thời sau khi commerce order đã commit, order KaitoKid vẫn tồn tại; owner tracking có thể retry Place Order idempotently khi chưa có `MaVanDon`.
+- Trước khi gọi Place Order, `HardenedLalamoveShippingService` claim atomically bằng `TrangThaiVanChuyen = lalamove_placing` khi `MaVanDon IS NULL`; concurrent request khác không được phát thêm `POST /v3/orders`.
+- Nếu kết quả Place Order không xác định được (ví dụ timeout/mất kết nối sau khi request đã phát), backend chuyển sang `lalamove_place_unknown` và **không auto-retry**. Lalamove `Request-ID` không được KaitoKid coi là carrier idempotency guarantee. Phải đối soát trước khi cho phép tạo lại để tránh hai vận đơn thật cho cùng một order KaitoKid.
 
 ## Persistence
 
@@ -24,7 +25,7 @@ Dùng các cột shipping đã có trong `DonHang`:
 - `MaVanDon = Lalamove orderId`
 - `LinkTracking = Lalamove shareLink`
 - `MaDichVuVanChuyen = quotationId` sau khi Place Order thành công; trước đó có thể đang là service type được chọn.
-- `TrangThaiVanChuyen` là trạng thái KaitoKid đã map từ Lalamove.
+- `TrangThaiVanChuyen` là trạng thái KaitoKid đã map từ Lalamove; các trạng thái guard nội bộ gồm `lalamove_placing` và `lalamove_place_unknown`.
 
 `LichSuTrangThaiVanChuyen` tiếp tục là audit history; webhook event id được ghi vào mô tả dưới marker `[LALAMOVE_EVENT:<eventId>]` để chống replay mà không cần tạo thêm bảng idempotency.
 
@@ -39,6 +40,8 @@ Endpoint public:
 - Path dùng để verify mặc định `/api/shipping/lalamove/webhook`; deploy qua reverse proxy có path khác phải đặt `LALAMOVE_WEBHOOK_PATH` đúng public pathname mà Lalamove ký.
 - Replay cùng `eventId` trả success nhưng không apply lại.
 - Event cũ hơn event Lalamove đã ghi gần nhất vẫn được audit với `ignored=stale`, nhưng không được regress trạng thái hiện tại.
+- Runtime hiện tại là một Node API process; `HardenedLalamoveShippingService` serialize webhook theo Lalamove `orderId` trong process trước khi chạy duplicate/stale guard, tránh hai event cùng order chạy đồng thời.
+- Nếu sau này scale nhiều Node API writer, process lock này không đủ. Trước khi horizontal scale phải bổ sung DB-backed unique webhook event key hoặc distributed lock rồi mới cho nhiều writer cùng nhận webhook.
 
 ## Mapping trạng thái
 
@@ -65,7 +68,9 @@ Carrier-side `CANCELED`, `REJECTED`, `EXPIRED` **không tự động hoàn tồn
 
 ## Tracking
 
-`GET /api/shipping/track/{orderCode}` vẫn owner-only theo D016. Với Lalamove, backend gọi `GET /v3/orders/{orderId}` để refresh status/share link trước khi trả tracking khi có thể.
+`GET /api/shipping/track/{orderCode}` vẫn owner-only theo D016. Với Lalamove đã có `MaVanDon`, backend gọi `GET /v3/orders/{orderId}` để refresh status/share link trước khi trả tracking khi có thể.
+
+Nếu order Lalamove chưa có `MaVanDon`, tracking chỉ trả trạng thái nội bộ hiện tại. Tracking **không phát lại Place Order**; đặc biệt `lalamove_placing` / `lalamove_place_unknown` phải fail-closed để tránh duplicate carrier order.
 
 ## Simulator
 
