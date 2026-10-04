@@ -45,14 +45,20 @@ export function shippingStatusMeta(status?: string | null): {
       return { label: 'Đang lấy hàng', tone: 'warning' };
     case 'picked':
       return { label: 'Đã lấy hàng', tone: 'info' };
+    case 'lalamove_on_going':
+      return { label: 'Tài xế đã nhận đơn', tone: 'info' };
     case 'delivering':
     case 'shipping':
       return { label: 'Đang giao', tone: 'info' };
     case 'delivered':
     case 'completed':
       return { label: 'Đã giao hàng', tone: 'success' };
+    case 'carrier_cancelled':
+      return { label: 'Đã hủy vận đơn', tone: 'danger' };
     case 'cancelled':
       return { label: 'Đã hủy', tone: 'danger' };
+    case 'failed':
+      return { label: 'Giao hàng thất bại', tone: 'danger' };
     case 'pending':
       return { label: 'Chờ vận chuyển', tone: 'warning' };
     default:
