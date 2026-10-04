@@ -13,12 +13,16 @@ import { CurrentUser } from "../../auth/current-user.decorator.js";
 import type { AuthenticatedUser } from "../../auth/authenticated-user.js";
 import { JwtAuthGuard } from "../../auth/jwt-auth.guard.js";
 import { pathInt } from "../../common/query-value.js";
+import { LalamoveShippingService } from "../shipping/lalamove-shipping.service.js";
 import { OrdersService } from "./orders.service.js";
 
 @Controller("api/orders")
 @UseGuards(JwtAuthGuard)
 export class OrdersController {
-  constructor(private readonly orders: OrdersService) {}
+  constructor(
+    private readonly orders: OrdersService,
+    private readonly lalamove: LalamoveShippingService,
+  ) {}
 
   @Post()
   create(
@@ -48,7 +52,9 @@ export class OrdersController {
     @CurrentUser() user: AuthenticatedUser,
     @Param("id") rawId: string,
   ) {
-    const result = await this.orders.cancelOrder(user.id, pathInt(rawId));
+    const orderId = pathInt(rawId);
+    await this.lalamove.cancelBeforeCustomerOrder(user.id, orderId);
+    const result = await this.orders.cancelOrder(user.id, orderId);
     if (!result) throw new BadRequestException("Không thể hủy đơn hàng");
     return { message: "Đã hủy đơn hàng" };
   }
