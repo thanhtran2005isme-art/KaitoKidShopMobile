@@ -31,6 +31,7 @@ export interface ShippingConfig {
 
   lalamoveBaseUrl?: string;
   lalamoveMarket?: string;
+  lalamoveServiceType?: string;
   lalamoveApiKeyConfigured?: boolean;
   lalamoveApiSecretConfigured?: boolean;
 
