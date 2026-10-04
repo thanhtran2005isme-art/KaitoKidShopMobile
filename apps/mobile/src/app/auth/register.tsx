@@ -33,7 +33,7 @@ const REGISTER_COLORS = {
   border: '#374151',
   text: '#F3F4F6',
   muted: '#9CA3AF',
-  accent: '#A78BFA',
+  accent: '#FFFFFF',
   danger: '#FCA5A5',
   dangerBackground: '#2B171B',
   dangerBorder: '#5B2730',
@@ -189,159 +189,159 @@ export default function RegisterScreen() {
               </View>
             ) : (
               <>
-            <View style={styles.form}>
-              <AuthField
-                appearance="dark"
-                autoCapitalize="words"
-                autoComplete="name"
-                error={fieldErrors.fullName}
-                icon="user"
-                label="Name"
-                onBlur={() =>
-                  setFieldErrors((current) => ({
-                    ...current,
-                    fullName: validateName(),
-                  }))
-                }
-                onChangeText={(value) => {
-                  setFullName(value);
-                  clearError('fullName');
-                }}
-                onSubmitEditing={() => phoneRef.current?.focus()}
-                returnKeyType="next"
-                showLeadingIcon={false}
-                textContentType="name"
-                value={fullName}
-              />
+                <View style={styles.form}>
+                  <AuthField
+                    appearance="dark"
+                    autoCapitalize="words"
+                    autoComplete="name"
+                    error={fieldErrors.fullName}
+                    icon="user"
+                    label="Name"
+                    onBlur={() =>
+                      setFieldErrors((current) => ({
+                        ...current,
+                        fullName: validateName(),
+                      }))
+                    }
+                    onChangeText={(value) => {
+                      setFullName(value);
+                      clearError('fullName');
+                    }}
+                    onSubmitEditing={() => phoneRef.current?.focus()}
+                    returnKeyType="next"
+                    showLeadingIcon={false}
+                    textContentType="name"
+                    value={fullName}
+                  />
 
-              <AuthField
-                ref={phoneRef}
-                appearance="dark"
-                autoComplete="tel"
-                error={fieldErrors.phone}
-                icon="phone"
-                keyboardType="phone-pad"
-                label="Phone"
-                onBlur={() =>
-                  setFieldErrors((current) => ({
-                    ...current,
-                    phone: validatePhone(),
-                  }))
-                }
-                onChangeText={(value) => {
-                  setPhoneNumber(value);
-                  clearError('phone');
-                }}
-                onSubmitEditing={() => emailRef.current?.focus()}
-                returnKeyType="next"
-                showLeadingIcon={false}
-                textContentType="telephoneNumber"
-                value={phoneNumber}
-              />
+                  <AuthField
+                    ref={phoneRef}
+                    appearance="dark"
+                    autoComplete="tel"
+                    error={fieldErrors.phone}
+                    icon="phone"
+                    keyboardType="phone-pad"
+                    label="Phone"
+                    onBlur={() =>
+                      setFieldErrors((current) => ({
+                        ...current,
+                        phone: validatePhone(),
+                      }))
+                    }
+                    onChangeText={(value) => {
+                      setPhoneNumber(value);
+                      clearError('phone');
+                    }}
+                    onSubmitEditing={() => emailRef.current?.focus()}
+                    returnKeyType="next"
+                    showLeadingIcon={false}
+                    textContentType="telephoneNumber"
+                    value={phoneNumber}
+                  />
 
-              <AuthField
-                ref={emailRef}
-                appearance="dark"
-                autoCapitalize="none"
-                autoComplete="email"
-                autoCorrect={false}
-                error={fieldErrors.email}
-                icon="mail"
-                keyboardType="email-address"
-                label="Email"
-                onBlur={() =>
-                  setFieldErrors((current) => ({
-                    ...current,
-                    email: validateEmail(),
-                  }))
-                }
-                onChangeText={(value) => {
-                  setEmail(value);
-                  clearError('email');
-                }}
-                onSubmitEditing={() => passwordRef.current?.focus()}
-                returnKeyType="next"
-                showLeadingIcon={false}
-                textContentType="emailAddress"
-                value={email}
-              />
+                  <AuthField
+                    ref={emailRef}
+                    appearance="dark"
+                    autoCapitalize="none"
+                    autoComplete="email"
+                    autoCorrect={false}
+                    error={fieldErrors.email}
+                    icon="mail"
+                    keyboardType="email-address"
+                    label="Email"
+                    onBlur={() =>
+                      setFieldErrors((current) => ({
+                        ...current,
+                        email: validateEmail(),
+                      }))
+                    }
+                    onChangeText={(value) => {
+                      setEmail(value);
+                      clearError('email');
+                    }}
+                    onSubmitEditing={() => passwordRef.current?.focus()}
+                    returnKeyType="next"
+                    showLeadingIcon={false}
+                    textContentType="emailAddress"
+                    value={email}
+                  />
 
-              <AuthField
-                ref={passwordRef}
-                appearance="dark"
-                autoComplete="new-password"
-                error={fieldErrors.password}
-                icon="lock"
-                label="Password"
-                onBlur={() =>
-                  setFieldErrors((current) => ({
-                    ...current,
-                    password: validatePassword(),
-                  }))
-                }
-                onChangeText={(value) => {
-                  setPassword(value);
-                  clearError('password');
-                }}
-                onSubmitEditing={() => void handleRegister()}
-                returnKeyType="done"
-                secure
-                showLeadingIcon={false}
-                showSecureToggle={false}
-                textContentType="newPassword"
-                value={password}
-              />
-            </View>
-
-            {serverError ? (
-              <View accessibilityRole="alert" style={styles.errorCard}>
-                <AppIcon color={REGISTER_COLORS.danger} name="warning" size={18} />
-                <View style={styles.errorCopy}>
-                  <Text style={styles.errorTitle}>Chưa thể tạo tài khoản</Text>
-                  <Text style={styles.errorText}>{serverError}</Text>
+                  <AuthField
+                    ref={passwordRef}
+                    appearance="dark"
+                    autoComplete="new-password"
+                    error={fieldErrors.password}
+                    icon="lock"
+                    label="Password"
+                    onBlur={() =>
+                      setFieldErrors((current) => ({
+                        ...current,
+                        password: validatePassword(),
+                      }))
+                    }
+                    onChangeText={(value) => {
+                      setPassword(value);
+                      clearError('password');
+                    }}
+                    onSubmitEditing={() => void handleRegister()}
+                    returnKeyType="done"
+                    secure
+                    showLeadingIcon={false}
+                    showSecureToggle={false}
+                    textContentType="newPassword"
+                    value={password}
+                  />
                 </View>
-              </View>
-            ) : null}
 
-            <Pressable
-              accessibilityLabel="Tạo tài khoản"
-              accessibilityRole="button"
-              accessibilityState={{ busy: loading, disabled: loading }}
-              disabled={loading}
-              onPress={() => void handleRegister()}
-              style={({ pressed }) => [
-                styles.submitButton,
-                loading && styles.submitButtonDisabled,
-                pressed && !loading && styles.submitButtonPressed,
-              ]}>
-              {loading ? (
-                <>
-                  <ActivityIndicator color={REGISTER_COLORS.card} size="small" />
-                  <Text style={styles.submitButtonText}>Đang gửi email...</Text>
-                </>
-              ) : (
-                <Text style={styles.submitButtonText}>Đăng ký</Text>
-              )}
-            </Pressable>
+                {serverError ? (
+                  <View accessibilityRole="alert" style={styles.errorCard}>
+                    <AppIcon color={REGISTER_COLORS.danger} name="warning" size={18} />
+                    <View style={styles.errorCopy}>
+                      <Text style={styles.errorTitle}>Chưa thể tạo tài khoản</Text>
+                      <Text style={styles.errorText}>{serverError}</Text>
+                    </View>
+                  </View>
+                ) : null}
 
-            <Pressable
-              accessibilityLabel="Đã có tài khoản, chuyển sang đăng nhập"
-              accessibilityRole="button"
-              hitSlop={8}
-              onPress={() =>
-                router.replace({
-                  pathname: '/auth/login',
-                  params: redirect ? { redirect } : {},
-                })
-              }
-              style={({ pressed }) => [
-                styles.divider,
-                pressed && styles.dividerPressed,
-              ]}>
-              <View style={styles.dividerLine} />
-              <Text style={styles.dividerText}>Đã có tài khoản? Đăng nhập</Text>
-              <View style={styles.dividerLine} />
-            </Pressable>
+                <Pressable
+                  accessibilityLabel="Tạo tài khoản"
+                  accessibilityRole="button"
+                  accessibilityState={{ busy: loading, disabled: loading }}
+                  disabled={loading}
+                  onPress={() => void handleRegister()}
+                  style={({ pressed }) => [
+                    styles.submitButton,
+                    loading && styles.submitButtonDisabled,
+                    pressed && !loading && styles.submitButtonPressed,
+                  ]}>
+                  {loading ? (
+                    <>
+                      <ActivityIndicator color={REGISTER_COLORS.card} size="small" />
+                      <Text style={styles.submitButtonText}>Đang gửi email...</Text>
+                    </>
+                  ) : (
+                    <Text style={styles.submitButtonText}>Đăng ký</Text>
+                  )}
+                </Pressable>
+
+                <Pressable
+                  accessibilityLabel="Đã có tài khoản, chuyển sang đăng nhập"
+                  accessibilityRole="button"
+                  hitSlop={8}
+                  onPress={() =>
+                    router.replace({
+                      pathname: '/auth/login',
+                      params: redirect ? { redirect } : {},
+                    })
+                  }
+                  style={({ pressed }) => [
+                    styles.divider,
+                    pressed && styles.dividerPressed,
+                  ]}>
+                  <View style={styles.dividerLine} />
+                  <Text style={styles.dividerText}>Đã có tài khoản? Đăng nhập</Text>
+                  <View style={styles.dividerLine} />
+                </Pressable>
               </>
             )}
           </Animated.View>
@@ -395,7 +395,7 @@ const styles = StyleSheet.create({
     height: 58,
     borderRadius: 29,
     borderWidth: 1,
-    borderColor: '#4C3C70',
+    borderColor: '#4B5563',
     backgroundColor: '#1B2233',
     alignItems: 'center',
     justifyContent: 'center',
