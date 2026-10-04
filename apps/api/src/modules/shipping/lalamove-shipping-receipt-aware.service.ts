@@ -1,0 +1,209 @@
+import { Injectable } from "@nestjs/common";
+import { PrismaService } from "../../database/prisma.service.js";
+import { HardenedLalamoveShippingService } from "./lalamove-shipping-hardened.service.js";
+import { ShippingService } from "./shipping.service.js";
+
+interface ReceiptBoundaryRow {
+  id: unknown;
+  status: string;
+  shippingStatus: string | null;
+  shippingProvider: string | null;
+  completedAt: Date | string | null;
+}
+
+function record(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {};
+}
+
+function text(value: unknown): string | null {
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function normalized(value: string | null | undefined): string {
+  return (value ?? "").trim().toLowerCase();
+}
+
+/**
+ * Giữ ranh giới giữa "carrier báo giao xong" và "khách xác nhận đã nhận".
+ *
+ * Lalamove COMPLETED chỉ cho phép vận chuyển đi tới `delivered`. Business order
+ * vẫn ở `shipping` cho tới khi khách gọi confirm-received. Sau khi khách đã
+ * xác nhận/khiếu nại/yêu cầu hoàn, polling hoặc webhook của carrier không được
+ * phép ghi đè các state hậu mãi đó.
+ */
+@Injectable()
+export class ReceiptAwareLalamoveShippingService extends HardenedLalamoveShippingService {
+  private readonly receiptQueues = new Map<string, Promise<unknown>>();
+
+  constructor(private readonly receiptDb: PrismaService) {
+    super(receiptDb);
+  }
+
+  override async track(userId: number, orderCode: string) {
+    const before = await this.loadByOwner(userId, orderCode);
+    const result = await super.track(userId, orderCode);
+
+    if (before?.shippingProvider?.toLowerCase() === "lalamove") {
+      await this.restoreReceiptBoundary(before);
+      return ShippingService.prototype.track.call(this, userId, orderCode);
+    }
+
+    return result;
+  }
+
+  override async handleWebhook(body: Record<string, unknown>) {
+    const data = record(body.data);
+    const carrierOrder = record(data.order);
+    const externalOrderId = text(carrierOrder.orderId ?? data.orderId);
+    if (!externalOrderId) return super.handleWebhook(body);
+
+    return this.withReceiptQueue(externalOrderId, async () => {
+      const before = await this.loadByTrackingCode(externalOrderId);
+      const result = await super.handleWebhook(body);
+      if (before) await this.restoreReceiptBoundary(before);
+      return result;
+    });
+  }
+
+  private async restoreReceiptBoundary(before: ReceiptBoundaryRow) {
+    const orderId = Number(before.id);
+    if (!Number.isSafeInteger(orderId) || orderId <= 0) return;
+
+    const rows = await this.receiptDb.$queryRawUnsafe<ReceiptBoundaryRow[]>(
+      `SELECT Id AS id, TrangThai AS status,
+              TrangThaiVanChuyen AS shippingStatus,
+              NhaVanChuyen AS shippingProvider,
+              NgayHoanThanh AS completedAt
+       FROM DonHang WHERE Id = ? LIMIT 1`,
+      orderId,
+    );
+    const current = rows[0];
+    if (!current) return;
+
+    const beforeStatus = normalized(before.status);
+    const beforeShipping = normalized(before.shippingStatus);
+    const currentStatus = normalized(current.status);
+    const currentShipping = normalized(current.shippingStatus);
+    const completedAt = current.completedAt ?? before.completedAt;
+
+    // Commerce terminal/after-sales states must never be resurrected by a
+    // late carrier COMPLETED webhook or by an owner tracking refresh.
+    if (beforeStatus === "cancelled") {
+      await this.receiptDb.$executeRawUnsafe(
+        `UPDATE DonHang
+         SET TrangThai = 'cancelled', TrangThaiVanChuyen = 'cancelled', NgayCapNhat = ?
+         WHERE Id = ?`,
+        new Date(),
+        orderId,
+      );
+      return;
+    }
+
+    if (completedAt) {
+      const protectedStatus =
+        ["return_requested", "returned"].includes(beforeStatus)
+          ? beforeStatus
+          : ["return_requested", "returned"].includes(currentStatus)
+            ? currentStatus
+            : "completed";
+      await this.receiptDb.$executeRawUnsafe(
+        `UPDATE DonHang
+         SET TrangThai = ?,
+             TrangThaiVanChuyen = 'received_by_customer',
+             NgayCapNhat = ?
+         WHERE Id = ?`,
+        protectedStatus,
+        new Date(),
+        orderId,
+      );
+      return;
+    }
+
+    const dispute =
+      beforeShipping === "delivery_disputed" ||
+      currentShipping === "delivery_disputed" ||
+      await this.hasOpenDeliveryDispute(orderId);
+    if (dispute) {
+      await this.receiptDb.$executeRawUnsafe(
+        `UPDATE DonHang
+         SET TrangThai = 'shipping',
+             TrangThaiVanChuyen = 'delivery_disputed',
+             NgayHoanThanh = NULL,
+             NgayCapNhat = ?
+         WHERE Id = ?`,
+        new Date(),
+        orderId,
+      );
+      return;
+    }
+
+    // Carrier has delivered, but the customer has not acknowledged receipt.
+    if (currentShipping === "delivered") {
+      await this.receiptDb.$executeRawUnsafe(
+        `UPDATE DonHang
+         SET TrangThai = 'shipping',
+             NgayHoanThanh = NULL,
+             NgayCapNhat = ?
+         WHERE Id = ?`,
+        new Date(),
+        orderId,
+      );
+    }
+  }
+
+  private async hasOpenDeliveryDispute(orderId: number): Promise<boolean> {
+    const rows = await this.receiptDb.$queryRawUnsafe<Array<{ status: string }>>(
+      `SELECT TrangThai AS status
+       FROM LichSuTrangThaiVanChuyen
+       WHERE DonHangId = ?
+         AND TrangThai IN ('delivery_disputed','received_by_customer')
+       ORDER BY ThoiGian DESC, Id DESC
+       LIMIT 1`,
+      orderId,
+    );
+    return normalized(rows[0]?.status) === "delivery_disputed";
+  }
+
+  private async loadByOwner(userId: number, orderCode: string) {
+    const rows = await this.receiptDb.$queryRawUnsafe<ReceiptBoundaryRow[]>(
+      `SELECT Id AS id, TrangThai AS status,
+              TrangThaiVanChuyen AS shippingStatus,
+              NhaVanChuyen AS shippingProvider,
+              NgayHoanThanh AS completedAt
+       FROM DonHang
+       WHERE MaDonHang = ? AND NguoiDungId = ?
+       LIMIT 1`,
+      orderCode,
+      userId,
+    );
+    return rows[0] ?? null;
+  }
+
+  private async loadByTrackingCode(trackingCode: string) {
+    const rows = await this.receiptDb.$queryRawUnsafe<ReceiptBoundaryRow[]>(
+      `SELECT Id AS id, TrangThai AS status,
+              TrangThaiVanChuyen AS shippingStatus,
+              NhaVanChuyen AS shippingProvider,
+              NgayHoanThanh AS completedAt
+       FROM DonHang
+       WHERE LOWER(COALESCE(NhaVanChuyen,'')) = 'lalamove'
+         AND MaVanDon = ?
+       LIMIT 1`,
+      trackingCode,
+    );
+    return rows[0] ?? null;
+  }
+
+  private async withReceiptQueue<T>(key: string, task: () => Promise<T>): Promise<T> {
+    const previous = this.receiptQueues.get(key) ?? Promise.resolve();
+    const run = previous.catch(() => undefined).then(task);
+    this.receiptQueues.set(key, run);
+    try {
+      return await run;
+    } finally {
+      if (this.receiptQueues.get(key) === run) this.receiptQueues.delete(key);
+    }
+  }
+}
