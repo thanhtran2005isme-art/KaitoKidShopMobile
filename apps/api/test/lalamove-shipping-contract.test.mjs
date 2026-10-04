@@ -96,14 +96,15 @@ test("tracking strictly refreshes a known Lalamove order and never retries an em
 });
 
 test("carrier delivered never equals customer receipt confirmation", () => {
-  assert.match(receiptAwareSource, /Carrier has delivered|Carrier has delivered/i);
+  assert.match(receiptAwareSource, /Carrier has delivered/);
   assert.match(receiptAwareSource, /TrangThai = 'shipping'/);
   assert.match(receiptAwareSource, /TrangThaiVanChuyen = 'delivery_disputed'/);
   assert.match(receiptAwareSource, /TrangThaiVanChuyen = 'received_by_customer'/);
   assert.match(receiptAwareSource, /NgayHoanThanh = NULL/);
   assert.match(receiptAwareSource, /hasOpenDeliveryDispute/);
-  assert.match(receiptAwareSource, /return_requested/);
   assert.match(receiptAwareSource, /returned/);
+  assert.match(receiptAwareSource, /không\s+need|không\s+cần|không cần tạo thêm giá trị enum/i);
+  assert.doesNotMatch(receiptAwareSource, /"return_requested"/);
 });
 
 test("customer cancel asks Lalamove first and propagates forbidden cancellation", () => {
