@@ -16,11 +16,15 @@ import { CurrentUser } from "../../auth/current-user.decorator.js";
 import type { AuthenticatedUser } from "../../auth/authenticated-user.js";
 import { JwtAuthGuard } from "../../auth/jwt-auth.guard.js";
 import { queryOptionalInt } from "../../common/query-value.js";
+import { LalamoveShippingService } from "./lalamove-shipping.service.js";
 import { ShippingService } from "./shipping.service.js";
 
 @Controller("api/shipping")
 export class ShippingController {
-  constructor(private readonly shipping: ShippingService) {}
+  constructor(
+    private readonly shipping: ShippingService,
+    private readonly lalamove: LalamoveShippingService,
+  ) {}
 
   @Get("providers")
   getProviders() {
@@ -61,6 +65,12 @@ export class ShippingController {
       toWardCode:
         typeof body.toWardCode === "string" ? body.toWardCode : null,
     });
+  }
+
+  @Post("lalamove/webhook")
+  @HttpCode(HttpStatus.OK)
+  lalamoveWebhook(@Body() body: Record<string, unknown>) {
+    return this.lalamove.handleWebhook(body);
   }
 
   @Get("track/:orderCode")
