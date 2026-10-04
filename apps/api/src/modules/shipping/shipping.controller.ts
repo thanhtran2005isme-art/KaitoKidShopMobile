@@ -27,8 +27,16 @@ export class ShippingController {
   ) {}
 
   @Get("providers")
-  getProviders() {
-    return this.shipping.getProviders();
+  async getProviders() {
+    const providers = await this.shipping.getProviders();
+    return providers.map((provider) =>
+      provider.code === "lalamove"
+        ? {
+            ...provider,
+            note: "Phí và vận đơn thật qua Lalamove API; trạng thái đồng bộ bằng webhook/tracking.",
+          }
+        : provider
+    );
   }
 
   @Post("quote")
