@@ -241,6 +241,8 @@ export class OrderAfterSalesService {
       status === "completed" &&
       Boolean(completedAt) &&
       Boolean(returnDeadline && Date.now() <= returnDeadline.getTime());
+    const canReview =
+      Boolean(completedAt) && ["completed", "return_requested"].includes(status);
 
     return {
       ...order,
@@ -251,7 +253,7 @@ export class OrderAfterSalesService {
         !completedAt && shippingStatus === "delivered" && !["cancelled", "returned"].includes(status),
       deliveryIssueReported: shippingStatus === "delivery_disputed",
       customerReceiptConfirmed: Boolean(completedAt),
-      canReview: effectiveStatus === "completed" && Boolean(completedAt),
+      canReview,
       canRequestReturn,
       returnRequested: status === "return_requested",
       receivedAt: completedAt,
