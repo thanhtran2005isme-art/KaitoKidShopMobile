@@ -27,11 +27,33 @@ const statusMap: Record<string, string> = {
   cancelled: 'Đã huỷ',
 };
 
-const CANCELLABLE_STATUSES = ['pending', 'confirmed'];
-const CANCELLABLE_SHIPPING_STATUSES = ['', 'ready_to_pick', 'picking'];
-function canCancelOrder(o: { status: string; shippingStatus?: string }) {
-  if (!CANCELLABLE_STATUSES.includes(o.status)) return false;
-  return CANCELLABLE_SHIPPING_STATUSES.includes(o.shippingStatus || '');
+const shippingStatusMap: Record<string, string> = {
+  order_placed: 'Đã đặt hàng',
+  ready_to_pick: 'Đã tạo vận đơn',
+  picking: 'Đang lấy hàng',
+  picked: 'Đã lấy hàng',
+  lalamove_on_going: 'Tài xế đã nhận đơn',
+  delivering: 'Đang giao hàng',
+  shipping: 'Đang giao hàng',
+  delivered: 'Đã giao hàng',
+  completed: 'Đã giao hàng',
+  carrier_cancelled: 'Đã hủy vận đơn',
+  cancelled: 'Đã hủy',
+  failed: 'Giao hàng thất bại',
+  pending: 'Chờ vận chuyển',
+  payment_confirmed: 'Đã xác nhận thanh toán',
+};
+
+const providerMap: Record<string, string> = {
+  ghn: 'Giao Hàng Nhanh',
+  ghtk: 'Giao Hàng Tiết Kiệm',
+  mock: 'KaitoKid (Mock)',
+  lalamove: 'Lalamove',
+};
+
+function shippingStatusLabel(status?: string | null) {
+  const key = (status || '').toLowerCase();
+  return shippingStatusMap[key] || status?.trim() || 'Đang cập nhật';
 }
 
 /** Map status thực sự sang group dùng cho filter tab. */
@@ -262,7 +284,7 @@ export default function OrderTracking() {
                       <i className="fa fa-file-invoice"></i> Xuất hoá đơn
                     </button>
                   )}
-                  {canCancelOrder(order) && (
+                  {order.canCancel && (
                     <button
                       className="btn-view-order"
                       style={{ marginLeft: 8, background: '#fee2e2', color: '#dc2626' }}
@@ -359,7 +381,7 @@ export default function OrderTracking() {
                     <i className="fa fa-redo"></i> Mua lại
                   </button>
                 )}
-                {canCancelOrder(selected) && (
+                {selected.canCancel && (
                   <button
                     className="btn-view-order"
                     style={{ background: '#dc2626', color: '#fff' }}
@@ -414,17 +436,14 @@ export default function OrderTracking() {
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
                         <span style={{ color: '#64748b', fontSize: 13 }}>Đơn vị vận chuyển:</span>
                         <strong>
-                          {tracking.nhaVanChuyen === 'ghn' ? 'Giao Hàng Nhanh' :
-                           tracking.nhaVanChuyen === 'ghtk' ? 'Giao Hàng Tiết Kiệm' :
-                           tracking.nhaVanChuyen === 'mock' ? 'KaitoKid (Mock)' :
-                           tracking.nhaVanChuyen}
+                          {providerMap[tracking.nhaVanChuyen.toLowerCase()] || tracking.nhaVanChuyen}
                         </strong>
                       </div>
                     )}
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                       <span style={{ color: '#64748b', fontSize: 13 }}>Trạng thái:</span>
-                      <strong style={{ color: '#16a34a', textTransform: 'uppercase' }}>
-                        {tracking.trangThaiVanChuyen}
+                      <strong style={{ color: '#16a34a' }}>
+                        {shippingStatusLabel(tracking.trangThaiVanChuyen)}
                       </strong>
                     </div>
                   </div>
@@ -444,7 +463,7 @@ export default function OrderTracking() {
                             boxShadow: idx === 0 ? '0 0 0 3px #bbf7d0' : 'none',
                           }} />
                           <div style={{ fontSize: 14, fontWeight: 600, color: '#0f172a' }}>
-                            {h.moTa || h.trangThai}
+                            {h.moTa || shippingStatusLabel(h.trangThai)}
                           </div>
                           {h.viTri && (
                             <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>
