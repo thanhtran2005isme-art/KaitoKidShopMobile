@@ -142,7 +142,8 @@ export class ShippingStatusSimulatorService
       `SELECT Id AS id
        FROM DonHang
        WHERE TrangThaiVanChuyen IN ('ready_to_pick','picking','picked','delivering')
-         AND TrangThai <> 'cancelled'`,
+         AND TrangThai <> 'cancelled'
+         AND LOWER(COALESCE(NhaVanChuyen,'mock')) <> 'lalamove'`,
     );
     if (!rows.length) return 0;
 
@@ -158,6 +159,7 @@ export class ShippingStatusSimulatorService
                   COALESCE(NgayCapNhat, NgayTao) AS lastTime
            FROM DonHang
            WHERE Id = ? AND TrangThai <> 'cancelled'
+             AND LOWER(COALESCE(NhaVanChuyen,'mock')) <> 'lalamove'
            LIMIT 1
            FOR UPDATE`,
           toNumber(candidate.id),
@@ -197,7 +199,6 @@ export class ShippingStatusSimulatorService
         return 1;
       });
     }
-
     return advanced;
   }
 }
