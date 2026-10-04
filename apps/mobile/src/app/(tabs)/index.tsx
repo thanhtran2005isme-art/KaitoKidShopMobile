@@ -92,7 +92,15 @@ export default function HomeScreen() {
 
             <PromoStrip items={data.blocks.brandValue} />
 
-            <CategoryStrip categories={data.categories} />
+            <CategoryStrip
+              categories={data.categories}
+              products={[
+                ...data.newArrivals,
+                ...data.bestSellers,
+                ...data.saleProducts,
+                ...data.recommendations,
+              ]}
+            />
 
             <DiscoveryTiles items={data.blocks.categoryTile} />
 
