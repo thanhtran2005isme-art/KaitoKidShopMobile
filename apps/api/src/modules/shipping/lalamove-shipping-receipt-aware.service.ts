@@ -30,8 +30,9 @@ function normalized(value: string | null | undefined): string {
  *
  * Lalamove COMPLETED chỉ cho phép vận chuyển đi tới `delivered`. Business order
  * vẫn ở `shipping` cho tới khi khách gọi confirm-received. Sau khi khách đã
- * xác nhận/khiếu nại/yêu cầu hoàn, polling hoặc webhook của carrier không được
- * phép ghi đè các state hậu mãi đó.
+ * xác nhận/khiếu nại, polling hoặc webhook của carrier không được phép ghi đè
+ * state do khách tạo. Yêu cầu hoàn hàng được lưu ở shipping history nên không
+ * cần tạo thêm giá trị enum cho DonHang.TrangThai.
  */
 @Injectable()
 export class ReceiptAwareLalamoveShippingService extends HardenedLalamoveShippingService {
@@ -88,8 +89,6 @@ export class ReceiptAwareLalamoveShippingService extends HardenedLalamoveShippin
     const currentShipping = normalized(current.shippingStatus);
     const completedAt = current.completedAt ?? before.completedAt;
 
-    // Commerce terminal/after-sales states must never be resurrected by a
-    // late carrier COMPLETED webhook or by an owner tracking refresh.
     if (beforeStatus === "cancelled") {
       await this.receiptDb.$executeRawUnsafe(
         `UPDATE DonHang
@@ -103,11 +102,9 @@ export class ReceiptAwareLalamoveShippingService extends HardenedLalamoveShippin
 
     if (completedAt) {
       const protectedStatus =
-        ["return_requested", "returned"].includes(beforeStatus)
-          ? beforeStatus
-          : ["return_requested", "returned"].includes(currentStatus)
-            ? currentStatus
-            : "completed";
+        beforeStatus === "returned" || currentStatus === "returned"
+          ? "returned"
+          : "completed";
       await this.receiptDb.$executeRawUnsafe(
         `UPDATE DonHang
          SET TrangThai = ?,
