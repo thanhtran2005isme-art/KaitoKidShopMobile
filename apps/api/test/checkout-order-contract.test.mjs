@@ -137,9 +137,18 @@ test("customer receipt is explicit and starts the seven-day return window", () =
   assert.match(afterSalesSource, /không tự động hoàn tiền|không tự hủy|đối soát/i);
 });
 
-test("review requires customer receipt and remains available while return is pending", () => {
-  assert.match(reviewsSource, /TrangThai IN \('completed','return_requested'\)/);
+test("return request uses history marker and does not invent a DonHang enum state", () => {
+  assert.match(afterSalesSource, /FROM LichSuTrangThaiVanChuyen/);
+  assert.match(afterSalesSource, /TrangThai = 'return_requested'/);
+  assert.doesNotMatch(
+    afterSalesSource,
+    /UPDATE DonHang[\s\S]*?SET TrangThai = 'return_requested'/,
+  );
+});
+
+test("review requires customer-confirmed receipt and remains valid during return review", () => {
+  assert.match(reviewsSource, /TrangThai = 'completed'/);
   assert.match(reviewsSource, /NgayHoanThanh IS NOT NULL/);
   assert.match(reviewsSource, /khách chưa xác nhận đã nhận hàng/);
-  assert.match(afterSalesSource, /\["completed", "return_requested"\]\.includes\(status\)/);
+  assert.match(afterSalesSource, /const canReview = Boolean\(completedAt\) && status === "completed"/);
 });
