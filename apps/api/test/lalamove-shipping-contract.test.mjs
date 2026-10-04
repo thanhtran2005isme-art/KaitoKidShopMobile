@@ -9,6 +9,7 @@ function source(path) {
 const clientSource = source("../src/modules/shipping/lalamove.client.ts");
 const lifecycleSource = source("../src/modules/shipping/lalamove-shipping.service.ts");
 const hardenedSource = source("../src/modules/shipping/lalamove-shipping-hardened.service.ts");
+const receiptAwareSource = source("../src/modules/shipping/lalamove-shipping-receipt-aware.service.ts");
 const moduleSource = source("../src/modules/shipping/shipping.module.ts");
 const controllerSource = source("../src/modules/shipping/shipping.controller.ts");
 const simulatorSource = source("../src/modules/shipping/shipping-status-simulator.service.ts");
@@ -57,13 +58,14 @@ test("Place Order re-quotes server-side and persists real carrier identifiers", 
   assert.match(lifecycleSource, /MaDichVuVanChuyen = COALESCE/);
 });
 
-test("DI routes ShippingService and Lalamove token through the hardened lifecycle", () => {
+test("DI routes ShippingService through receipt-aware hardened Lalamove lifecycle", () => {
   assert.match(moduleSource, /provide: LalamoveShippingService/);
-  assert.match(moduleSource, /useClass: HardenedLalamoveShippingService/);
+  assert.match(moduleSource, /useClass: ReceiptAwareLalamoveShippingService/);
   assert.match(moduleSource, /provide: ShippingService/);
   assert.match(moduleSource, /useExisting: LalamoveShippingService/);
   assert.match(lifecycleSource, /override async createShippingOrder/);
   assert.match(hardenedSource, /override async createShippingOrder/);
+  assert.match(receiptAwareSource, /extends HardenedLalamoveShippingService/);
 });
 
 test("Place Order is claimed atomically and ambiguous outcomes fail closed", () => {
@@ -93,6 +95,17 @@ test("tracking strictly refreshes a known Lalamove order and never retries an em
   );
 });
 
+test("carrier delivered never equals customer receipt confirmation", () => {
+  assert.match(receiptAwareSource, /Carrier has delivered|Carrier has delivered/i);
+  assert.match(receiptAwareSource, /TrangThai = 'shipping'/);
+  assert.match(receiptAwareSource, /TrangThaiVanChuyen = 'delivery_disputed'/);
+  assert.match(receiptAwareSource, /TrangThaiVanChuyen = 'received_by_customer'/);
+  assert.match(receiptAwareSource, /NgayHoanThanh = NULL/);
+  assert.match(receiptAwareSource, /hasOpenDeliveryDispute/);
+  assert.match(receiptAwareSource, /return_requested/);
+  assert.match(receiptAwareSource, /returned/);
+});
+
 test("customer cancel asks Lalamove first and propagates forbidden cancellation", () => {
   assert.match(lifecycleSource, /"DELETE"/);
   assert.match(
@@ -111,6 +124,8 @@ test("webhook events are idempotent, serialized per carrier order and stale-safe
   assert.match(lifecycleSource, /if \(!stale\) await this\.applyState/);
   assert.match(hardenedSource, /webhookQueues/);
   assert.match(hardenedSource, /withWebhookQueue\(\s*externalOrderId/s);
+  assert.match(receiptAwareSource, /receiptQueues/);
+  assert.match(receiptAwareSource, /withReceiptQueue\(externalOrderId/);
   assert.match(lifecycleSource, /ASSIGNING_DRIVER/);
   assert.match(lifecycleSource, /ON_GOING/);
   assert.match(lifecycleSource, /PICKED_UP/);
@@ -128,4 +143,5 @@ test("shipping simulator never advances a real Lalamove shipment", () => {
 test("Lalamove never fabricates a carrier tracking code", () => {
   assert.doesNotMatch(lifecycleSource, /LALAMOVE-FAKE/);
   assert.doesNotMatch(hardenedSource, /LALAMOVE-FAKE/);
+  assert.doesNotMatch(receiptAwareSource, /LALAMOVE-FAKE/);
 });
