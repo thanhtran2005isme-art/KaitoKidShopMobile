@@ -11,6 +11,7 @@ import { useShopping } from '@/context/ShoppingContext';
 import { resolveMediaUrl } from '@/services/api-client';
 import type { Product } from '@/types/shop';
 import { productColorValue } from '@/utils/product-detail';
+import { releaseWebFocus } from '@/utils/web-focus';
 
 function formatPrice(value: number) {
   return `${Math.round(value).toLocaleString('vi-VN')}đ`;
@@ -48,6 +49,7 @@ export const ProductCard = memo(function ProductCard({
   const wished = isWishlisted(product.id);
 
   const openProduct = () => {
+    releaseWebFocus();
     router.push({
       pathname: '/product/[slug]',
       params: { slug: product.slug || String(product.id) },
@@ -55,6 +57,7 @@ export const ProductCard = memo(function ProductCard({
   };
 
   const openLoginForProduct = () => {
+    releaseWebFocus();
     router.push({
       pathname: '/auth/login',
       params: { redirect: `/product/${product.slug || product.id}` },
@@ -433,9 +436,7 @@ const styles = StyleSheet.create({
     height: 18,
     borderRadius: 9,
     borderWidth: 1.5,
-    shadowColor: '#0F172A',
-    shadowOpacity: 0.08,
-    shadowRadius: 1,
+    boxShadow: '0 1px 1px rgba(15, 23, 42, 0.08)',
   },
   moreColors: { color: BRAND_COLORS.muted, fontSize: 10, lineHeight: 14, fontWeight: '700' },
   pressed: { opacity: 0.72 },

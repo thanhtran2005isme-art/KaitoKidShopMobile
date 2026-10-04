@@ -6,6 +6,7 @@ import { AppIcon } from '@/components/ui/app-icon';
 import { BRAND_COLORS } from '@/constants/brand';
 import { resolveMediaUrl } from '@/services/api-client';
 import type { HomepageBlock } from '@/types/shop';
+import { releaseWebFocus } from '@/utils/web-focus';
 
 function decodeRoutePart(value: string) {
   try {
@@ -39,7 +40,14 @@ export function DiscoveryTiles({ items }: { items?: HomepageBlock[] }) {
 
   const tileWidth = Math.min((width - 44) / 2, 270);
 
+  const openAllCategories = () => {
+    releaseWebFocus();
+    router.push('/categories');
+  };
+
   const open = (link?: string | null) => {
+    releaseWebFocus();
+
     const target = link?.trim();
     if (!target) {
       router.push('/categories');
@@ -76,7 +84,7 @@ export function DiscoveryTiles({ items }: { items?: HomepageBlock[] }) {
         <Pressable
           accessibilityLabel="Xem tất cả danh mục"
           accessibilityRole="button"
-          onPress={() => router.push('/categories')}>
+          onPress={openAllCategories}>
           <Text style={styles.more}>Xem tất cả</Text>
         </Pressable>
       </View>

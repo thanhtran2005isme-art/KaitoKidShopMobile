@@ -43,10 +43,7 @@ export default function TabsLayout() {
           borderTopColor: BRAND_COLORS.line,
           backgroundColor: BRAND_COLORS.surface,
           elevation: 7,
-          shadowColor: '#0F172A',
-          shadowOpacity: 0.05,
-          shadowRadius: 8,
-          shadowOffset: { width: 0, height: -2 },
+          boxShadow: '0 -2px 8px rgba(15, 23, 42, 0.05)',
         },
       }}>
       <Tabs.Screen

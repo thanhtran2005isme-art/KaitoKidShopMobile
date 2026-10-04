@@ -6,6 +6,7 @@ import { AppIcon } from '@/components/ui/app-icon';
 import { BRAND_COLORS } from '@/constants/brand';
 import { resolveMediaUrl } from '@/services/api-client';
 import type { Category, Product } from '@/types/shop';
+import { releaseWebFocus } from '@/utils/web-focus';
 
 const PASTELS = ['#EDE9FE', '#DBEAFE', '#FEF3C7', '#FCE7F3', '#DCFCE7', '#FFE4E6'];
 
@@ -62,6 +63,16 @@ export function CategoryStrip({
 
   if (!visible.length) return null;
 
+  const openAllCategories = () => {
+    releaseWebFocus();
+    router.push('/categories');
+  };
+
+  const openCategory = (category: Category) => {
+    releaseWebFocus();
+    router.push({ pathname: '/categories', params: { category: category.slug || category.name } });
+  };
+
   return (
     <View style={styles.section}>
       <View style={styles.headingRow}>
@@ -73,7 +84,7 @@ export function CategoryStrip({
           accessibilityLabel="Xem tất cả danh mục"
           accessibilityRole="button"
           hitSlop={8}
-          onPress={() => router.push('/categories')}>
+          onPress={openAllCategories}>
           <Text style={styles.more}>Xem tất cả</Text>
         </Pressable>
       </View>
@@ -90,9 +101,7 @@ export function CategoryStrip({
             <Pressable
               accessibilityLabel={`Mở danh mục ${item.name}`}
               accessibilityRole="button"
-              onPress={() =>
-                router.push({ pathname: '/categories', params: { category: item.slug || item.name } })
-              }
+              onPress={() => openCategory(item)}
               style={({ pressed }) => [styles.item, pressed && styles.pressed]}>
               <View style={[styles.imageWrap, { backgroundColor: PASTELS[index % PASTELS.length] }]}>
                 {image ? (
