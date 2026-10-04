@@ -7,29 +7,102 @@ function source(path) {
 }
 
 const clientSource = source("../src/modules/shipping/lalamove.client.ts");
-const shippingSource = source("../src/modules/shipping/shipping.service.ts");
+const lifecycleSource = source("../src/modules/shipping/lalamove-shipping.service.ts");
+const moduleSource = source("../src/modules/shipping/shipping.module.ts");
+const controllerSource = source("../src/modules/shipping/shipping.controller.ts");
+const simulatorSource = source("../src/modules/shipping/shipping-status-simulator.service.ts");
+const orderHelpersSource = source("../src/modules/orders/order.helpers.ts");
 
 test("Lalamove request signs the exact v3 HMAC contract server-side", () => {
-  assert.match(clientSource, /createHmac\("sha256", config\.apiSecret\)/);
-  assert.match(clientSource, /`\$\{timestamp\}\\r\\n\$\{method\}\\r\\n\$\{path\}\\r\\n\\r\\n\$\{serializedBody\}`/);
-  assert.match(clientSource, /Authorization: `hmac \$\{config\.apiKey\}:\$\{timestamp\}:\$\{signature\}`/);
+  assert.match(clientSource, /createHmac\("sha256", apiSecret\)/);
+  assert.match(
+    clientSource,
+    /`\$\{timestamp\}\\r\\n\$\{method\}\\r\\n\$\{path\}\\r\\n\\r\\n\$\{serializedBody\}`/,
+  );
+  assert.match(
+    clientSource,
+    /Authorization: `hmac \$\{config\.apiKey\}:\$\{timestamp\}:\$\{signature\}`/,
+  );
   assert.match(clientSource, /Market: config\.market/);
   assert.match(clientSource, /"Request-ID": randomUUID\(\)/);
 });
 
-test("shipping quote supports Lalamove quotation without client-side secret", () => {
-  assert.match(shippingSource, /"lalamove"/);
-  assert.match(shippingSource, /"\/v3\/quotations"/);
-  assert.match(shippingSource, /provider: "lalamove"/);
-  assert.match(shippingSource, /priceBreakdown\.total/);
-  assert.match(shippingSource, /process\.env\.LALAMOVE_API_KEY/);
-  assert.match(shippingSource, /process\.env\.LALAMOVE_API_SECRET/);
+test("webhook signature uses apiKey, timestamp, path and JSON data only", () => {
+  assert.match(clientSource, /verifyLalamoveWebhookSignature/);
+  assert.match(clientSource, /JSON\.stringify\(input\.data \?\? \{\}\)/);
+  assert.match(clientSource, /timingSafeEqual/);
+  assert.match(lifecycleSource, /LALAMOVE_WEBHOOK_PATH/);
+  assert.match(lifecycleSource, /\/api\/shipping\/lalamove\/webhook/);
+  assert.match(controllerSource, /@Post\("lalamove\/webhook"\)/);
 });
 
-test("Lalamove quotation stage never fabricates a carrier tracking code", () => {
+test("checkout quote exposes stable Lalamove service type, not client-authoritative quotationId", () => {
+  assert.match(lifecycleSource, /"\/v3\/quotations"/);
+  assert.match(lifecycleSource, /serviceCode: quotation\.serviceType/);
+  assert.match(lifecycleSource, /provider: "lalamove"/);
+  assert.doesNotMatch(lifecycleSource, /serviceCode: quotation\.quotationId/);
+});
+
+test("Place Order re-quotes server-side and persists real carrier identifiers", () => {
+  assert.match(lifecycleSource, /createQuotation\(cfg, order\.customerAddress\)/);
+  assert.match(lifecycleSource, /PhiVanChuyen AS shippingFee/);
+  assert.match(lifecycleSource, /Math\.abs\(quotation\.fee - toNumber\(order\.shippingFee\)\) > 1/);
+  assert.match(lifecycleSource, /`\/v3\/quotations\/\$\{encodeURIComponent\(quotation\.quotationId\)\}`/);
+  assert.match(lifecycleSource, /"POST",\s*"\/v3\/orders"/s);
+  assert.match(lifecycleSource, /isPODEnabled: true/);
+  assert.match(lifecycleSource, /kaitoKidOrderCode: order\.orderCode/);
+  assert.match(lifecycleSource, /MaVanDon = COALESCE/);
+  assert.match(lifecycleSource, /LinkTracking = COALESCE/);
+  assert.match(lifecycleSource, /MaDichVuVanChuyen = COALESCE/);
+});
+
+test("Lalamove lifecycle replaces ShippingService without changing checkout callers", () => {
+  assert.match(moduleSource, /provide: ShippingService/);
+  assert.match(moduleSource, /useExisting: LalamoveShippingService/);
+  assert.match(lifecycleSource, /override async createShippingOrder/);
+  assert.match(lifecycleSource, /override async track/);
+});
+
+test("tracking syncs real Lalamove order and supports idempotent retry of Place Order", () => {
   assert.match(
-    shippingSource,
-    /selected\.code === "lalamove"[\s\S]*?không tạo mã vận đơn giả/,
+    lifecycleSource,
+    /`\/v3\/orders\/\$\{encodeURIComponent\(externalOrderId\)\}`/,
   );
-  assert.doesNotMatch(shippingSource, /LALAMOVE-FAKE/);
+  assert.match(lifecycleSource, /syncLalamoveOrder/);
+  assert.match(lifecycleSource, /else if \(order\.shippingServiceCode\)/);
+  assert.match(lifecycleSource, /if \(order\.shippingProvider\?\.toLowerCase\(\) === "lalamove" && order\.trackingCode\)/);
+});
+
+test("customer cancel asks Lalamove first and propagates forbidden cancellation", () => {
+  assert.match(lifecycleSource, /"DELETE"/);
+  assert.match(
+    lifecycleSource,
+    /`\/v3\/orders\/\$\{encodeURIComponent\(order\.trackingCode\)\}`/,
+  );
+  assert.match(lifecycleSource, /response\.status === 204/);
+  assert.match(lifecycleSource, /response\.status === 409/);
+  assert.match(orderHelpersSource, /shippingStatus === "cancelled"/);
+});
+
+test("webhook events are idempotent and stale events cannot regress current state", () => {
+  assert.match(lifecycleSource, /\[LALAMOVE_EVENT:\$\{eventId\}\]/);
+  assert.match(lifecycleSource, /LOCATE\(\?, COALESCE\(MoTa,''\)\)/);
+  assert.match(lifecycleSource, /ignored=stale/);
+  assert.match(lifecycleSource, /if \(!stale\) await this\.applyState/);
+  assert.match(lifecycleSource, /ASSIGNING_DRIVER/);
+  assert.match(lifecycleSource, /ON_GOING/);
+  assert.match(lifecycleSource, /PICKED_UP/);
+  assert.match(lifecycleSource, /COMPLETED/);
+  assert.match(lifecycleSource, /CANCELED/);
+});
+
+test("shipping simulator never advances a real Lalamove shipment", () => {
+  assert.match(
+    simulatorSource,
+    /LOWER\(COALESCE\(NhaVanChuyen,'mock'\)\) <> 'lalamove'/,
+  );
+});
+
+test("Lalamove never fabricates a carrier tracking code", () => {
+  assert.doesNotMatch(lifecycleSource, /LALAMOVE-FAKE/);
 });
