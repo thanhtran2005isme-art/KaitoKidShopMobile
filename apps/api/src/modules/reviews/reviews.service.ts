@@ -98,13 +98,15 @@ export class ReviewsService {
       const orders = await tx.$queryRawUnsafe<Array<{ id: unknown }>>(
         `SELECT Id AS id
          FROM DonHang
-         WHERE Id = ? AND NguoiDungId = ? AND TrangThai = 'completed'
+         WHERE Id = ? AND NguoiDungId = ?
+           AND TrangThai = 'completed'
+           AND NgayHoanThanh IS NOT NULL
          LIMIT 1`,
         orderId,
         userId,
       );
       if (!orders[0]) {
-        throw new BadRequestException("Đơn hàng không tồn tại, không thuộc tài khoản này hoặc chưa hoàn tất.");
+        throw new BadRequestException("Đơn hàng không tồn tại, không thuộc tài khoản này hoặc khách chưa xác nhận đã nhận hàng.");
       }
 
       const productItems = await tx.$queryRawUnsafe<Array<{ size: string; color: string }>>(
