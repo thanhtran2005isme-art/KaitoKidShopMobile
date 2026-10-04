@@ -26,7 +26,7 @@ export interface CustomerOrderDTO {
   total: number;
   couponCode?: string;
   paymentMethod: string;
-  status: string; // 'pending' | 'confirmed' | 'shipping' | 'completed' | 'cancelled'
+  status: string;
   canCancel: boolean;
   shippingStatus?: string;
   trackingCode?: string;
@@ -37,6 +37,16 @@ export interface CustomerOrderDTO {
   note?: string;
   createdAt: string;
   items: CustomerOrderItemDTO[];
+  canConfirmReceived?: boolean;
+  canReportNotReceived?: boolean;
+  deliveryIssueReported?: boolean;
+  customerReceiptConfirmed?: boolean;
+  canReview?: boolean;
+  canRequestReturn?: boolean;
+  returnRequested?: boolean;
+  receivedAt?: string | null;
+  returnDeadline?: string | null;
+  returnWindowDays?: number;
 }
 
 export const customerOrderApi = {
@@ -54,6 +64,36 @@ export const customerOrderApi = {
   async getById(id: number): Promise<ApiResponse<CustomerOrderDTO>> {
     try {
       const response = await apiClient.get<CustomerOrderDTO>(`/api/orders/${id}`);
+      return { success: true, data: response.data };
+    } catch (error) {
+      return { success: false, error: getErrorMessage(error) };
+    }
+  },
+
+  /** Khách xác nhận đã thực nhận hàng; bắt đầu mốc hoàn hàng 7 ngày. */
+  async confirmReceived(id: number): Promise<ApiResponse<{ message: string; receivedAt: string; returnDeadline: string }>> {
+    try {
+      const response = await apiClient.post(`/api/orders/${id}/confirm-received`);
+      return { success: true, data: response.data };
+    } catch (error) {
+      return { success: false, error: getErrorMessage(error) };
+    }
+  },
+
+  /** Báo carrier đã đánh dấu giao nhưng khách chưa nhận; không tự hủy/hoàn kho. */
+  async reportNotReceived(id: number): Promise<ApiResponse<{ message: string }>> {
+    try {
+      const response = await apiClient.post(`/api/orders/${id}/report-not-received`);
+      return { success: true, data: response.data };
+    } catch (error) {
+      return { success: false, error: getErrorMessage(error) };
+    }
+  },
+
+  /** Gửi yêu cầu hoàn hàng trong 7 ngày kể từ lúc khách xác nhận nhận hàng. */
+  async requestReturn(id: number, reason: string): Promise<ApiResponse<{ message: string; returnDeadline: string | null }>> {
+    try {
+      const response = await apiClient.post(`/api/orders/${id}/return-request`, { reason });
       return { success: true, data: response.data };
     } catch (error) {
       return { success: false, error: getErrorMessage(error) };
