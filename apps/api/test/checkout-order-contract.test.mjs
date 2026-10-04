@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 import { evaluateCoupon } from "../dist/modules/coupons/coupon.helpers.js";
 import {
@@ -14,6 +15,14 @@ import {
   normalizeGhnName,
   normalizeProvince,
 } from "../dist/modules/shipping/shipping.helpers.js";
+
+function source(path) {
+  return readFileSync(new URL(path, import.meta.url), "utf8");
+}
+
+const ordersControllerSource = source("../src/modules/orders/orders.controller.ts");
+const afterSalesSource = source("../src/modules/orders/order-after-sales.service.ts");
+const reviewsSource = source("../src/modules/reviews/reviews.service.ts");
 
 test("coupon percent giữ min-order, usage và max-discount của C#", () => {
   const now = new Date("2026-09-30T12:00:00Z");
@@ -114,4 +123,22 @@ test("mock shipping giữ branch + phụ phí cân nặng", () => {
 test("GHN normalizer bỏ quận/huyện/phường + khoảng trắng như C#", () => {
   assert.equal(normalizeGhnName("Quận Cầu Giấy"), "caugiay");
   assert.equal(normalizeGhnName("Phường Dịch Vọng"), "dichvong");
+});
+
+test("customer receipt is explicit and starts the seven-day return window", () => {
+  assert.match(ordersControllerSource, /@Post\(":id\/confirm-received"\)/);
+  assert.match(ordersControllerSource, /@Post\(":id\/report-not-received"\)/);
+  assert.match(ordersControllerSource, /@Post\(":id\/return-request"\)/);
+  assert.match(afterSalesSource, /7 \* 24 \* 60 \* 60 \* 1000/);
+  assert.match(afterSalesSource, /TrangThaiVanChuyen = 'received_by_customer'/);
+  assert.match(afterSalesSource, /NgayHoanThanh = \?/);
+  assert.match(afterSalesSource, /TrangThaiVanChuyen = 'delivery_disputed'/);
+  assert.match(afterSalesSource, /TrangThai = 'return_requested'/);
+  assert.match(afterSalesSource, /không tự động hoàn tiền|không tự hủy|đối soát/i);
+});
+
+test("review requires customer-confirmed receipt timestamp", () => {
+  assert.match(reviewsSource, /TrangThai = 'completed'/);
+  assert.match(reviewsSource, /NgayHoanThanh IS NOT NULL/);
+  assert.match(reviewsSource, /khách chưa xác nhận đã nhận hàng/);
 });
