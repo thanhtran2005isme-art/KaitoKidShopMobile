@@ -23,22 +23,22 @@ const BENEFITS: {
     icon: 'bag',
     title: 'Theo dõi đơn hàng',
     description: 'Xem trạng thái xử lý, vận chuyển và lịch sử mua sắm.',
-    background: '#EDE9FE',
-    color: '#6D28D9',
+    background: '#F3F4F6',
+    color: '#111111',
   },
   {
     icon: 'heart',
     title: 'Đồng bộ yêu thích',
     description: 'Lưu lại sản phẩm bạn quan tâm và quay lại bất cứ lúc nào.',
-    background: '#FCE7F3',
-    color: '#BE185D',
+    background: '#F3F4F6',
+    color: '#111111',
   },
   {
     icon: 'gift',
     title: 'Điểm & voucher',
     description: 'Theo dõi quyền lợi thành viên và voucher đang sử dụng.',
-    background: '#FFF7ED',
-    color: '#C2410C',
+    background: '#F3F4F6',
+    color: '#111111',
   },
 ];
 
@@ -129,7 +129,7 @@ export function GuestAccountExperience({
           <View style={styles.trustRow}>
             <View style={styles.trustIcon}>
               <AppIcon
-                color={BRAND_COLORS.success}
+                color={BRAND_COLORS.ink}
                 name="shield"
                 size={18}
               />
@@ -257,7 +257,7 @@ const styles = StyleSheet.create({
   },
   trustRow: {
     borderRadius: 18,
-    backgroundColor: '#F0FDF4',
+    backgroundColor: '#F3F4F6',
     padding: 12,
     flexDirection: 'row',
     alignItems: 'center',
@@ -267,13 +267,13 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 12,
-    backgroundColor: '#DCFCE7',
+    backgroundColor: '#E5E7EB',
     alignItems: 'center',
     justifyContent: 'center',
   },
   trustText: {
     flex: 1,
-    color: '#166534',
+    color: '#374151',
     fontSize: 11,
     lineHeight: 16,
     fontWeight: '700',

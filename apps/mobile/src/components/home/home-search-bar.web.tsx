@@ -37,7 +37,7 @@ const WEB_SEARCH_CSS = `
   left: -20px;
   top: 0;
   filter: blur(30px);
-  opacity: .4;
+  opacity: .28;
 }
 .kks-glow::before {
   content: '';
@@ -50,10 +50,10 @@ const WEB_SEARCH_CSS = `
   height: 999px;
   background-image: conic-gradient(
     #000 0%,
-    #402fb5 5%,
+    #52525b 5%,
     #000 38%,
     #000 50%,
-    #cf30aa 60%,
+    #a1a1aa 60%,
     #000 87%,
     #000 100%
   );
@@ -77,10 +77,10 @@ const WEB_SEARCH_CSS = `
   height: 600px;
   background-image: conic-gradient(
     rgba(0,0,0,0) 0%,
-    #18116a 5%,
+    #3f3f46 5%,
     rgba(0,0,0,0) 10%,
     rgba(0,0,0,0) 50%,
-    #6e1b60 56%,
+    #71717a 56%,
     rgba(0,0,0,0) 60%,
     rgba(0,0,0,0) 100%
   );
@@ -102,13 +102,13 @@ const WEB_SEARCH_CSS = `
   position: absolute;
   width: 600px;
   height: 600px;
-  filter: brightness(1.4);
+  filter: brightness(1.3);
   background-image: conic-gradient(
     rgba(0,0,0,0) 0%,
-    #a099d8 4%,
+    #d4d4d8 4%,
     rgba(0,0,0,0) 8%,
     rgba(0,0,0,0) 50%,
-    #dfa2da 54%,
+    #ffffff 54%,
     rgba(0,0,0,0) 58%,
     rgba(0,0,0,0) 100%
   );
@@ -130,15 +130,15 @@ const WEB_SEARCH_CSS = `
   position: absolute;
   width: 600px;
   height: 600px;
-  filter: brightness(1.3);
+  filter: brightness(1.2);
   background-image: conic-gradient(
-    #1c191c 0%,
-    #402fb5 5%,
-    #1c191c 14%,
-    #1c191c 50%,
-    #cf30aa 60%,
-    #1c191c 64%,
-    #1c191c 100%
+    #18181b 0%,
+    #52525b 5%,
+    #18181b 14%,
+    #18181b 50%,
+    #a1a1aa 60%,
+    #18181b 64%,
+    #18181b 100%
   );
   transition: all 2s;
 }
@@ -191,7 +191,7 @@ const WEB_SEARCH_CSS = `
   outline: none;
 }
 .kks-search-input::placeholder {
-  color: #c0b9c0;
+  color: #a1a1aa;
   opacity: 1;
 }
 .kks-input-mask {
@@ -212,11 +212,11 @@ const WEB_SEARCH_CSS = `
   width: 30px;
   height: 20px;
   position: absolute;
-  background: #cf30aa;
+  background: #71717a;
   top: 10px;
   left: 5px;
   filter: blur(20px);
-  opacity: .8;
+  opacity: .55;
   transition: all 2s;
   z-index: 4;
 }
@@ -251,12 +251,12 @@ const WEB_SEARCH_CSS = `
   position: absolute;
   width: 600px;
   height: 600px;
-  filter: brightness(1.35);
+  filter: brightness(1.2);
   background-image: conic-gradient(
     rgba(0,0,0,0) 0%,
-    #3d3a4f 25%,
+    #52525b 25%,
     rgba(0,0,0,0) 50%,
-    #3d3a4f 75%,
+    #d4d4d8 75%,
     rgba(0,0,0,0) 100%
   );
   animation: kks-rotate 4s linear infinite;
@@ -275,11 +275,11 @@ const WEB_SEARCH_CSS = `
   isolation: isolate;
   overflow: hidden;
   border-radius: 10px;
-  background: linear-gradient(180deg, #161329, #000, #1d1b4b);
+  background: linear-gradient(180deg, #18181b, #000, #27272a);
   border: 1px solid transparent;
   padding: 0;
   cursor: pointer;
-  box-shadow: 0 0 8px rgba(64,47,181,.55);
+  box-shadow: 0 0 8px rgba(0,0,0,.45);
 }
 .kks-filter-button:active {
   transform: scale(.96);
@@ -339,7 +339,7 @@ export function HomeSearchBar() {
             <svg preserveAspectRatio="none" height="27" width="27" viewBox="4.8 4.56 14.832 15.408" fill="none">
               <path
                 d="M8.16 6.65002H15.83C16.47 6.65002 16.99 7.17002 16.99 7.81002V9.09002C16.99 9.56002 16.7 10.14 16.41 10.43L13.91 12.64C13.56 12.93 13.33 13.51 13.33 13.98V16.48C13.33 16.83 13.1 17.29 12.81 17.47L12 17.98C11.24 18.45 10.2 17.92 10.2 16.99V13.91C10.2 13.5 9.97 12.98 9.73 12.69L7.52 10.36C7.23 10.08 7 9.55002 7 9.20002V7.87002C7 7.17002 7.52 6.65002 8.16 6.65002Z"
-                stroke="#d6d6e6"
+                stroke="#f4f4f5"
                 strokeWidth="1"
                 strokeMiterlimit="10"
                 strokeLinecap="round"
@@ -354,12 +354,12 @@ export function HomeSearchBar() {
               <line stroke="url(#kks-search-line-gradient)" y2="16.65" y1="22" x2="16.65" x1="22" />
               <defs>
                 <linearGradient gradientTransform="rotate(50)" id="kks-search-gradient">
-                  <stop stopColor="#f8e7f8" offset="0%" />
-                  <stop stopColor="#b6a9b7" offset="50%" />
+                  <stop stopColor="#f4f4f5" offset="0%" />
+                  <stop stopColor="#a1a1aa" offset="50%" />
                 </linearGradient>
                 <linearGradient id="kks-search-line-gradient">
-                  <stop stopColor="#b6a9b7" offset="0%" />
-                  <stop stopColor="#837484" offset="50%" />
+                  <stop stopColor="#d4d4d8" offset="0%" />
+                  <stop stopColor="#71717a" offset="50%" />
                 </linearGradient>
               </defs>
             </svg>

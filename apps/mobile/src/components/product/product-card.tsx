@@ -109,7 +109,7 @@ export const ProductCard = memo(function ProductCard({
         <ActivityIndicator color={BRAND_COLORS.primary} size="small" />
       ) : (
         <AppIcon
-          color={wished ? '#E11D48' : BRAND_COLORS.ink}
+          color={BRAND_COLORS.ink}
           name={wished ? 'heartFilled' : 'heart'}
           size={19}
         />
@@ -125,7 +125,7 @@ export const ProductCard = memo(function ProductCard({
 
       <View style={styles.metaRow}>
         <View style={styles.ratingRow}>
-          <AppIcon color="#D97706" name="starFilled" size={13} />
+          <AppIcon color={BRAND_COLORS.ink} name="starFilled" size={13} />
           <Text style={styles.rating}>
             {product.rating > 0 ? product.rating.toFixed(1) : 'Mới'}
           </Text>
@@ -334,7 +334,7 @@ const styles = StyleSheet.create({
   newBadge: { backgroundColor: BRAND_COLORS.primarySoft },
   newBadgeText: { color: BRAND_COLORS.primaryDark },
   bestBadge: { backgroundColor: BRAND_COLORS.accentSoft },
-  bestBadgeText: { color: '#C2410C' },
+  bestBadgeText: { color: BRAND_COLORS.ink },
   saleBadge: { backgroundColor: '#FEF2F2' },
   saleBadgeText: { color: BRAND_COLORS.danger },
   overlayWishlist: {
@@ -361,8 +361,8 @@ const styles = StyleSheet.create({
     borderColor: BRAND_COLORS.line,
   },
   wishlistActive: {
-    backgroundColor: '#FFF1F2',
-    borderColor: '#FDA4AF',
+    backgroundColor: BRAND_COLORS.primarySoft,
+    borderColor: '#D1D5DB',
   },
   content: { padding: 10, gap: 8 },
   contentMain: { gap: 8 },

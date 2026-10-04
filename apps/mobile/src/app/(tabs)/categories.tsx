@@ -29,8 +29,8 @@ const COLORS = {
   background: BRAND_COLORS.canvas,
   surface: BRAND_COLORS.surface,
   ink: BRAND_COLORS.ink,
-  dark: '#24113D',
-  darkSoft: '#3B1B63',
+  dark: '#111111',
+  darkSoft: '#27272A',
   secondary: '#4B5563',
   muted: BRAND_COLORS.muted,
   line: BRAND_COLORS.line,
@@ -648,13 +648,13 @@ export default function CategoriesScreen() {
 
   const listHeader = (
     <View style={styles.listHeader}>
-      <LinearGradient colors={['#2E1065', '#4C1D95', '#24113D']} style={styles.catalogHero}>
+      <LinearGradient colors={['#09090B', '#18181B', '#27272A']} style={styles.catalogHero}>
         <View pointerEvents="none" style={styles.heroGlowPink} />
         <View pointerEvents="none" style={styles.heroGlowWhite} />
 
         <View style={styles.catalogHeroTop}>
           <View style={styles.catalogHeroIcon}>
-            <AppIcon color={COLORS.accent} name="sparkles" size={22} />
+            <AppIcon color={COLORS.white} name="sparkles" size={22} />
           </View>
           <View style={styles.catalogHeroCopy}>
             <Text style={styles.heroEyebrow}>KAITOKID / DANH MỤC</Text>
@@ -924,7 +924,7 @@ const styles = StyleSheet.create({
     width: 190,
     height: 190,
     borderRadius: 95,
-    backgroundColor: 'rgba(249,115,22,0.24)',
+    backgroundColor: 'rgba(255,255,255,0.05)',
     right: -62,
     top: -92,
   },
@@ -958,7 +958,7 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   heroEyebrow: {
-    color: '#FDBA74',
+    color: '#E5E7EB',
     fontSize: 9,
     lineHeight: 13,
     fontWeight: '900',
@@ -1157,7 +1157,7 @@ const styles = StyleSheet.create({
   },
   subcategoryChipActive: {
     backgroundColor: COLORS.accentSoft,
-    borderColor: '#A78BFA',
+    borderColor: '#A1A1AA',
   },
   subcategoryChipText: {
     color: COLORS.ink,
@@ -1285,7 +1285,7 @@ const styles = StyleSheet.create({
   },
   editorialWishlistActive: {
     backgroundColor: COLORS.accentSoft,
-    borderColor: '#C4B5FD',
+    borderColor: '#D1D5DB',
   },
   editorialProductCopy: {
     minHeight: 116,

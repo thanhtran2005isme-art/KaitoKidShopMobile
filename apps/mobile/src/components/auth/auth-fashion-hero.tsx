@@ -83,7 +83,7 @@ export function AuthFashionHero({
         </Animated.View>
       ) : (
         <LinearGradient
-          colors={['#111827', BRAND_COLORS.primaryDark, BRAND_COLORS.primary]}
+          colors={['#27272A', BRAND_COLORS.primaryDark, BRAND_COLORS.primary]}
           end={{ x: 1, y: 1 }}
           start={{ x: 0, y: 0 }}
           style={StyleSheet.absoluteFill}
@@ -92,9 +92,9 @@ export function AuthFashionHero({
 
       <LinearGradient
         colors={[
-          'rgba(17,24,39,0.10)',
-          'rgba(17,24,39,0.20)',
-          'rgba(17,24,39,0.78)',
+          'rgba(17,17,17,0.10)',
+          'rgba(17,17,17,0.24)',
+          'rgba(0,0,0,0.82)',
         ]}
         locations={[0, 0.46, 1]}
         style={StyleSheet.absoluteFill}
@@ -151,7 +151,7 @@ const styles = StyleSheet.create({
     maxWidth: 720,
     alignSelf: 'center',
     overflow: 'hidden',
-    backgroundColor: '#111827',
+    backgroundColor: '#111111',
     position: 'relative',
   },
   topBar: {
@@ -171,7 +171,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 15,
-    backgroundColor: 'rgba(17,24,39,0.42)',
+    backgroundColor: 'rgba(0,0,0,0.48)',
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: 'rgba(255,255,255,0.28)',
     alignItems: 'center',
@@ -182,7 +182,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     paddingHorizontal: 8,
     paddingRight: 13,
-    backgroundColor: 'rgba(17,24,39,0.42)',
+    backgroundColor: 'rgba(0,0,0,0.48)',
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: 'rgba(255,255,255,0.24)',
     flexDirection: 'row',
@@ -193,7 +193,9 @@ const styles = StyleSheet.create({
     width: 30,
     height: 30,
     borderRadius: 10,
-    backgroundColor: BRAND_COLORS.accent,
+    backgroundColor: '#000000',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(255,255,255,0.35)',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -212,9 +214,9 @@ const styles = StyleSheet.create({
     minHeight: 38,
     borderRadius: 14,
     paddingHorizontal: 11,
-    backgroundColor: 'rgba(124,58,237,0.72)',
+    backgroundColor: 'rgba(0,0,0,0.72)',
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(255,255,255,0.26)',
+    borderColor: 'rgba(255,255,255,0.32)',
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
@@ -234,7 +236,7 @@ const styles = StyleSheet.create({
     gap: 7,
   },
   eyebrow: {
-    color: '#FDE68A',
+    color: '#E5E7EB',
     fontSize: 10,
     fontWeight: '900',
     letterSpacing: 1.3,

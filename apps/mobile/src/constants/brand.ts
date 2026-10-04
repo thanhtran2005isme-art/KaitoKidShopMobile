@@ -1,22 +1,24 @@
 export const BRAND = {
   name: 'KaitoKid',
-  tagline: 'THỜI TRANG & PHỤ KIỆN',
+  tagline: 'KAITOKID SHOP FASHION',
   promise: 'Nam · Nữ · Trẻ em · Unisex',
-  searchPlaceholder: 'Tìm áo, quần, váy, phụ kiện...',
-  categorySubtitle: 'Khám phá sản phẩm theo danh mục',
+  searchPlaceholder: 'Tìm sản phẩm, danh mục...',
 } as const;
 
 export const BRAND_COLORS = {
-  primary: '#7C3AED',
-  primaryDark: '#5B21B6',
-  primarySoft: '#EDE9FE',
-  accent: '#F97316',
-  accentSoft: '#FFF7ED',
-  ink: '#111827',
+  // Mobile/Expo monochrome commerce palette. Product media and semantic
+  // success/error states keep their own truthful colors.
+  primary: '#111111',
+  primarySoft: '#F3F4F6',
+  primaryDark: '#000000',
+  accent: '#111111',
+  accentSoft: '#F3F4F6',
+  canvas: '#F7F7F7',
+  surface: '#FFFFFF',
+  ink: '#111111',
   muted: '#6B7280',
   line: '#E5E7EB',
-  canvas: '#F8FAFC',
-  surface: '#FFFFFF',
+  success: '#16A34A',
   danger: '#DC2626',
-  success: '#047857',
+  warning: '#D97706',
 } as const;

@@ -65,10 +65,10 @@ export const AuthField = forwardRef<TextInput, AuthFieldProps>(function AuthFiel
   }, [error, errorProgress, reducedMotion]);
 
   const frameStyle = useAnimatedStyle(() => {
-    const idleBorder = dark ? '#374151' : BRAND_COLORS.line;
-    const focusBorder = dark ? '#A78BFA' : BRAND_COLORS.primary;
-    const idleBackground = dark ? '#111827' : '#F9FAFB';
-    const focusBackground = dark ? '#151D2D' : '#FCFAFF';
+    const idleBorder = dark ? '#3F3F46' : BRAND_COLORS.line;
+    const focusBorder = dark ? '#D4D4D8' : BRAND_COLORS.primary;
+    const idleBackground = dark ? '#111111' : '#F9FAFB';
+    const focusBackground = dark ? '#18181B' : '#FFFFFF';
 
     const borderColor =
       errorProgress.value > 0.05
@@ -103,10 +103,10 @@ export const AuthField = forwardRef<TextInput, AuthFieldProps>(function AuthFiel
               color={
                 focused
                   ? dark
-                    ? '#A78BFA'
+                    ? '#FFFFFF'
                     : BRAND_COLORS.primary
                   : dark
-                    ? '#9CA3AF'
+                    ? '#A1A1AA'
                     : BRAND_COLORS.muted
               }
               name={icon}
@@ -127,7 +127,7 @@ export const AuthField = forwardRef<TextInput, AuthFieldProps>(function AuthFiel
             setFocused(true);
             onFocus?.(event);
           }}
-          placeholderTextColor={dark ? '#6B7280' : '#9CA3AF'}
+          placeholderTextColor={dark ? '#71717A' : '#9CA3AF'}
           secureTextEntry={secure && !revealed}
           style={[
             styles.input,
@@ -149,7 +149,7 @@ export const AuthField = forwardRef<TextInput, AuthFieldProps>(function AuthFiel
               pressed && styles.pressed,
             ]}>
             <AppIcon
-              color={dark ? '#9CA3AF' : BRAND_COLORS.muted}
+              color={dark ? '#A1A1AA' : BRAND_COLORS.muted}
               name={revealed ? 'eyeOff' : 'eye'}
               size={dark ? 17 : 20}
             />
@@ -182,7 +182,7 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   labelDark: {
-    color: '#9CA3AF',
+    color: '#A1A1AA',
     fontSize: 14,
     lineHeight: 18,
     fontWeight: '400',
@@ -255,6 +255,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 17,
   },
-  helperDark: { color: '#9CA3AF' },
+  helperDark: { color: '#A1A1AA' },
   pressed: { opacity: 0.6 },
 });
