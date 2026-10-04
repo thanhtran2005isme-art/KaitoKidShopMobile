@@ -18,7 +18,7 @@ import {
 } from "./shipping.helpers.js";
 import { ShippingService } from "./shipping.service.js";
 
-interface LalamoveRuntimeConfig {
+interface RuntimeConfig {
   enabled: boolean;
   baseUrl: string;
   market: string;
@@ -30,7 +30,7 @@ interface LalamoveRuntimeConfig {
   pickupPhone: string | null;
 }
 
-interface LalamoveOrderRow {
+interface OrderRow {
   id: unknown;
   orderCode: string;
   userId: unknown;
@@ -45,7 +45,7 @@ interface LalamoveOrderRow {
   shippingServiceCode: string | null;
 }
 
-interface LalamoveState {
+interface CarrierState {
   orderId?: unknown;
   quotationId?: unknown;
   shareLink?: unknown;
@@ -63,11 +63,9 @@ function text(value: unknown): string | null {
   return typeof value === "string" && value.trim() ? value.trim() : null;
 }
 
-function jsonMessage(value: unknown, fallback: string): string {
+function apiMessage(value: unknown, fallback: string): string {
   const body = record(value);
-  return text(body.message)
-    ?? text(record(body.errors).message)
-    ?? fallback;
+  return text(body.message) ?? text(record(body.errors).message) ?? fallback;
 }
 
 @Injectable()
@@ -81,35 +79,30 @@ export class LalamoveShippingService extends ShippingService {
   override async quote(req: ShippingQuoteInput) {
     const requested = (req.provider ?? "mock").trim().toLowerCase();
     if (requested === "lalamove") {
-      const options = await this.quoteLalamove(req);
+      const options = await this.quoteLalamoveLifecycle(req);
       return {
         success: options.length > 0,
-        message: options.length > 0
-          ? null
-          : "Không tính được phí Lalamove cho địa chỉ này.",
+        message: options.length ? null : "Không tính được phí Lalamove cho địa chỉ này.",
         options,
       };
     }
-
     if (requested !== "all") return super.quote(req);
 
     const [mock, ghn, ghtk, lalamove] = await Promise.all([
       super.quote({ ...req, provider: "mock" }),
       super.quote({ ...req, provider: "ghn" }),
       super.quote({ ...req, provider: "ghtk" }),
-      this.quoteLalamove(req),
+      this.quoteLalamoveLifecycle(req),
     ]);
     const options = [
       ...mock.options,
       ...ghn.options,
       ...ghtk.options,
       ...lalamove,
-    ].sort((left, right) => left.fee - right.fee);
+    ].sort((a, b) => a.fee - b.fee);
     return {
       success: options.length > 0,
-      message: options.length > 0
-        ? null
-        : "Không tính được phí ship cho địa chỉ này.",
+      message: options.length ? null : "Không tính được phí ship cho địa chỉ này.",
       options,
     };
   }
@@ -126,32 +119,27 @@ export class LalamoveShippingService extends ShippingService {
   }
 
   override async track(userId: number, orderCode: string) {
-    const rows = await this.db.$queryRawUnsafe<LalamoveOrderRow[]>(
-      `${this.orderSelect()}
-       WHERE MaDonHang = ? AND NguoiDungId = ?
-       LIMIT 1`,
+    const rows = await this.db.$queryRawUnsafe<OrderRow[]>(
+      `${this.lalamoveOrderSelect()}
+       WHERE MaDonHang = ? AND NguoiDungId = ? LIMIT 1`,
       orderCode,
       userId,
     );
     const order = rows[0];
     if (
-      order &&
-      order.shippingProvider?.toLowerCase() === "lalamove" &&
+      order?.shippingProvider?.toLowerCase() === "lalamove" &&
       order.trackingCode
     ) {
-      await this.syncLalamoveOrder(
-        toNumber(order.id),
-        order.trackingCode,
-      ).catch(() => undefined);
+      await this.syncLalamoveOrder(toNumber(order.id), order.trackingCode)
+        .catch(() => undefined);
     }
     return super.track(userId, orderCode);
   }
 
   async cancelBeforeCustomerOrder(userId: number, orderId: number) {
-    const rows = await this.db.$queryRawUnsafe<LalamoveOrderRow[]>(
-      `${this.orderSelect()}
-       WHERE Id = ? AND NguoiDungId = ?
-       LIMIT 1`,
+    const rows = await this.db.$queryRawUnsafe<OrderRow[]>(
+      `${this.lalamoveOrderSelect()}
+       WHERE Id = ? AND NguoiDungId = ? LIMIT 1`,
       orderId,
       userId,
     );
@@ -165,7 +153,7 @@ export class LalamoveShippingService extends ShippingService {
       ![null, "ready_to_pick", "picking"].includes(order.shippingStatus)
     ) {
       throw new BadRequestException(
-        "Lalamove đã nhận/chạy đơn nên KaitoKid không còn cho phép hủy từ trạng thái hiện tại.",
+        "Lalamove đã nhận/chạy đơn nên KaitoKid không còn cho phép hủy ở trạng thái hiện tại.",
       );
     }
 
@@ -184,18 +172,14 @@ export class LalamoveShippingService extends ShippingService {
       );
       return { external: true };
     }
-
     const payload = await this.safeJson(response);
     if (response.status === 409) {
       throw new BadRequestException(
-        jsonMessage(
-          payload,
-          "Lalamove không cho phép hủy vận đơn ở trạng thái hiện tại.",
-        ),
+        apiMessage(payload, "Lalamove không cho phép hủy vận đơn ở trạng thái hiện tại."),
       );
     }
     throw new ServiceUnavailableException(
-      jsonMessage(payload, "Không thể hủy vận đơn Lalamove lúc này."),
+      apiMessage(payload, "Không thể hủy vận đơn Lalamove lúc này."),
     );
   }
 
@@ -207,8 +191,7 @@ export class LalamoveShippingService extends ShippingService {
         "Backend chưa cấu hình Lalamove webhook credentials.",
       );
     }
-
-    const valid = verifyLalamoveWebhookSignature({
+    if (!verifyLalamoveWebhookSignature({
       apiKey: body.apiKey,
       expectedApiKey: apiKey,
       apiSecret,
@@ -216,8 +199,7 @@ export class LalamoveShippingService extends ShippingService {
       signature: body.signature,
       path: this.webhookPath,
       data: body.data,
-    });
-    if (!valid) {
+    })) {
       throw new UnauthorizedException("Lalamove webhook signature không hợp lệ.");
     }
 
@@ -228,24 +210,21 @@ export class LalamoveShippingService extends ShippingService {
     const externalOrderId = text(externalOrder.orderId ?? data.orderId);
     if (!externalOrderId) return { received: true, ignored: true };
 
-    const rows = await this.db.$queryRawUnsafe<LalamoveOrderRow[]>(
-      `${this.orderSelect()}
+    const rows = await this.db.$queryRawUnsafe<OrderRow[]>(
+      `${this.lalamoveOrderSelect()}
        WHERE LOWER(COALESCE(NhaVanChuyen,'')) = 'lalamove'
-         AND MaVanDon = ?
-       LIMIT 1`,
+         AND MaVanDon = ? LIMIT 1`,
       externalOrderId,
     );
     const order = rows[0];
     if (!order) return { received: true, ignored: true };
     const orderId = toNumber(order.id);
-
     const marker = eventId ? `[LALAMOVE_EVENT:${eventId}]` : null;
+
     if (marker) {
       const duplicate = await this.db.$queryRawUnsafe<Array<{ id: unknown }>>(
-        `SELECT Id AS id
-         FROM LichSuTrangThaiVanChuyen
-         WHERE DonHangId = ? AND LOCATE(?, COALESCE(MoTa,'')) > 0
-         LIMIT 1`,
+        `SELECT Id AS id FROM LichSuTrangThaiVanChuyen
+         WHERE DonHangId = ? AND LOCATE(?, COALESCE(MoTa,'')) > 0 LIMIT 1`,
         orderId,
         marker,
       );
@@ -255,47 +234,41 @@ export class LalamoveShippingService extends ShippingService {
     const eventAt = this.eventTime(data, externalOrder);
     const latest = await this.latestLalamoveEventTime(orderId);
     const stale = Boolean(latest && eventAt && eventAt.getTime() < latest.getTime());
+    const state = {
+      ...externalOrder,
+      shareLink: externalOrder.shareLink ?? data.shareLink,
+      status: externalOrder.status ?? data.status,
+      driverId: externalOrder.driverId ?? data.driverId,
+    };
+    if (!stale) await this.applyState(orderId, state);
 
-    if (!stale) {
-      await this.applyState(orderId, {
-        ...externalOrder,
-        shareLink: externalOrder.shareLink ?? data.shareLink,
-        status: externalOrder.status ?? data.status,
-        driverId: externalOrder.driverId ?? data.driverId,
-      });
-    }
-
-    const status = text(externalOrder.status ?? data.status) ?? eventType;
-    const driverId = text(externalOrder.driverId ?? data.driverId);
-    const description = [
-      marker,
-      `Lalamove ${eventType}: ${status}`,
-      driverId ? `driver=${driverId}` : null,
-      stale ? "ignored=stale" : null,
-    ].filter(Boolean).join(" · ");
+    const rawStatus = text(state.status) ?? eventType;
+    const driverId = text(state.driverId);
     await this.insertHistoryAt(
       orderId,
-      this.mapStatus(status).shippingStatus,
-      description,
+      this.mapCarrierStatus(rawStatus).shippingStatus,
+      [
+        marker,
+        `Lalamove ${eventType}: ${rawStatus}`,
+        driverId ? `driver=${driverId}` : null,
+        stale ? "ignored=stale" : null,
+      ].filter(Boolean).join(" · "),
       "Lalamove",
       eventAt ?? new Date(),
     );
     return { received: true, stale };
   }
 
-  private async quoteLalamove(
+  private async quoteLalamoveLifecycle(
     req: ShippingQuoteInput,
   ): Promise<ShippingQuoteOption[]> {
     if (!req.toProvince?.trim() || !req.toDistrict?.trim()) return [];
-    const cfg = await this.loadConfig();
+    const cfg = await this.loadLalamoveConfig();
     if (!this.configReady(cfg)) return [];
-    const dropoffAddress = [
-      req.toAddress,
-      req.toWard,
-      req.toDistrict,
-      req.toProvince,
-    ].filter((value): value is string => Boolean(value?.trim())).join(", ");
-    if (!cfg.pickupAddress || !dropoffAddress) return [];
+    const dropoff = [req.toAddress, req.toWard, req.toDistrict, req.toProvince]
+      .filter((value): value is string => Boolean(value?.trim()))
+      .join(", ");
+    if (!cfg.pickupAddress || !dropoff) return [];
 
     try {
       const response = await lalamoveRequest(
@@ -308,28 +281,24 @@ export class LalamoveShippingService extends ShippingService {
             language: "vi_VN",
             stops: [
               { address: cfg.pickupAddress },
-              { address: dropoffAddress },
+              { address: dropoff },
             ],
           },
         },
       );
       if (!response.ok) return [];
-      const payload = record(await response.json());
-      const data = record(payload.data);
+      const data = record(record(await response.json()).data);
       const quotationId = text(data.quotationId);
-      const price = Number(record(data.priceBreakdown).total ?? 0);
+      const fee = Number(record(data.priceBreakdown).total ?? 0);
       const serviceType = text(data.serviceType) ?? cfg.serviceType;
-      if (!quotationId || !Number.isFinite(price) || price <= 0) return [];
-
+      if (!quotationId || !Number.isFinite(fee) || fee <= 0) return [];
       return [{
         provider: "lalamove",
-        // Với Lalamove, serviceCode chính là quotationId server-authoritative.
-        // OrdersService sẽ persist ID này và Place Order dùng lại ngay sau checkout.
         serviceCode: quotationId,
         serviceName: serviceType.toUpperCase() === "MOTORCYCLE"
           ? "Lalamove · Xe máy"
           : `Lalamove · ${serviceType}`,
-        fee: price,
+        fee,
         insuranceFee: 0,
         leadTimeHours: 2,
         deliveryType: "on_demand",
@@ -343,24 +312,19 @@ export class LalamoveShippingService extends ShippingService {
     orderId: number,
     quotationId: string,
   ): Promise<string> {
-    const rows = await this.db.$queryRawUnsafe<LalamoveOrderRow[]>(
-      `${this.orderSelect()} WHERE Id = ? LIMIT 1`,
+    const rows = await this.db.$queryRawUnsafe<OrderRow[]>(
+      `${this.lalamoveOrderSelect()} WHERE Id = ? LIMIT 1`,
       orderId,
     );
     const order = rows[0];
     if (!order) throw new Error("Đơn hàng không tồn tại.");
-    if (
-      order.shippingProvider?.toLowerCase() === "lalamove" &&
-      order.trackingCode
-    ) {
+    if (order.shippingProvider?.toLowerCase() === "lalamove" && order.trackingCode) {
       return order.trackingCode;
     }
 
     const cfg = await this.requireConfig();
     if (!cfg.pickupPhone) {
-      throw new Error(
-        "Lalamove cần số điện thoại điểm lấy hàng trong Admin Shipping.",
-      );
+      throw new Error("Lalamove cần số điện thoại điểm lấy hàng trong Admin Shipping.");
     }
 
     const quoteResponse = await lalamoveRequest(
@@ -371,7 +335,7 @@ export class LalamoveShippingService extends ShippingService {
     const quotePayload = await this.safeJson(quoteResponse);
     if (!quoteResponse.ok) {
       throw new Error(
-        jsonMessage(quotePayload, "Quotation Lalamove đã hết hạn hoặc không hợp lệ."),
+        apiMessage(quotePayload, "Quotation Lalamove đã hết hạn hoặc không hợp lệ."),
       );
     }
     const quotation = record(record(quotePayload).data);
@@ -410,18 +374,16 @@ export class LalamoveShippingService extends ShippingService {
     );
     const payload = await this.safeJson(response);
     if (!response.ok) {
-      throw new Error(jsonMessage(payload, "Lalamove Place Order thất bại."));
+      throw new Error(apiMessage(payload, "Lalamove Place Order thất bại."));
     }
-
     const data = record(record(payload).data);
     const externalOrderId = text(data.orderId);
     if (!externalOrderId) throw new Error("Lalamove không trả orderId.");
 
     await this.applyState(orderId, data, quotationId, externalOrderId);
-    const mapped = this.mapStatus(text(data.status));
     await this.appendHistory(
       orderId,
-      mapped.shippingStatus,
+      this.mapCarrierStatus(text(data.status)).shippingStatus,
       `Đã tạo vận đơn Lalamove ${externalOrderId} từ quotation ${quotationId}`,
       "Lalamove",
     );
@@ -436,18 +398,14 @@ export class LalamoveShippingService extends ShippingService {
       `/v3/orders/${encodeURIComponent(externalOrderId)}`,
     );
     if (!response.ok) return;
-    const payload = record(await response.json());
-    const data = record(payload.data);
-
-    const rows = await this.db.$queryRawUnsafe<Array<{ shippingStatus: string | null }>>(
-      `SELECT TrangThaiVanChuyen AS shippingStatus
-       FROM DonHang WHERE Id = ? LIMIT 1`,
+    const data = record(record(await response.json()).data);
+    const previous = await this.db.$queryRawUnsafe<Array<{ status: string | null }>>(
+      "SELECT TrangThaiVanChuyen AS status FROM DonHang WHERE Id = ? LIMIT 1",
       orderId,
     );
-    const previous = rows[0]?.shippingStatus ?? null;
     await this.applyState(orderId, data);
-    const mapped = this.mapStatus(text(data.status));
-    if (mapped.shippingStatus !== previous) {
+    const mapped = this.mapCarrierStatus(text(data.status));
+    if (mapped.shippingStatus !== (previous[0]?.status ?? null)) {
       await this.appendHistory(
         orderId,
         mapped.shippingStatus,
@@ -459,15 +417,11 @@ export class LalamoveShippingService extends ShippingService {
 
   private async applyState(
     orderId: number,
-    state: LalamoveState,
+    state: CarrierState,
     quotationId?: string,
     externalOrderId?: string,
   ) {
-    const mapped = this.mapStatus(text(state.status));
-    const shareLink = text(state.shareLink);
-    const trackingCode = externalOrderId ?? text(state.orderId);
-    const serviceCode = quotationId ?? text(state.quotationId);
-
+    const mapped = this.mapCarrierStatus(text(state.status));
     await this.db.$executeRawUnsafe(
       `UPDATE DonHang
        SET MaVanDon = COALESCE(?, MaVanDon),
@@ -483,9 +437,9 @@ export class LalamoveShippingService extends ShippingService {
            END,
            NgayCapNhat = ?
        WHERE Id = ?`,
-      trackingCode,
-      shareLink,
-      serviceCode,
+      externalOrderId ?? text(state.orderId),
+      text(state.shareLink),
+      quotationId ?? text(state.quotationId),
       mapped.shippingStatus,
       mapped.orderStatus,
       mapped.orderStatus,
@@ -495,37 +449,30 @@ export class LalamoveShippingService extends ShippingService {
     );
   }
 
-  private mapStatus(status: string | null): {
-    shippingStatus: string;
-    orderStatus: string | null;
-  } {
+  private mapCarrierStatus(status: string | null) {
     switch ((status ?? "").toUpperCase()) {
       case "ASSIGNING_DRIVER":
-        return { shippingStatus: "ready_to_pick", orderStatus: null };
+        return { shippingStatus: "ready_to_pick", orderStatus: null as string | null };
       case "ON_GOING":
-        // Dùng trạng thái riêng để CanCancel hiện hữu trở thành false sau khi
-        // đã gán tài xế; Lalamove chỉ cho hủy ON_GOING trong cửa sổ rất ngắn.
         return { shippingStatus: "lalamove_on_going", orderStatus: "confirmed" };
       case "PICKED_UP":
         return { shippingStatus: "delivering", orderStatus: "shipping" };
       case "COMPLETED":
         return { shippingStatus: "delivered", orderStatus: "completed" };
       case "CANCELED":
-        return { shippingStatus: "cancelled", orderStatus: null };
+        return { shippingStatus: "cancelled", orderStatus: null as string | null };
       case "REJECTED":
       case "EXPIRED":
-        return { shippingStatus: "failed", orderStatus: null };
+        return { shippingStatus: "failed", orderStatus: null as string | null };
       default:
-        return { shippingStatus: "ready_to_pick", orderStatus: null };
+        return { shippingStatus: "ready_to_pick", orderStatus: null as string | null };
     }
   }
 
   private async latestLalamoveEventTime(orderId: number): Promise<Date | null> {
     const rows = await this.db.$queryRawUnsafe<Array<{ time: Date | string | null }>>(
-      `SELECT MAX(ThoiGian) AS time
-       FROM LichSuTrangThaiVanChuyen
-       WHERE DonHangId = ?
-         AND LOCATE('[LALAMOVE_EVENT:', COALESCE(MoTa,'')) > 0`,
+      `SELECT MAX(ThoiGian) AS time FROM LichSuTrangThaiVanChuyen
+       WHERE DonHangId = ? AND LOCATE('[LALAMOVE_EVENT:', COALESCE(MoTa,'')) > 0`,
       orderId,
     );
     return rows[0]?.time ? new Date(rows[0].time) : null;
@@ -550,22 +497,17 @@ export class LalamoveShippingService extends ShippingService {
     );
   }
 
-  private eventTime(
-    data: Record<string, any>,
-    order: Record<string, any>,
-  ): Date | null {
+  private eventTime(data: Record<string, any>, order: Record<string, any>) {
     const raw = text(data.updatedAt ?? order.updatedAt);
     if (!raw) return null;
     const parsed = new Date(raw);
     return Number.isNaN(parsed.getTime()) ? null : parsed;
   }
 
-  private async loadConfig(): Promise<LalamoveRuntimeConfig> {
+  private async loadLalamoveConfig(): Promise<RuntimeConfig> {
     const rows = await this.db.$queryRawUnsafe<Array<{ value: string }>>(
-      `SELECT GiaTri AS value
-       FROM CauHinhCuaHang
-       WHERE NhomCauHinh = 'shipping' AND MaCauHinh = 'config'
-       LIMIT 1`,
+      `SELECT GiaTri AS value FROM CauHinhCuaHang
+       WHERE NhomCauHinh = 'shipping' AND MaCauHinh = 'config' LIMIT 1`,
     );
     let raw: Record<string, unknown> = {};
     try {
@@ -573,75 +515,61 @@ export class LalamoveShippingService extends ShippingService {
     } catch {
       raw = {};
     }
-
     const rawBranches = valueCaseInsensitive(raw, "KaitoKidBranches");
     const branches = Array.isArray(rawBranches)
       ? rawBranches.map(record).filter((branch) =>
           boolValue(valueCaseInsensitive(branch, "Active"), true)
         )
       : [];
-    const fallbackBranch = branches.find((branch) =>
-      text(valueCaseInsensitive(branch, "Address"))
+    const branch = branches.find((value) =>
+      text(valueCaseInsensitive(value, "Address"))
     );
-    const branchAddress = fallbackBranch
+    const branchAddress = branch
       ? [
-          text(valueCaseInsensitive(fallbackBranch, "Address")),
-          text(valueCaseInsensitive(fallbackBranch, "District")),
-          text(valueCaseInsensitive(fallbackBranch, "Province")),
+          text(valueCaseInsensitive(branch, "Address")),
+          text(valueCaseInsensitive(branch, "District")),
+          text(valueCaseInsensitive(branch, "Province")),
         ].filter(Boolean).join(", ")
       : null;
 
     return {
       enabled: boolValue(valueCaseInsensitive(raw, "LalamoveEnabled"), false),
-      baseUrl:
-        text(valueCaseInsensitive(raw, "LalamoveBaseUrl"))
+      baseUrl: text(valueCaseInsensitive(raw, "LalamoveBaseUrl"))
         ?? process.env.LALAMOVE_BASE_URL?.trim()
         ?? "https://rest.sandbox.lalamove.com",
-      market:
-        text(valueCaseInsensitive(raw, "LalamoveMarket"))
+      market: text(valueCaseInsensitive(raw, "LalamoveMarket"))
         ?? process.env.LALAMOVE_MARKET?.trim()
         ?? "VN",
       apiKey: process.env.LALAMOVE_API_KEY?.trim() || null,
       apiSecret: process.env.LALAMOVE_API_SECRET?.trim() || null,
-      serviceType:
-        text(valueCaseInsensitive(raw, "LalamoveServiceType"))
+      serviceType: text(valueCaseInsensitive(raw, "LalamoveServiceType"))
         ?? process.env.LALAMOVE_SERVICE_TYPE?.trim()
         ?? "MOTORCYCLE",
-      pickupAddress:
-        text(valueCaseInsensitive(raw, "PickupAddress"))
+      pickupAddress: text(valueCaseInsensitive(raw, "PickupAddress"))
         ?? process.env.LALAMOVE_PICKUP_ADDRESS?.trim()
         ?? branchAddress,
-      pickupName:
-        text(valueCaseInsensitive(raw, "PickupName"))
-        ?? text(valueCaseInsensitive(fallbackBranch ?? {}, "Name"))
+      pickupName: text(valueCaseInsensitive(raw, "PickupName"))
+        ?? text(valueCaseInsensitive(branch ?? {}, "Name"))
         ?? "KaitoKid Shop",
-      pickupPhone:
-        text(valueCaseInsensitive(raw, "PickupPhone"))
-        ?? text(valueCaseInsensitive(fallbackBranch ?? {}, "Phone")),
+      pickupPhone: text(valueCaseInsensitive(raw, "PickupPhone"))
+        ?? text(valueCaseInsensitive(branch ?? {}, "Phone")),
     };
   }
 
-  private configReady(cfg: LalamoveRuntimeConfig): boolean {
-    return Boolean(
-      cfg.enabled &&
-      cfg.apiKey &&
-      cfg.apiSecret &&
-      cfg.pickupAddress,
-    );
+  private configReady(cfg: RuntimeConfig) {
+    return Boolean(cfg.enabled && cfg.apiKey && cfg.apiSecret && cfg.pickupAddress);
   }
 
-  private async requireConfig(): Promise<LalamoveRuntimeConfig> {
-    const cfg = await this.loadConfig();
+  private async requireConfig() {
+    const cfg = await this.loadLalamoveConfig();
     if (!this.configReady(cfg) || !cfg.apiKey || !cfg.apiSecret) {
       throw new Error("Lalamove chưa được bật/cấu hình đầy đủ ở backend.");
     }
     return cfg;
   }
 
-  private requestConfig(cfg: LalamoveRuntimeConfig) {
-    if (!cfg.apiKey || !cfg.apiSecret) {
-      throw new Error("Thiếu Lalamove API credentials.");
-    }
+  private requestConfig(cfg: RuntimeConfig) {
+    if (!cfg.apiKey || !cfg.apiSecret) throw new Error("Thiếu Lalamove API credentials.");
     return {
       baseUrl: cfg.baseUrl,
       market: cfg.market,
@@ -650,7 +578,7 @@ export class LalamoveShippingService extends ShippingService {
     };
   }
 
-  private normalizePhone(value: string, market: string): string {
+  private normalizePhone(value: string, market: string) {
     const source = value.trim();
     if (source.startsWith("+")) return `+${source.slice(1).replace(/\D/g, "")}`;
     const digits = source.replace(/\D/g, "");
@@ -662,16 +590,16 @@ export class LalamoveShippingService extends ShippingService {
   }
 
   private async safeJson(response: Response): Promise<Record<string, unknown>> {
-    const textBody = await response.text();
-    if (!textBody) return {};
+    const body = await response.text();
+    if (!body) return {};
     try {
-      return record(JSON.parse(textBody));
+      return record(JSON.parse(body));
     } catch {
-      return { message: textBody.slice(0, 500) };
+      return { message: body.slice(0, 500) };
     }
   }
 
-  private orderSelect(): string {
+  private lalamoveOrderSelect() {
     return `SELECT
       Id AS id, MaDonHang AS orderCode, NguoiDungId AS userId,
       TenNguoiNhan AS customerName, SoDienThoai AS customerPhone,
