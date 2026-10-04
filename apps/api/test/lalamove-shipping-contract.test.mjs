@@ -8,6 +8,7 @@ function source(path) {
 
 const clientSource = source("../src/modules/shipping/lalamove.client.ts");
 const lifecycleSource = source("../src/modules/shipping/lalamove-shipping.service.ts");
+const hardenedSource = source("../src/modules/shipping/lalamove-shipping-hardened.service.ts");
 const moduleSource = source("../src/modules/shipping/shipping.module.ts");
 const controllerSource = source("../src/modules/shipping/shipping.controller.ts");
 const simulatorSource = source("../src/modules/shipping/shipping-status-simulator.service.ts");
@@ -56,21 +57,32 @@ test("Place Order re-quotes server-side and persists real carrier identifiers", 
   assert.match(lifecycleSource, /MaDichVuVanChuyen = COALESCE/);
 });
 
-test("Lalamove lifecycle replaces ShippingService without changing checkout callers", () => {
+test("DI routes ShippingService and Lalamove token through the hardened lifecycle", () => {
+  assert.match(moduleSource, /provide: LalamoveShippingService/);
+  assert.match(moduleSource, /useClass: HardenedLalamoveShippingService/);
   assert.match(moduleSource, /provide: ShippingService/);
   assert.match(moduleSource, /useExisting: LalamoveShippingService/);
   assert.match(lifecycleSource, /override async createShippingOrder/);
-  assert.match(lifecycleSource, /override async track/);
+  assert.match(hardenedSource, /override async createShippingOrder/);
 });
 
-test("tracking syncs real Lalamove order and supports idempotent retry of Place Order", () => {
+test("Place Order is claimed atomically and ambiguous outcomes fail closed", () => {
+  assert.match(hardenedSource, /TrangThaiVanChuyen = 'lalamove_placing'/);
+  assert.match(hardenedSource, /MaVanDon IS NULL/);
+  assert.match(hardenedSource, /if \(claimed === 0\)/);
+  assert.match(hardenedSource, /lalamove_place_unknown/);
+  assert.match(hardenedSource, /khóa auto-retry để tránh tạo trùng vận đơn/);
+});
+
+test("tracking syncs known Lalamove orders but never retries an ambiguous empty tracking code", () => {
   assert.match(
     lifecycleSource,
     /`\/v3\/orders\/\$\{encodeURIComponent\(externalOrderId\)\}`/,
   );
   assert.match(lifecycleSource, /syncLalamoveOrder/);
-  assert.match(lifecycleSource, /else if \(order\.shippingServiceCode\)/);
-  assert.match(lifecycleSource, /if \(order\.shippingProvider\?\.toLowerCase\(\) === "lalamove" && order\.trackingCode\)/);
+  assert.match(hardenedSource, /!current\.trackingCode/);
+  assert.match(hardenedSource, /ShippingService\.prototype\.track\.call/);
+  assert.match(hardenedSource, /must never trigger a second POST \/v3\/orders/);
 });
 
 test("customer cancel asks Lalamove first and propagates forbidden cancellation", () => {
@@ -84,11 +96,13 @@ test("customer cancel asks Lalamove first and propagates forbidden cancellation"
   assert.match(orderHelpersSource, /shippingStatus === "cancelled"/);
 });
 
-test("webhook events are idempotent and stale events cannot regress current state", () => {
+test("webhook events are idempotent, serialized per carrier order and stale-safe", () => {
   assert.match(lifecycleSource, /\[LALAMOVE_EVENT:\$\{eventId\}\]/);
   assert.match(lifecycleSource, /LOCATE\(\?, COALESCE\(MoTa,''\)\)/);
   assert.match(lifecycleSource, /ignored=stale/);
   assert.match(lifecycleSource, /if \(!stale\) await this\.applyState/);
+  assert.match(hardenedSource, /webhookQueues/);
+  assert.match(hardenedSource, /withWebhookQueue\(\s*externalOrderId/s);
   assert.match(lifecycleSource, /ASSIGNING_DRIVER/);
   assert.match(lifecycleSource, /ON_GOING/);
   assert.match(lifecycleSource, /PICKED_UP/);
@@ -105,4 +119,5 @@ test("shipping simulator never advances a real Lalamove shipment", () => {
 
 test("Lalamove never fabricates a carrier tracking code", () => {
   assert.doesNotMatch(lifecycleSource, /LALAMOVE-FAKE/);
+  assert.doesNotMatch(hardenedSource, /LALAMOVE-FAKE/);
 });
