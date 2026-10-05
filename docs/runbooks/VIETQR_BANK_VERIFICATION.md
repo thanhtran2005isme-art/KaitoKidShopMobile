@@ -1,10 +1,12 @@
-# VietQR Bank Verification — Admin Payment
+# VietQR Bank Verification — LEGACY PR #75
 
-## Mục tiêu
+> **Trạng thái:** Superseded cho Customer payment bởi D027/payOS từ 2026-10-05.
 
-Admin không được gõ tự do tên ngân hàng hoặc tên chủ tài khoản nhận tiền.
+Runbook này được giữ lại để giải thích phần code/config VietQR đã tồn tại trong giai đoạn trước của PR #75. Nó **không còn là acceptance path của online payment hiện hành**.
 
-Luồng chuẩn:
+## Trước D027
+
+PR #75 từng triển khai:
 
 ```text
 Admin Settings → Payment
@@ -13,77 +15,60 @@ Admin Settings → Payment
   → nhập STK 6–19 chữ số
   → POST /api/admin/payment/lookup-account
   → backend gọi VietQR /v2/lookup
-  → nhận accountName thật
-  → khóa trường Chủ tài khoản
-  → xác minh lại toàn bộ bank slot khi bấm Lưu
+  → nhận accountName
+  → lưu bank/account
+  → Customer tự dựng VietQR theo order amount/content
 ```
 
-Nếu lookup thất bại hoặc STK sai, UI không lưu cấu hình Payment.
+Mục tiêu khi đó là giảm lỗi nhập tay bank/account, nhưng flow này không cung cấp payment webhook authoritative để KaitoKid tự biết giao dịch ngân hàng đã thành công.
 
-## Backend secrets
+## Trạng thái hiện hành
 
-Thêm vào `apps/api/.env` (không commit giá trị thật):
+Online payment mới dùng payOS:
 
-```env
-VIETQR_BASE_URL=https://api.vietqr.io/v2
-VIETQR_CLIENT_ID=...
-VIETQR_API_KEY=...
+```text
+Customer Web/Mobile
+  → KaitoKid Node tạo/recover payOS payment request
+  → backend trả QR/payment link payOS
+  → khách thanh toán
+  → payOS signed webhook
+  → Node verify signature + amount + order
+  → DonHang.NgayThanhToan / confirmed
+  → Web/Mobile tự refresh success
 ```
 
-Client ID / API Key lấy từ My VietQR theo tài liệu VietQR. Hai giá trị này chỉ được dùng ở Node backend.
+Runbook phải dùng cho merge gate hiện tại:
 
-## Endpoint nội bộ KaitoKid
+```text
+docs/runbooks/PAYOS_PAYMENT_E2E.md
+```
 
-- `GET /api/admin/payment/banks`
-  - yêu cầu staff JWT + `settings.view`;
-  - backend proxy catalog VietQR;
-  - cache in-process 24 giờ;
-  - Web chỉ cho chọn bank có `transferSupported=true` và `lookupSupported=true`.
+Durable decision:
 
-- `POST /api/admin/payment/lookup-account`
-  - yêu cầu staff JWT + `settings.manage`;
-  - body `{ bankBin, accountNumber }`;
-  - STK chỉ nhận 6–19 chữ số;
-  - backend giữ secret và gọi VietQR `/v2/lookup`;
-  - thành công trả canonical bank + `accountName`.
+```text
+docs/decisions/D027-payos-payment-lifecycle.md
+```
 
-## QR checkout
+## Legacy code/config còn trong migration window
 
-Xác minh tài khoản và sinh QR là hai việc tách biệt:
+Các surface sau có thể vẫn còn trên branch trong lúc cleanup để không phá dữ liệu/config cũ:
 
-1. Admin xác minh bank + STK + account holder trước khi lưu.
-2. Customer Web/Mobile vẫn ưu tiên VietQR động theo số tiền + nội dung từng đơn.
-3. Ảnh QR Admin upload/dán URL chỉ là fallback khi VietQR động không tải được.
+- `VIETQR_BASE_URL`;
+- `VIETQR_CLIENT_ID` / `VIETQR_API_KEY`;
+- `GET /api/admin/payment/banks`;
+- `POST /api/admin/payment/lookup-account`;
+- Admin bank selector/account-holder verification/QR upload;
+- `bankAccounts` trong `CauHinhCuaHang`.
 
-Không dùng ảnh QR tĩnh để suy ra hoặc xác minh tên chủ tài khoản.
+Khi payOS đã cấu hình, các phần trên **không được** dùng làm payment authority cho Customer checkout và không được mở rộng thêm như kiến trúc hiện hành.
 
-## Troubleshooting
+## Không còn là merge gate
 
-### Danh sách ngân hàng không tải
+Các acceptance cũ sau đây không còn quyết định việc merge payment cutover:
 
-- kiểm tra Node API có internet;
-- kiểm tra `VIETQR_BASE_URL`;
-- thử lại `GET /api/admin/payment/banks` khi đang đăng nhập Admin.
+- VietQR lookup STK thật;
+- dynamic `img.vietqr.io` là QR chính;
+- QR upload làm fallback customer payment;
+- Customer Web/Mobile phụ thuộc Admin bank account.
 
-### Báo thiếu VIETQR_CLIENT_ID / VIETQR_API_KEY
-
-Điền credential thật vào `apps/api/.env`, restart Node API rồi bấm `Xác minh tài khoản` lại.
-
-### STK đúng nhưng lookup thất bại
-
-- xác nhận bank được chọn đúng;
-- chỉ nhập chữ số, không khoảng trắng/dấu chấm;
-- một số bank không hỗ trợ lookup; UI KaitoKid đã loại các bank đó khỏi danh sách selectable;
-- nếu VietQR rate-limit, đợi rồi thử lại; không bỏ qua bước xác minh bằng cách nhập tay account holder.
-
-## Acceptance local bắt buộc trước merge
-
-- chọn ngân hàng thật từ dropdown, không nhập chuỗi tự do;
-- nhập STK thật → lookup phải trả đúng chủ tài khoản;
-- đổi STK hoặc đổi ngân hàng → trạng thái verified cũ bị xóa ngay;
-- nhập sai STK → báo lỗi và không cho lưu Payment;
-- reload Admin sau khi lưu phải giữ đúng bank BIN/code/STK/chủ tài khoản;
-- tạo đơn ATM trên Web + Mobile và xác nhận VietQR động dùng đúng bank/STK/số tiền/nội dung;
-- QR upload/URL chỉ được dùng khi ảnh VietQR động tải lỗi.
-
-CI PR #75 đã khóa `admin-vietqr-contract.test.mjs`; build/API/Web/Mobile pass không thay thế acceptance lookup thật vì credential thật không được đưa vào CI.
+Chúng được thay bằng payOS credential + public webhook + signed payment E2E trong `PAYOS_PAYMENT_E2E.md`.
