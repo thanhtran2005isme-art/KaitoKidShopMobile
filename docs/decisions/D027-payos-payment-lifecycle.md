@@ -154,11 +154,22 @@ create KaitoKid order
 
 Không Place Order Lalamove trước khi payOS xác nhận tiền.
 
+### 9. Runtime cutover không phụ thuộc VietQR/Admin bank settings
+
+Từ cutover này, online payment mới chỉ được bật khi backend có đủ `PAYOS_CLIENT_ID`, `PAYOS_API_KEY`, `PAYOS_CHECKSUM_KEY` và `payosEnabled` không bị đặt thành `false`.
+
+Các key legacy như `bankEnabled`, `enableBankTransfer` hoặc việc tồn tại `bankAccounts` không còn quyền kích hoạt ATM cho đơn mới. Nếu `payosEnabled` chưa tồn tại, backend mặc định bật payOS khi credentials đã được cấu hình.
+
+Điều này tách rõ hai khái niệm:
+
+- **provider availability**: do payOS credentials + `payosEnabled` quyết định;
+- **legacy bank data**: chỉ còn để đọc/config migration hoặc xử lý đơn cũ, không phải payment provider hiện hành.
+
 ## Legacy VietQR/Admin
 
-Bank/VietQR settings hiện có được giữ tạm để đọc đơn/config legacy trong migration window. Chúng không còn là payment authority khi payOS credentials đã cấu hình.
+Bank/VietQR settings hiện có được giữ tạm để đọc đơn/config legacy trong migration window. Chúng không còn là payment authority và cũng không còn quyền kích hoạt online payment mới.
 
-`VIETQR_CLIENT_ID`/`VIETQR_API_KEY`, Admin bank verification UI và runbook VietQR cũ được xem là legacy work-in-progress của PR #75 và sẽ được retire/simplify dần; không dùng để kết luận rằng online payment mới cần customer tự chuyển khoản thủ công.
+`VIETQR_CLIENT_ID`/`VIETQR_API_KEY`, Admin bank verification UI và runbook VietQR cũ được xem là legacy migration surface của PR #75. Không mở rộng thêm luồng customer dựa vào VietQR tự ghép hoặc xác nhận thủ công.
 
 ## Database impact
 
@@ -187,4 +198,5 @@ Không merge payment cutover chỉ vì static/build PASS. Live acceptance cần 
 7. amount/signature invalid bị reject;
 8. cancel pending provider-first hoạt động;
 9. paid-vs-expiry/cancel race không hoàn tồn/coupon sai;
-10. paid online tạo shipment đúng một lần.
+10. paid online tạo shipment đúng một lần;
+11. khi thiếu payOS credentials, cấu hình VietQR/bank legacy không làm ATM xuất hiện cho đơn mới.
