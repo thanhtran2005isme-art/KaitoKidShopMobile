@@ -36,7 +36,7 @@ Legacy ASP.NET Core `backend/` đã retire trong retirement change. SQL/schema a
 
 - Origin mặc định: `http://localhost:5300`
 - REST/Auth/Admin/Customer/media: same origin
-- Socket.IO path: `/chatHub`
+- Socket.IO path: `/chatHub` cho chat realtime hiện có
 - MariaDB: `kaitokid`
 - Expected current base-table contract: 52 tables
 - Secrets: `apps/api/.env` (gitignored)
@@ -62,7 +62,7 @@ Node là background worker owner duy nhất; critical workers vẫn điều khi�
 - `ShoppingContext` phải chờ `AuthContext` restore session xong trước khi xử lý trạng thái no-token/logout.
 - Partial checkout giữ continuity qua reload bằng cách chỉ persist `CartItemIds` đã chọn: Expo Web dùng `localStorage`, native dùng `expo-secure-store`. Sau restore, Mobile tải cart thật từ backend rồi giữ các ID còn hợp lệ; logout xóa selection đã persist.
 - Không persist snapshot sản phẩm/giá/tồn kho/coupon/shipping làm source of truth ở checkout; backend vẫn authoritative theo D015 và D024.
-- Online payment screen trên PR #75 hiển thị QR/payment link payOS do backend cấp, có thể mở hosted checkout bằng `expo-web-browser`, và poll KaitoKid backend khoảng 3 giây khi pending. Sau verified webhook làm `paidAt` xuất hiện, Mobile tự chuyển sang Order Success.
+- Online payment screen trên PR #75 hiển thị QR/payment link payOS do backend cấp, có thể mở hosted checkout bằng `expo-web-browser`, và poll KaitoKid backend khoảng 3 giây khi pending. Polling chỉ refresh UI; verified payOS webhook/reconcile mới là payment authority. Sau `paidAt`, Mobile tự chuyển sang Order Success.
 - Mobile không đọc SMS, notification ngân hàng hoặc biến động số dư để xác định paid.
 - Lựa chọn thẻ tín dụng/thẻ ghi nợ cũ vẫn chỉ là UI/local validation; chưa phải card gateway riêng.
 
@@ -72,7 +72,7 @@ Node là background worker owner duy nhất; critical workers vẫn điều khi�
 - Customer + Staff/Admin cùng gọi Node `:5300`
 - Staff auth dùng chung `adminApiClient`; không fallback về legacy `localhost:5053`.
 - Chat realtime gọi Socket.IO Node `/chatHub`.
-- Customer Web payment trên PR #75 dùng owner-scoped `GET /api/payment/instructions/:orderCode`; QR/payment link payOS đến từ backend và Web poll KaitoKid backend khoảng 3 giây để refresh UI sau webhook.
+- Customer Web payment trên PR #75 dùng owner-scoped `GET /api/payment/instructions/:orderCode`; QR/payment link payOS đến từ backend và Web poll KaitoKid backend khoảng 3 giây để refresh UI sau webhook. Polling không tự xác nhận paid.
 - Admin bank/VietQR verification code của giai đoạn trước PR #75 là **legacy migration surface**. Nó không còn được phép bật online payment mới và không còn là payment authority cho customer checkout. Không mở rộng thêm luồng này.
 
 ## Database
@@ -142,7 +142,7 @@ docs/runbooks/PAYOS_PAYMENT_E2E.md
 - Partial checkout theo selected `CartItemIds`.
 - Checkout selection có thể persist qua reload, nhưng chỉ lưu ID; dữ liệu commerce authoritative vẫn lấy lại từ backend.
 - Pricing/coupon/combo/shipping/payment authoritative ở backend.
-- payOS signed webhook/reconcile là authority để set `NgayThanhToan`; return/cancel URL từ browser không được tự đánh dấu paid.
+- payOS signed webhook/reconcile là authority để set `NgayThanhToan`; return/cancel URL từ browser và polling UI không được tự đánh dấu paid.
 - `bankEnabled`/VietQR legacy không được kích hoạt online payment mới khi payOS chưa cấu hình.
 - Với online payment, cancel/expiry phải provider-first; chỉ restore stock/coupon sau khi payOS xác nhận chưa paid/cancelled.
 - Online paid mới được tạo shipment; duplicate webhook không được double-create shipment.
