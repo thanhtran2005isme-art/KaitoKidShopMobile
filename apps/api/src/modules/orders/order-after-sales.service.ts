@@ -11,6 +11,7 @@ const RETURN_MARKERS = [
   "return_received_restock",
   "return_received_quarantine",
 ] as const;
+const REFUND_MARKERS = ["refund_pending", "refund_completed_manual"] as const;
 
 type CustomerReturnStatus =
   | "none"
@@ -19,6 +20,8 @@ type CustomerReturnStatus =
   | "rejected"
   | "received_restock"
   | "received_quarantine";
+
+type CustomerRefundStatus = "none" | "pending" | "completed";
 
 interface AfterSalesRow {
   id: unknown;
@@ -50,6 +53,12 @@ function returnStatus(marker?: string): CustomerReturnStatus {
     case "return_received_quarantine": return "received_quarantine";
     default: return "none";
   }
+}
+
+function refundStatus(marker?: string): CustomerRefundStatus {
+  if (marker === "refund_pending") return "pending";
+  if (marker === "refund_completed_manual") return "completed";
+  return "none";
 }
 
 @Injectable()
@@ -89,18 +98,23 @@ export class OrderAfterSalesService {
          AND TrangThai IN (
            'received_by_customer',
            'return_requested','return_approved','return_rejected',
-           'return_received_restock','return_received_quarantine'
+           'return_received_restock','return_received_quarantine',
+           'refund_pending','refund_completed_manual'
          )
        ORDER BY ThoiGian ASC, Id ASC`,
       ...ids,
     );
     const receiptIds = new Set<number>();
     const latestReturnById = new Map<number, CustomerReturnStatus>();
+    const latestRefundById = new Map<number, CustomerRefundStatus>();
     for (const marker of markerRows) {
       const id = toNumber(marker.orderId);
       if (marker.status === "received_by_customer") receiptIds.add(id);
       if ((RETURN_MARKERS as readonly string[]).includes(marker.status)) {
         latestReturnById.set(id, returnStatus(marker.status));
+      }
+      if ((REFUND_MARKERS as readonly string[]).includes(marker.status)) {
+        latestRefundById.set(id, refundStatus(marker.status));
       }
     }
 
@@ -111,6 +125,7 @@ export class OrderAfterSalesService {
         byId.get(order.id),
         receiptIds.has(order.id),
         latestReturnById.get(order.id) ?? "none",
+        latestRefundById.get(order.id) ?? "none",
       ),
     );
   }
@@ -294,6 +309,7 @@ export class OrderAfterSalesService {
     row: AfterSalesRow | undefined,
     receiptMarker: boolean,
     currentReturnStatus: CustomerReturnStatus,
+    currentRefundStatus: CustomerRefundStatus,
   ) {
     if (!row) return order;
 
@@ -336,6 +352,7 @@ export class OrderAfterSalesService {
       canRequestReturn,
       returnRequested,
       returnStatus: currentReturnStatus,
+      refundStatus: currentRefundStatus,
       receivedAt: receiptConfirmed ? completedAt : null,
       returnDeadline,
       returnWindowDays: 7,
