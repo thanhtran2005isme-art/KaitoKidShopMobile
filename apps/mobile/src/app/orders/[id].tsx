@@ -1,9 +1,10 @@
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  AppState,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -40,8 +41,28 @@ type OrderAction =
   | 'report-not-received'
   | 'return-request';
 
+const LALAMOVE_POLL_MS = 10_000;
+const LALAMOVE_TERMINAL_SHIPPING_STATUSES = new Set([
+  'delivered',
+  'completed',
+  'received_by_customer',
+  'delivery_disputed',
+  'returned',
+  'carrier_cancelled',
+  'cancelled',
+  'failed',
+]);
+
 function messageFrom(error: unknown, fallback: string) {
   return error instanceof Error && error.message ? error.message : fallback;
+}
+
+function shouldPollLalamove(order: CustomerOrder | null) {
+  if (!order) return false;
+  if ((order.shippingProvider || '').toLowerCase() !== 'lalamove') return false;
+  if (!order.trackingCode) return false;
+  if (['cancelled', 'completed', 'returned'].includes((order.status || '').toLowerCase())) return false;
+  return !LALAMOVE_TERMINAL_SHIPPING_STATUSES.has((order.shippingStatus || '').toLowerCase());
 }
 
 export default function OrderDetailScreen() {
@@ -59,6 +80,7 @@ export default function OrderDetailScreen() {
   const [showReturnForm, setShowReturnForm] = useState(false);
   const [returnReason, setReturnReason] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const livePollInFlight = useRef(false);
 
   const loadOrder = useCallback(
     async (mode: 'initial' | 'refresh' = 'initial') => {
@@ -87,6 +109,42 @@ export default function OrderDetailScreen() {
   useEffect(() => {
     if (!authLoading) void loadOrder('initial');
   }, [authLoading, loadOrder]);
+
+  useEffect(() => {
+    if (!token || actionBusy || !shouldPollLalamove(order)) return;
+
+    let disposed = false;
+    const syncLiveLalamove = async () => {
+      if (
+        disposed ||
+        livePollInFlight.current ||
+        AppState.currentState !== 'active' ||
+        !order
+      ) return;
+
+      livePollInFlight.current = true;
+      try {
+        await ordersApi.getTracking(token, order.orderCode);
+        if (disposed) return;
+        const nextOrder = await ordersApi.getOrder(token, order.id);
+        if (!disposed) setOrder(nextOrder);
+      } catch {
+        // Webhook là nguồn chính; giữ dữ liệu và lỗi thao tác hiện có nếu fallback thất bại.
+      } finally {
+        livePollInFlight.current = false;
+      }
+    };
+
+    const interval = setInterval(() => void syncLiveLalamove(), LALAMOVE_POLL_MS);
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') void syncLiveLalamove();
+    });
+    return () => {
+      disposed = true;
+      clearInterval(interval);
+      subscription.remove();
+    };
+  }, [actionBusy, order, token]);
 
   const cancelOrder = () => {
     if (!token || !order || !order.canCancel || actionBusy) return;
