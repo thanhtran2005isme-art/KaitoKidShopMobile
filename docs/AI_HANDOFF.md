@@ -47,6 +47,8 @@ Legacy ASP.NET Core `backend/` đã retire trong retirement change. SQL/schema a
 - payOS webhook public: `POST /api/payment/payos/webhook`; endpoint không dùng KaitoKid JWT nhưng bắt buộc verify checksum signature, currency, amount và order mapping trước khi xác nhận paid.
 - `DonHang.Id` là integer `orderCode` gửi sang payOS; `MaDonHang` tiếp tục là display code cho customer.
 - Payment DB compatibility code hiện vẫn là `ATM`; client nhận thêm `paymentProvider='payos'`. Không tự hiểu `ATM` là manual VietQR khi payOS đã cấu hình.
+- **Runtime cutover:** đơn online mới chỉ bật khi đủ `PAYOS_CLIENT_ID` + `PAYOS_API_KEY` + `PAYOS_CHECKSUM_KEY` và `payosEnabled` không bị đặt `false`. `bankEnabled`, `enableBankTransfer` và `bankAccounts` legacy không còn quyền kích hoạt ATM mới.
+- Bank/VietQR settings cũ vẫn có thể tồn tại để đọc config/đơn legacy trong migration window; không dùng chúng làm payment authority hiện hành.
 
 Node là background worker owner duy nhất; critical workers vẫn điều khiển bằng feature flags.
 
@@ -71,7 +73,7 @@ Node là background worker owner duy nhất; critical workers vẫn điều khi�
 - Staff auth dùng chung `adminApiClient`; không fallback về legacy `localhost:5053`.
 - Chat realtime gọi Socket.IO Node `/chatHub`.
 - Customer Web payment trên PR #75 dùng owner-scoped `GET /api/payment/instructions/:orderCode`; QR/payment link payOS đến từ backend và Web poll KaitoKid backend khoảng 3 giây để refresh UI sau webhook.
-- Admin bank/VietQR verification code của giai đoạn trước PR #75 hiện là legacy migration surface. Khi payOS credentials hoạt động, nó không còn là payment authority cho customer checkout và cần được retire/simplify thay vì mở rộng thêm.
+- Admin bank/VietQR verification code của giai đoạn trước PR #75 là **legacy migration surface**. Nó không còn được phép bật online payment mới và không còn là payment authority cho customer checkout. Không mở rộng thêm luồng này.
 
 ## Database
 
@@ -141,6 +143,7 @@ docs/runbooks/PAYOS_PAYMENT_E2E.md
 - Checkout selection có thể persist qua reload, nhưng chỉ lưu ID; dữ liệu commerce authoritative vẫn lấy lại từ backend.
 - Pricing/coupon/combo/shipping/payment authoritative ở backend.
 - payOS signed webhook/reconcile là authority để set `NgayThanhToan`; return/cancel URL từ browser không được tự đánh dấu paid.
+- `bankEnabled`/VietQR legacy không được kích hoạt online payment mới khi payOS chưa cấu hình.
 - Với online payment, cancel/expiry phải provider-first; chỉ restore stock/coupon sau khi payOS xác nhận chưa paid/cancelled.
 - Online paid mới được tạo shipment; duplicate webhook không được double-create shipment.
 - Payment/order cancellation/restock idempotent dưới race.
@@ -158,6 +161,6 @@ docs/runbooks/PAYOS_PAYMENT_E2E.md
 3. Read `docs/ARCHITECTURE.md`, `docs/BRAND.md`, relevant decisions/troubleshooting.
 4. Nếu tiếp tục PR #75, đọc D025, D026, **D027** và các runbook Lalamove/payOS trước khi sửa code.
 5. Inspect current `main` + recent Git history; PR #75 chưa merge thì không coi behavior nhánh là `main` source of truth.
-6. Do not infer a C# fallback from old migration docs; `apps/api` is the current backend source of truth.
+6. Do not infer a C# fallback from old migration docs; `apps/api` là backend source of truth hiện hành.
 7. One task/fix/phase = one aggregate commit by default; AI commit descriptions in Vietnamese.
 8. Khi một fix làm thay đổi architecture, operations hoặc durable behavior, cập nhật docs liên quan trong cùng task/PR; cosmetic-only fix không cần tạo quyết định mới.
