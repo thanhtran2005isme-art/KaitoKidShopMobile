@@ -56,8 +56,9 @@ export interface EnsurePayOsPaymentInput {
   paymentExpiresAt: Date | string | null;
 }
 
-interface CachedQrPayment {
+interface CachedProviderPayment {
   payment: PayOsPayment;
+  refreshedAtMs: number;
   expiresAtMs: number;
 }
 
@@ -83,13 +84,19 @@ function numberValue(value: unknown): number {
 }
 
 const ORDER_SUFFIX_BASE = 0x1000000;
-const QR_CACHE_FALLBACK_TTL_MS = 20 * 60_000;
+const PROVIDER_CACHE_FALLBACK_TTL_MS = 20 * 60_000;
+const STATUS_PROVIDER_MIN_INTERVAL_MS = 10_000;
+const RATE_LIMIT_BACKOFF_INITIAL_MS = 15_000;
+const RATE_LIMIT_BACKOFF_MAX_MS = 60_000;
 
 @Injectable()
 export class PayOsService {
   private sdk: PayOsSdkClient | null = null;
   private readonly ensureFlights = new Map<string, Promise<PayOsPayment>>();
-  private readonly qrCache = new Map<number, CachedQrPayment>();
+  private readonly getFlights = new Map<number, Promise<PayOsPayment>>();
+  private readonly paymentCache = new Map<number, CachedProviderPayment>();
+  private rateLimitUntilMs = 0;
+  private rateLimitBackoffMs = RATE_LIMIT_BACKOFF_INITIAL_MS;
 
   isConfigured(): boolean {
     return Boolean(
@@ -151,6 +158,14 @@ export class PayOsService {
     const providerOrderCode = this.providerOrderCode(input.orderCode);
     this.assertPaymentInput(providerOrderCode, input.amount);
 
+    // Instructions có thể bị gọi lại do StrictMode/re-render. Nếu payment vừa
+    // được create/get trong process này thì dùng cache, không hit payOS lần nữa.
+    const cached = this.cachedPayment(providerOrderCode);
+    if (cached) {
+      this.assertSameAmount(cached, input.amount);
+      return cached;
+    }
+
     try {
       const existing = await this.getPayment(providerOrderCode);
       this.assertSameAmount(existing, input.amount);
@@ -175,12 +190,21 @@ export class PayOsService {
     };
     if (expires && Number.isFinite(expires)) payload.expiredAt = expires;
 
+    if (Date.now() < this.rateLimitUntilMs) {
+      throw this.rateLimitError();
+    }
+
     try {
       const created = await this.client().paymentRequests.create(payload);
+      this.resetRateLimitBackoff();
       const normalized = this.normalizePayment(created);
       this.assertSameAmount(normalized, input.amount);
-      return this.rememberQr(normalized, input.paymentExpiresAt);
+      return this.rememberPayment(normalized, input.paymentExpiresAt);
     } catch (error) {
+      if (this.isRateLimited(error)) {
+        this.noteRateLimit();
+        throw this.rateLimitError();
+      }
       if (this.isAlreadyExists(error)) {
         const recovered = await this.recoverExistingPayment(
           providerOrderCode,
@@ -192,16 +216,77 @@ export class PayOsService {
     }
   }
 
+  /**
+   * Fresh provider read dùng cho cancel/expiry và các trust boundary cần trạng
+   * thái mới nhất. Concurrent GET cùng order được coalesce để tránh burst.
+   */
   async getPayment(providerOrderCode: number): Promise<PayOsPayment> {
+    return this.fetchPayment(providerOrderCode, false);
+  }
+
+  /**
+   * Polling Web/Mobile có thể gọi KaitoKid mỗi vài giây nhưng backend không được
+   * gọi payOS cùng tần suất. Cache tối thiểu 10 giây/order; nếu payOS trả 429,
+   * dùng trạng thái cache tạm thời và exponential cooldown thay vì tạo burst.
+   */
+  async getPaymentForStatus(providerOrderCode: number): Promise<PayOsPayment> {
     this.assertOrderId(providerOrderCode);
-    try {
-      const value = await this.client().paymentRequests.get(providerOrderCode);
-      return this.mergeCachedQr(this.normalizePayment(value));
-    } catch (error) {
-      if (this.isNotFound(error)) {
-        throw new NotFoundException("Yêu cầu thanh toán payOS chưa tồn tại");
+    const cached = this.cachedEntry(providerOrderCode);
+    if (
+      cached &&
+      Date.now() - cached.refreshedAtMs < STATUS_PROVIDER_MIN_INTERVAL_MS
+    ) {
+      return cached.payment;
+    }
+    if (Date.now() < this.rateLimitUntilMs) {
+      if (cached) return cached.payment;
+      throw this.rateLimitError();
+    }
+    return this.fetchPayment(providerOrderCode, true);
+  }
+
+  private async fetchPayment(
+    providerOrderCode: number,
+    allowStaleOnRateLimit: boolean,
+  ): Promise<PayOsPayment> {
+    this.assertOrderId(providerOrderCode);
+
+    if (Date.now() < this.rateLimitUntilMs) {
+      const cached = this.cachedEntry(providerOrderCode);
+      if (allowStaleOnRateLimit && cached) return cached.payment;
+      throw this.rateLimitError();
+    }
+
+    const existingFlight = this.getFlights.get(providerOrderCode);
+    if (existingFlight) return existingFlight;
+
+    const flight = (async () => {
+      try {
+        const value = await this.client().paymentRequests.get(providerOrderCode);
+        this.resetRateLimitBackoff();
+        const normalized = this.normalizePayment(value);
+        return this.rememberPayment(normalized, null);
+      } catch (error) {
+        if (this.isNotFound(error)) {
+          throw new NotFoundException("Yêu cầu thanh toán payOS chưa tồn tại");
+        }
+        if (this.isRateLimited(error)) {
+          this.noteRateLimit();
+          const cached = this.cachedEntry(providerOrderCode);
+          if (allowStaleOnRateLimit && cached) return cached.payment;
+          throw this.rateLimitError();
+        }
+        throw this.providerError("Không thể đọc trạng thái payOS", error);
       }
-      throw this.providerError("Không thể đọc trạng thái payOS", error);
+    })();
+
+    this.getFlights.set(providerOrderCode, flight);
+    try {
+      return await flight;
+    } finally {
+      if (this.getFlights.get(providerOrderCode) === flight) {
+        this.getFlights.delete(providerOrderCode);
+      }
     }
   }
 
@@ -215,9 +300,15 @@ export class PayOsService {
         providerOrderCode,
         reason.slice(0, 255),
       );
-      this.qrCache.delete(providerOrderCode);
-      return this.normalizePayment(value);
+      this.resetRateLimitBackoff();
+      const normalized = this.normalizePayment(value);
+      this.paymentCache.delete(providerOrderCode);
+      return normalized;
     } catch (error) {
+      if (this.isRateLimited(error)) {
+        this.noteRateLimit();
+        throw this.rateLimitError();
+      }
       throw this.providerError("Không thể hủy yêu cầu thanh toán payOS", error);
     }
   }
@@ -306,42 +397,57 @@ export class PayOsService {
     };
   }
 
-  private rememberQr(
+  private rememberPayment(
     payment: PayOsPayment,
     paymentExpiresAt: Date | string | null,
   ): PayOsPayment {
-    if (!payment.qrCode || !Number.isSafeInteger(payment.orderCode)) return payment;
+    if (!Number.isSafeInteger(payment.orderCode) || payment.orderCode <= 0) {
+      return payment;
+    }
+
+    const previous = this.cachedEntry(payment.orderCode);
+    const merged: PayOsPayment = previous
+      ? {
+          ...payment,
+          qrCode: payment.qrCode ?? previous.payment.qrCode,
+          checkoutUrl: payment.checkoutUrl ?? previous.payment.checkoutUrl,
+          paymentLinkId:
+            payment.paymentLinkId ?? previous.payment.paymentLinkId,
+          description: payment.description ?? previous.payment.description,
+          bin: payment.bin ?? previous.payment.bin,
+          accountNumber:
+            payment.accountNumber ?? previous.payment.accountNumber,
+          accountName: payment.accountName ?? previous.payment.accountName,
+        }
+      : payment;
+
     const requestedExpiry = paymentExpiresAt
       ? new Date(paymentExpiresAt).getTime()
       : Number.NaN;
     const expiresAtMs = Number.isFinite(requestedExpiry)
       ? Math.max(Date.now() + 60_000, requestedExpiry + 60_000)
-      : Date.now() + QR_CACHE_FALLBACK_TTL_MS;
-    this.qrCache.set(payment.orderCode, { payment, expiresAtMs });
-    return payment;
+      : previous?.expiresAtMs ?? Date.now() + PROVIDER_CACHE_FALLBACK_TTL_MS;
+
+    this.paymentCache.set(payment.orderCode, {
+      payment: merged,
+      refreshedAtMs: Date.now(),
+      expiresAtMs,
+    });
+    return merged;
   }
 
-  private mergeCachedQr(payment: PayOsPayment): PayOsPayment {
-    const cached = this.qrCache.get(payment.orderCode);
-    if (!cached) return payment;
+  private cachedEntry(providerOrderCode: number): CachedProviderPayment | null {
+    const cached = this.paymentCache.get(providerOrderCode);
+    if (!cached) return null;
     if (cached.expiresAtMs <= Date.now()) {
-      this.qrCache.delete(payment.orderCode);
-      return payment;
+      this.paymentCache.delete(providerOrderCode);
+      return null;
     }
-    if (Math.round(cached.payment.amount) !== Math.round(payment.amount)) {
-      this.qrCache.delete(payment.orderCode);
-      return payment;
-    }
-    return {
-      ...payment,
-      qrCode: payment.qrCode ?? cached.payment.qrCode,
-      checkoutUrl: payment.checkoutUrl ?? cached.payment.checkoutUrl,
-      paymentLinkId: payment.paymentLinkId ?? cached.payment.paymentLinkId,
-      description: payment.description ?? cached.payment.description,
-      bin: payment.bin ?? cached.payment.bin,
-      accountNumber: payment.accountNumber ?? cached.payment.accountNumber,
-      accountName: payment.accountName ?? cached.payment.accountName,
-    };
+    return cached;
+  }
+
+  private cachedPayment(providerOrderCode: number): PayOsPayment | null {
+    return this.cachedEntry(providerOrderCode)?.payment ?? null;
   }
 
   private async recoverExistingPayment(
@@ -433,6 +539,45 @@ export class PayOsService {
       numberValue(raw.code) === 231 ||
       /\bcode:\s*231\b/i.test(message) ||
       /Đơn thanh toán đã tồn tại/i.test(message)
+    );
+  }
+
+  private isRateLimited(error: unknown): boolean {
+    const raw = record(error);
+    const response = record(raw.response);
+    const message = error instanceof Error ? error.message : String(error);
+    return (
+      numberValue(raw.status) === 429 ||
+      numberValue(raw.statusCode) === 429 ||
+      numberValue(response.status) === 429 ||
+      /\b429\b|too many requests/i.test(message)
+    );
+  }
+
+  private noteRateLimit(): void {
+    const now = Date.now();
+    this.rateLimitUntilMs = Math.max(
+      this.rateLimitUntilMs,
+      now + this.rateLimitBackoffMs,
+    );
+    this.rateLimitBackoffMs = Math.min(
+      this.rateLimitBackoffMs * 2,
+      RATE_LIMIT_BACKOFF_MAX_MS,
+    );
+  }
+
+  private resetRateLimitBackoff(): void {
+    this.rateLimitUntilMs = 0;
+    this.rateLimitBackoffMs = RATE_LIMIT_BACKOFF_INITIAL_MS;
+  }
+
+  private rateLimitError(): ServiceUnavailableException {
+    const seconds = Math.max(
+      1,
+      Math.ceil((this.rateLimitUntilMs - Date.now()) / 1000),
+    );
+    return new ServiceUnavailableException(
+      `payOS đang giới hạn tần suất truy cập; KaitoKid sẽ tự thử lại sau khoảng ${seconds} giây`,
     );
   }
 
