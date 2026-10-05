@@ -8,6 +8,7 @@ import { BRAND_COLORS } from '@/constants/brand';
 import { resolveMediaUrl } from '@/services/api-client';
 import type { CustomerOrder } from '@/types/orders';
 import {
+  afterSalesStatusMeta,
   formatDateTime,
   formatMoney,
 } from '@/utils/order-status';
@@ -25,6 +26,7 @@ function OrderCardBase({
   );
   const preview = order.items.slice(0, 2);
   const hiddenCount = Math.max(0, order.items.length - preview.length);
+  const afterSales = afterSalesStatusMeta(order);
 
   return (
     <Pressable
@@ -83,6 +85,21 @@ function OrderCardBase({
         <Text style={styles.moreText}>
           {'+' + hiddenCount + ' sản phẩm khác trong đơn'}
         </Text>
+      ) : null}
+
+      {afterSales ? (
+        <View
+          style={[
+            styles.afterSalesCard,
+            afterSales.tone === 'success' && styles.afterSalesSuccess,
+            afterSales.tone === 'danger' && styles.afterSalesDanger,
+            afterSales.tone === 'info' && styles.afterSalesInfo,
+          ]}>
+          <Text style={styles.afterSalesLabel}>{afterSales.label}</Text>
+          <Text numberOfLines={2} style={styles.afterSalesText}>
+            {afterSales.description}
+          </Text>
+        </View>
       ) : null}
 
       <View style={styles.summaryRow}>
@@ -177,6 +194,39 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 17,
     fontWeight: '800',
+  },
+  afterSalesCard: {
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+    backgroundColor: '#FFFBEB',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    gap: 3,
+  },
+  afterSalesSuccess: {
+    borderColor: '#BBF7D0',
+    backgroundColor: '#F0FDF4',
+  },
+  afterSalesDanger: {
+    borderColor: '#FECACA',
+    backgroundColor: '#FEF2F2',
+  },
+  afterSalesInfo: {
+    borderColor: '#BFDBFE',
+    backgroundColor: '#EFF6FF',
+  },
+  afterSalesLabel: {
+    color: BRAND_COLORS.ink,
+    fontSize: 12,
+    lineHeight: 17,
+    fontWeight: '900',
+  },
+  afterSalesText: {
+    color: BRAND_COLORS.muted,
+    fontSize: 11,
+    lineHeight: 16,
+    fontWeight: '600',
   },
   summaryRow: {
     paddingTop: 13,
