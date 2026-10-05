@@ -26,7 +26,7 @@ Callback URL chỉ phục vụ UX; không phải authority paid.
 
 `payosEnabled` là optional store setting. Nếu key này chưa tồn tại, backend tự bật online payment khi ba credentials payOS đã đủ. Nếu `payosEnabled=false`, ATM/online bị tắt dù credentials còn tồn tại.
 
-Các key legacy `bankEnabled`, `enableBankTransfer`, `bankAccounts` **không còn được phép bật online payment mới**.
+Các key legacy `bankEnabled`, `enableBankTransfer`, `bankAccounts` **không còn được phép bật online payment mới**. VietQR verification cũ không còn là merge gate.
 
 ## 2. Public webhook
 
