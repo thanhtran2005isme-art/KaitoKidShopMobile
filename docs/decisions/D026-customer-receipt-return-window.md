@@ -34,6 +34,30 @@ Review chỉ được tạo khi đơn đúng owner, đúng order/product/variant
 - `return_requested` và các quyết định hậu mãi nằm trong `LichSuTrangThaiVanChuyen`; không thêm enum giả vào `DonHang.TrangThai`.
 - Customer DTO trả `returnStatus` theo marker mới nhất thay vì chỉ kiểm tra “đã từng có request hay chưa”.
 
+## Projection hậu mãi cho Customer Web/Mobile
+
+Customer DTO phải trả riêng hai trục trạng thái, đều lấy từ **marker mới nhất có authority** trong `LichSuTrangThaiVanChuyen`:
+
+- `returnStatus`:
+  - `none`
+  - `requested`
+  - `approved`
+  - `rejected`
+  - `received_restock`
+  - `received_quarantine`
+- `refundStatus`:
+  - `none`
+  - `pending` từ marker `refund_pending`
+  - `completed` từ marker `refund_completed_manual`.
+
+UI Customer Web/Mobile không được suy hoàn tiền từ `DonHang.TrangThai=returned`. Khi cùng lúc có return state và refund state, trạng thái refund có độ ưu tiên hiển thị cao hơn vì phản ánh bước hậu mãi mới hơn:
+
+1. `refundStatus=completed` → “Đã ghi nhận hoàn tiền”;
+2. `refundStatus=pending` → “Đang chờ hoàn tiền”;
+3. nếu chưa có refund marker mới hiển thị `returnStatus` hiện tại.
+
+`refundStatus=completed` chỉ có nghĩa Admin đã xác nhận hoàn tiền thủ công theo audit hiện tại; **không được mô tả như bằng chứng payment gateway đã tự refund**.
+
 ## Workflow Admin hậu mãi
 
 ### 1. Duyệt / từ chối
