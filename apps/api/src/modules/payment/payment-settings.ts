@@ -12,6 +12,7 @@ export interface PaymentBankAccount {
 export interface PaymentSettings {
   enableCod: boolean;
   enableBank: boolean;
+  enablePayOs: boolean;
   bankAccounts: PaymentBankAccount[];
 }
 
@@ -69,6 +70,14 @@ function readBoolAliases(
   return fallback;
 }
 
+function payOsConfigured(): boolean {
+  return Boolean(
+    process.env.PAYOS_CLIENT_ID?.trim() &&
+    process.env.PAYOS_API_KEY?.trim() &&
+    process.env.PAYOS_CHECKSUM_KEY?.trim(),
+  );
+}
+
 export async function loadPaymentSettings(
   client: SqlClient,
 ): Promise<PaymentSettings> {
@@ -79,6 +88,8 @@ export async function loadPaymentSettings(
   );
   const map = new Map(rows.map((row) => [row.code, row.value]));
 
+  // Tài khoản ngân hàng cũ vẫn được đọc để không phá các đơn/config legacy,
+  // nhưng payment customer hiện hành ưu tiên payOS khi backend có credentials.
   const accounts: PaymentBankAccount[] = [];
   const json = map.get("bankAccounts");
   if (json?.trim()) {
@@ -120,16 +131,19 @@ export async function loadPaymentSettings(
     }
   }
 
+  const configuredPayOs = payOsConfigured();
+  const onlineEnabled = readBoolAliases(
+    map,
+    ["payosEnabled", "bankEnabled", "enableBankTransfer"],
+    configuredPayOs || accounts.length > 0,
+  );
+
   return {
-    // Admin Web hiện lưu codEnabled/bankEnabled; vẫn đọc alias legacy để
-    // tương thích dữ liệu cũ đã tồn tại trong CauHinhCuaHang.
     enableCod: readBoolAliases(map, ["codEnabled", "enableCOD"], true),
-    enableBank:
-      readBoolAliases(
-        map,
-        ["bankEnabled", "enableBankTransfer"],
-        accounts.length > 0,
-      ) && accounts.length > 0,
+    // Giữ tên enableBank để OrdersService legacy không phải đổi contract ngay.
+    // Khi payOS được cấu hình, ATM hiện tại chính là online bank-transfer qua payOS.
+    enableBank: onlineEnabled && (configuredPayOs || accounts.length > 0),
+    enablePayOs: onlineEnabled && configuredPayOs,
     bankAccounts: accounts,
   };
 }
