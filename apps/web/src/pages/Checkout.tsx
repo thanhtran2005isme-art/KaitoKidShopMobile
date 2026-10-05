@@ -29,7 +29,7 @@ type PaymentMethod = 'atm' | 'cod';
 type ShippingProviderCode = 'mock' | 'ghn' | 'ghtk' | 'lalamove' | 'all';
 
 export default function Checkout() {
-  const { cart, subtotal, clearCart } = useCart();
+  const { cart, subtotal, refreshCart } = useCart();
   const { user } = useAuth();
   const navigate = useNavigate();
 
@@ -236,7 +236,10 @@ export default function Checkout() {
         });
       }
 
-      await clearCart();
+      // Backend là authority cho cart: chỉ refresh state sau khi order transaction
+      // hoàn tất. Không gọi clearCart() ở client vì sẽ xóa cả item không thuộc
+      // checkout/partial checkout và phá khả năng restore khi payment bị hủy.
+      await refreshCart();
       setShowReview(false);
       setPendingOrder(orderInfo);
 
@@ -284,7 +287,6 @@ export default function Checkout() {
         onPaid={() => {
           setPaymentStep(false);
           setCompletedStep(true);
-          window.scrollTo({ top: 0, behavior: 'smooth' });
         }}
       />
     );
@@ -292,7 +294,7 @@ export default function Checkout() {
 
   return (
     <div className="ivy-checkout-page">
-      {/* Steps: step 2 active */}
+      {/* Progress Steps */}
       <div className="ivy-cart-steps">
         <div className="ivy-step done"><div className="ivy-step-num">✓</div><span>Giỏ hàng</span></div>
         <div className="ivy-step-line active"></div>
@@ -304,63 +306,56 @@ export default function Checkout() {
       </div>
 
       <div className="ivy-checkout-layout">
-        {/* LEFT */}
-        <div className="ivy-checkout-left">
-          <CheckoutForm
-            isLoggedIn={!!user}
-            value={addressForm}
-            onChange={setAddressForm}
-            error={error}
-          />
-
+        <div className="ivy-checkout-main">
+          <CheckoutForm value={addressForm} onChange={setAddressForm} />
           <ShippingSelector
             provider={shippingProvider}
             onProviderChange={setShippingProvider}
             options={shippingOptions}
             selected={selectedShipping}
-            onSelect={(opt) => setSelectedShipping(opt)}
-            hasAddress={!!(addressForm.city && addressForm.district)}
+            onSelect={setSelectedShipping}
             loading={shippingLoading}
           />
-
           <PaymentMethodSelector value={paymentMethod} onChange={setPaymentMethod} />
         </div>
 
-        {/* RIGHT */}
         <OrderSummaryBox
+          cart={cart}
           subtotal={subtotal}
           shippingFee={shippingFee}
-          couponCode={appliedCoupon}
           couponDiscount={couponDiscount}
-          comboLabel={combo?.eligible ? `Mua kèm −${combo.percent}%` : undefined}
           comboDiscount={comboDiscount}
           total={total}
           promoInput={promoInput}
           onPromoInputChange={setPromoInput}
-          onApplyCoupon={applyCoupon}
-          submitting={submitting}
-          onSubmit={handleOpenReview}
-          submitLabel="XEM LẠI ĐƠN"
+          appliedCoupon={appliedCoupon}
+          onApplyCoupon={() => void applyCoupon()}
+          onRemoveCoupon={() => {
+            setAppliedCoupon(null);
+            setCouponDiscount(0);
+            setPromoInput('');
+          }}
+          error={error}
+          onReview={handleOpenReview}
         />
       </div>
 
       <ReviewOrderModal
         open={showReview}
+        onClose={() => setShowReview(false)}
+        onConfirm={() => void handleConfirmOrder()}
+        submitting={submitting}
         cart={cart}
+        address={fullAddress}
         customerName={addressForm.name}
         customerPhone={addressForm.phone}
-        customerAddress={fullAddress}
+        shipping={selectedShipping}
         paymentMethod={paymentMethod}
-        shippingName={selectedShipping?.serviceName || ''}
         subtotal={subtotal}
         shippingFee={shippingFee}
-        couponCode={appliedCoupon}
         couponDiscount={couponDiscount}
         comboDiscount={comboDiscount}
         total={total}
-        submitting={submitting}
-        onCancel={() => setShowReview(false)}
-        onConfirm={handleConfirmOrder}
       />
     </div>
   );
