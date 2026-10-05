@@ -17,7 +17,7 @@
     "test:catalog": "npm run build && node --test test/catalog-contract.test.mjs",
     "test:customer-aux": "npm run build && node --test test/customer-aux-contract.test.mjs",
     "test:cart-reservation": "npm run build && node --test test/cart-reservation-contract.test.mjs",
-    "test:checkout-order": "npm run build && node --test test/checkout-order-contract.test.mjs test/lalamove-shipping-contract.test.mjs test/payment-settings-contract.test.mjs test/admin-vietqr-contract.test.mjs",
+    "test:checkout-order": "npm run build && node --test test/checkout-order-contract.test.mjs test/lalamove-shipping-contract.test.mjs test/payment-settings-contract.test.mjs test/admin-vietqr-contract.test.mjs test/payos-payment-contract.test.mjs",
     "test:auth-rbac": "npm run build && node --test test/auth-rbac-contract.test.mjs",
     "test:realtime-cutover": "npm run build && node --test test/realtime-cutover-contract.test.mjs",
     "test:admin-migration": "npm run build && node --test test/admin-migration-contract.test.mjs",
@@ -32,6 +32,7 @@
     "@nestjs/common": "11.2.5",
     "@nestjs/core": "11.2.5",
     "@nestjs/platform-express": "11.2.5",
+    "@payos/node": "^2.0.5",
     "@prisma/adapter-mariadb": "7.10.0",
     "@prisma/client": "7.10.0",
     "dotenv": "^17.2.3",
@@ -42,6 +43,7 @@
     "@nestjs/platform-socket.io": "11.2.5",
     "socket.io": "^4.8.1",
     "onnxruntime-node": "^1.22.0",
+    "qrcode": "^1.5.4",
     "sharp": "^0.34.3"
   },
   "devDependencies": {
@@ -49,6 +51,7 @@
     "@types/express": "^5.0.5",
     "@types/multer": "^2.0.0",
     "@types/node": "^22.18.0",
+    "@types/qrcode": "^1.5.6",
     "prisma": "7.10.0",
     "socket.io-client": "^4.8.1",
     "typescript": "~5.9.3"
