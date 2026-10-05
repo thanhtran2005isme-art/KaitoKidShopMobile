@@ -60,6 +60,27 @@ Rà Admin thật phát hiện endpoint status legacy và UI vẫn cho `shipping 
 - Customer projection dùng marker hoàn hàng mới nhất, không dùng boolean “đã từng request” vĩnh viễn;
 - Mobile nhận nhãn `returned` và không tiếp tục thanh toán ATM cho đơn đã trả.
 
+## 2026-10-05 — Đồng bộ trạng thái return/refund về Customer Web + Mobile
+
+Sau khi Admin workflow đã khép kín, rà UI khách hàng cho thấy Web/Mobile vẫn có thể chỉ hiện “Đã yêu cầu hoàn hàng” dù case đã được duyệt, từ chối, nhận hàng hoàn hoặc chuyển sang chờ hoàn tiền.
+
+Đã đồng bộ projection và UI:
+
+- Customer backend trả `returnStatus` theo marker return mới nhất: `none/requested/approved/rejected/received_restock/received_quarantine`;
+- Customer backend trả `refundStatus` theo marker refund mới nhất: `none/pending/completed`;
+- `refundStatus` có độ ưu tiên hiển thị cao hơn `returnStatus`, vì phản ánh bước hậu mãi mới hơn;
+- Customer Web card + modal chi tiết hiển thị đúng trạng thái đang chờ duyệt, đã duyệt, bị từ chối, đã nhận hàng hoàn, quarantine/restock, chờ hoàn tiền và đã ghi nhận hoàn tiền;
+- Mobile card + màn chi tiết dùng chung `afterSalesStatusMeta`, tránh mỗi màn tự map trạng thái khác nhau;
+- copy quarantine nhấn mạnh hàng lỗi **không được cộng vào tồn bán được**;
+- copy refund completed nói rõ đây là **Admin xác nhận hoàn tiền thủ công**, không phải bằng chứng gateway tự refund;
+- contract checkout/order khóa `latestReturnById`, `latestRefundById`, `returnStatus` và `refundStatus` để tránh regression projection;
+- không thay schema/table count.
+
+Automated validation trên code head `7f8755d0ebc3080c385ad27b02400341a43ac6af`:
+
+- API checkout/Lalamove/after-sales contracts run `37252559011`: **PASS**;
+- Client checks run `37252559002`: Customer Web lint/build **PASS**, Mobile lint/typecheck **PASS**.
+
 ## Gate còn mở
 
 Không merge PR #75 cho tới khi chạy thật sandbox với credentials `pk_test/sk_test`, webhook public và xác nhận flow cả Customer Web `:5173` lẫn Mobile/Expo `:8081`. Static review/contract source không thay thế sandbox E2E.
