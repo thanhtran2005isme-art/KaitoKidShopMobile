@@ -29,9 +29,12 @@ function normalized(value: string | null | undefined): string {
  * Giữ ranh giới giữa "carrier báo giao xong" và "khách xác nhận đã nhận".
  *
  * Lalamove COMPLETED chỉ cho phép vận chuyển đi tới `delivered`. Business order
- * vẫn ở `shipping` cho tới khi khách gọi confirm-received. Sau khi khách đã
- * xác nhận/khiếu nại, polling hoặc webhook của carrier không được phép ghi đè
- * state do khách tạo. Yêu cầu hoàn hàng lưu ở shipping history, không cần tạo thêm giá trị enum cho DonHang.TrangThai.
+ * vẫn ở `shipping` cho tới khi khách gọi confirm-received. Bằng chứng khách
+ * nhận hàng phải có cả `NgayHoanThanh` và history marker
+ * `received_by_customer`; timestamp legacy/Admin đơn lẻ không đủ authority.
+ * Sau khi khách xác nhận/khiếu nại, polling hoặc webhook của carrier không được
+ * phép ghi đè state do khách tạo. Yêu cầu hoàn hàng lưu ở shipping history,
+ * không cần tạo thêm giá trị enum cho DonHang.TrangThai.
  */
 @Injectable()
 export class ReceiptAwareLalamoveShippingService extends HardenedLalamoveShippingService {
@@ -99,18 +102,26 @@ export class ReceiptAwareLalamoveShippingService extends HardenedLalamoveShippin
       return;
     }
 
-    if (completedAt) {
-      const protectedStatus =
-        beforeStatus === "returned" || currentStatus === "returned"
-          ? "returned"
-          : "completed";
+    if (beforeStatus === "returned" || currentStatus === "returned") {
       await this.receiptDb.$executeRawUnsafe(
         `UPDATE DonHang
-         SET TrangThai = ?,
+         SET TrangThai = 'returned', NgayCapNhat = ?
+         WHERE Id = ?`,
+        new Date(),
+        orderId,
+      );
+      return;
+    }
+
+    const receiptConfirmed =
+      Boolean(completedAt) && await this.hasCustomerReceiptMarker(orderId);
+    if (receiptConfirmed) {
+      await this.receiptDb.$executeRawUnsafe(
+        `UPDATE DonHang
+         SET TrangThai = 'completed',
              TrangThaiVanChuyen = 'received_by_customer',
              NgayCapNhat = ?
          WHERE Id = ?`,
-        protectedStatus,
         new Date(),
         orderId,
       );
@@ -136,10 +147,13 @@ export class ReceiptAwareLalamoveShippingService extends HardenedLalamoveShippin
     }
 
     // Carrier has delivered, but the customer has not acknowledged receipt.
-    if (currentShipping === "delivered") {
+    // Clear any legacy/Admin completion timestamp because it has no matching
+    // customer receipt marker and therefore cannot start review/return rights.
+    if (["delivered", "completed"].includes(currentShipping)) {
       await this.receiptDb.$executeRawUnsafe(
         `UPDATE DonHang
          SET TrangThai = 'shipping',
+             TrangThaiVanChuyen = 'delivered',
              NgayHoanThanh = NULL,
              NgayCapNhat = ?
          WHERE Id = ?`,
@@ -147,6 +161,17 @@ export class ReceiptAwareLalamoveShippingService extends HardenedLalamoveShippin
         orderId,
       );
     }
+  }
+
+  private async hasCustomerReceiptMarker(orderId: number): Promise<boolean> {
+    const rows = await this.receiptDb.$queryRawUnsafe<Array<{ id: unknown }>>(
+      `SELECT Id AS id
+       FROM LichSuTrangThaiVanChuyen
+       WHERE DonHangId = ? AND TrangThai = 'received_by_customer'
+       LIMIT 1`,
+      orderId,
+    );
+    return rows.length > 0;
   }
 
   private async hasOpenDeliveryDispute(orderId: number): Promise<boolean> {

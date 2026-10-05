@@ -97,6 +97,12 @@ test("tracking strictly refreshes a known Lalamove order and never retries an em
 
 test("carrier delivered never equals customer receipt confirmation", () => {
   assert.match(receiptAwareSource, /Carrier has delivered/);
+  assert.match(receiptAwareSource, /hasCustomerReceiptMarker/);
+  assert.match(
+    receiptAwareSource,
+    /Boolean\(completedAt\) && await this\.hasCustomerReceiptMarker\(orderId\)/,
+  );
+  assert.doesNotMatch(receiptAwareSource, /if \(completedAt\)/);
   assert.match(receiptAwareSource, /TrangThai = 'shipping'/);
   assert.match(receiptAwareSource, /TrangThaiVanChuyen = 'delivery_disputed'/);
   assert.match(receiptAwareSource, /TrangThaiVanChuyen = 'received_by_customer'/);
