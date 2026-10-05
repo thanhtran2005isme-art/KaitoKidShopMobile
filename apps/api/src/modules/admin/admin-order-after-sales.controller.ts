@@ -19,7 +19,7 @@ export class AdminOrderAfterSalesController {
   constructor(private readonly afterSales: AdminOrderAfterSalesService) {}
 
   @Get("cases")
-  list(@CurrentUser() user: AuthenticatedUser) {
+  list(@CurrentUser() user: AuthenticatedUser): Promise<unknown> {
     assertStaffPermission(user, "orders.view");
     return this.afterSales.listCases();
   }
@@ -28,7 +28,7 @@ export class AdminOrderAfterSalesController {
   one(
     @CurrentUser() user: AuthenticatedUser,
     @Param("id") rawId: string,
-  ) {
+  ): Promise<unknown> {
     assertStaffPermission(user, "orders.view");
     return this.afterSales.snapshot(intPath(rawId));
   }
@@ -38,7 +38,7 @@ export class AdminOrderAfterSalesController {
     @CurrentUser() user: AuthenticatedUser,
     @Param("id") rawId: string,
     @Body() body: JsonRecord,
-  ) {
+  ): Promise<unknown> {
     assertStaffPermission(user, "orders.update_status");
     return this.afterSales.decideReturn(
       user,
@@ -53,7 +53,7 @@ export class AdminOrderAfterSalesController {
     @CurrentUser() user: AuthenticatedUser,
     @Param("id") rawId: string,
     @Body() body: JsonRecord,
-  ) {
+  ): Promise<unknown> {
     assertStaffPermission(user, "orders.update_status");
     assertStaffPermission(user, "inventory.manage");
     return this.afterSales.receiveReturn(
@@ -69,7 +69,7 @@ export class AdminOrderAfterSalesController {
     @CurrentUser() user: AuthenticatedUser,
     @Param("id") rawId: string,
     @Body() body: JsonRecord,
-  ) {
+  ): Promise<unknown> {
     assertStaffPermission(user, "orders.update_status");
     return this.afterSales.markRefundCompleted(
       user,
