@@ -45,6 +45,8 @@ Acceptance:
 - payload sai signature trả 4xx;
 - không cần KaitoKid JWT ở webhook route.
 
+Localhost không nhận webhook trực tiếp từ Internet. Có thể dùng HTTPS tunnel cho port `5300`. Production vẫn bắt buộc public webhook dù local có provider-reconcile fallback.
+
 ## 3. Khởi động local
 
 ```bat
@@ -115,9 +117,21 @@ GET payment
 
 Không được trả `502` chỉ vì code `101`/`231` nếu payment hiện hữu có thể recover an toàn.
 
-Contract `payos-payment-contract.test.mjs` phải khóa cả hai case này.
+Request instructions đồng thời cho cùng order phải single-flight để không create cạnh tranh do React StrictMode.
 
-## 5. Customer Web acceptance
+## 5. QR acceptance
+
+CREATE payment request có thể trả raw `qrCode` dùng cho QR thanh toán ngân hàng.
+
+Bắt buộc:
+
+- KaitoKid chỉ render `qrUrl` từ raw `qrCode` do payOS trả;
+- app ngân hàng quét QR KaitoKid phải nhận đúng amount + nội dung;
+- `checkoutUrl` là URL web Hosted Checkout, **không được** encode thành QR rồi trình bày như QR ngân hàng;
+- nếu backend restart/không còn raw QR từ CREATE, UI chỉ hiện nút **Mở trang thanh toán payOS**, không hiện QR giả;
+- QR cache trong Node chỉ là short-lived UX cache, không phải payment authority.
+
+## 6. Customer Web acceptance
 
 1. Login customer.
 2. Thêm hàng và checkout.
@@ -128,8 +142,9 @@ Contract `payos-payment-contract.test.mjs` phải khóa cả hai case này.
 7. Màn payment phải hiển thị payOS, amount đúng `DonHang.TongTien`, QR/payment link có thể mở.
 8. Không được gọi/read `/api/admin/settings` từ Customer payment để xác nhận paid.
 9. Thanh toán bằng QR/payment link.
-10. payOS webhook phải cập nhật order `pending -> confirmed`.
-11. Web poll KaitoKid backend và chuyển success mà không cần nút “Tôi đã thanh toán”.
+10. Primary: payOS webhook cập nhật order `pending -> confirmed`.
+11. Fallback: Web poll `/api/payment/status/:orderCode`; nếu DB còn pending nhưng payOS GET trả `PAID`, backend phải validate `VND` + `amount == DonHang.TongTien`, confirm idempotent và trả `paidAt`.
+12. Web tự chuyển success, không có nút “Tôi đã thanh toán”.
 
 ### Hủy/hết hạn trước khi thanh toán
 
@@ -140,19 +155,51 @@ Contract `payos-payment-contract.test.mjs` phải khóa cả hai case này.
 - cart reservation được cấp lại `GiuDenLuc` theo reservation window hiện hành;
 - quay về `/cart` phải thấy lại sản phẩm, không phải add tay lại.
 
-## 6. Mobile acceptance
+## 7. Mobile acceptance
 
 1. Login Mobile.
 2. Cart -> Checkout -> chọn online payment -> Create Order.
-3. `checkout/payment` hiển thị QR payOS.
+3. `checkout/payment` chỉ hiển thị QR khi backend có raw payOS QR hợp lệ.
 4. Nút `Mở trang thanh toán payOS` mở hosted checkout bằng `expo-web-browser`.
 5. Thanh toán từ app ngân hàng/thiết bị phù hợp.
 6. Mobile poll `/api/payment/status/:orderCode` khoảng 3 giây/lần trong lúc pending.
-7. Sau webhook verified + DB paid, Mobile tự điều hướng tới `order-success/[orderCode]`.
-8. Mobile không xin quyền đọc SMS/notification/balance ngân hàng.
-9. Cancel/expiry phải có cùng cart-restore semantics như Web.
+7. Nếu webhook chưa tới được localhost, polling server-side phải tự reconcile provider `PAID` và cập nhật DB.
+8. Sau backend paid, Mobile tự điều hướng tới `order-success/[orderCode]`.
+9. Mobile không xin quyền đọc SMS/notification/balance ngân hàng.
+10. Cancel/expiry phải có cùng cart-restore semantics như Web.
 
-## 7. Security/idempotency acceptance
+## 8. Provider reconcile fallback acceptance
+
+Case local/dev bắt buộc test:
+
+```text
+payOS dashboard/payment request = PAID
+KaitoKid DonHang = pending, NgayThanhToan = NULL
+```
+
+Gọi owner-scoped:
+
+```text
+GET /api/payment/status/:orderCode
+```
+
+Kỳ vọng:
+
+```text
+backend GET payOS status
+-> PAID
+-> currency phải VND nếu provider trả currency
+-> amount phải == DonHang.TongTien
+-> SELECT DonHang ... FOR UPDATE
+-> set NgayThanhToan + confirmed đúng một lần
+-> append payment_confirmed source payos_reconcile
+-> tạo shipment online đúng một lần
+-> response có paidAt
+```
+
+Provider timeout/outage khi order chưa hết hạn không được biến status polling thành `502`; client tiếp tục dùng trạng thái local và poll lại. Khi tới expiry, provider-first cancel/reconcile vẫn giữ fail-closed semantics.
+
+## 9. Security/idempotency acceptance
 
 Phải chứng minh:
 
@@ -161,11 +208,13 @@ Phải chứng minh:
 - webhook không được fallback đoán theo `DonHang.Id`;
 - amount mismatch -> reject;
 - currency khác VND -> reject;
+- provider reconcile amount/currency mismatch -> reject;
 - duplicate paid webhook -> `NgayThanhToan` không bị side-effect lặp;
-- shipment không được tạo hai lần do duplicate webhook;
+- webhook và status reconcile chạy cạnh nhau vẫn chỉ có một paid transition;
+- shipment không được tạo hai lần;
 - order cancelled không bị revive bởi manual forged request.
 
-## 8. Cancel/expiry race
+## 10. Cancel/expiry race
 
 ### Pending chưa trả tiền
 
@@ -173,12 +222,12 @@ Phải chứng minh:
 
 ### Tiền vào đúng lúc cancel
 
-- Provider trả `PAID` hoặc cancel response cho thấy `PAID` -> KaitoKid confirm paid; không restore stock/coupon/cart.
+- Provider trả `PAID` hoặc cancel response cho thấy `PAID` -> validate amount/currency -> KaitoKid confirm paid; không restore stock/coupon/cart.
 
 ### Payment hết hạn
 
 - Sweeper phải đối soát payOS trước.
-- Nếu `PAID` -> confirm.
+- Nếu `PAID` -> validate + confirm.
 - Nếu `PENDING` -> cancel provider trước.
 - Nếu `CANCELLED`/no payment -> local cancel + restore stock/coupon/cart.
 - Nếu provider chưa terminal -> fail closed, không hoàn tồn/coupon/cart.
@@ -189,7 +238,7 @@ Phải chứng minh:
 - transaction giữ user lock trước inventory lock để cùng lock order với CartService;
 - gọi lại cancel/status sau terminal không được cộng cart/reservation lần hai.
 
-## 9. Shipping/Lalamove acceptance
+## 11. Shipping/Lalamove acceptance
 
 Online order chưa paid:
 
@@ -197,7 +246,7 @@ Online order chưa paid:
 trackingCode phải chưa được tạo bởi payment flow
 ```
 
-Sau verified paid:
+Sau verified paid/reconcile paid:
 
 ```text
 payment_confirmed
@@ -207,7 +256,7 @@ payment_confirmed
 
 Chứng minh shipment chỉ được tạo một lần.
 
-## 10. Automated gates
+## 12. Automated gates
 
 ```bat
 npm --prefix apps\api run test:checkout-order
@@ -217,9 +266,10 @@ npm --prefix apps\mobile run lint
 npm --prefix apps\mobile run typecheck
 ```
 
-`test:checkout-order` phải gồm:
+`test:checkout-order` phải gồm ít nhất:
 
 - `payos-payment-contract.test.mjs`;
+- `payos-status-reconcile-contract.test.mjs`;
 - `payment-runtime-cutover-contract.test.mjs`.
 
 Các contract phải khóa:
@@ -227,6 +277,9 @@ Các contract phải khóa:
 - mapping `MaDonHang <-> payOS orderCode` reversible;
 - code `101` create path;
 - code `231` recovery path;
+- concurrent create single-flight;
+- checkoutUrl không bị dùng làm QR ngân hàng;
+- status polling reconcile provider PAID trước expiry;
 - cart restore sau cancel/expiry;
 - legacy bank/VietQR không thể kích hoạt ATM mới.
 
@@ -237,7 +290,7 @@ scripts\node-concurrency-race-gate.bat
 scripts\node-realtime-runtime-gate.bat
 ```
 
-## 11. Merge gate
+## 13. Merge gate
 
 PR #75 tiếp tục Draft/Open cho đến khi:
 
@@ -245,7 +298,9 @@ PR #75 tiếp tục Draft/Open cho đến khi:
 - runtime cutover test PASS: không credentials thì legacy bank settings không bật ATM;
 - payOS credentials thật/test channel đã được cấu hình ngoài Git;
 - public webhook được confirm;
+- QR ngân hàng thật quét được trên Web/Mobile;
 - Web + Mobile payment E2E PASS;
+- status polling recover được transaction PAID khi webhook local chưa tới;
 - reset DB không tái hiện collision `231` từ `DonHang.Id`;
 - cancel/expiry race PASS;
 - cancel/expiry trả item lại cart đúng một lần;
