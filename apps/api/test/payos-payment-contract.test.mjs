@@ -10,6 +10,7 @@ function source(path) {
 
 const providerSource = source('../src/modules/payment/payos.service.ts');
 const paymentSource = source('../src/modules/payment/payment.service.ts');
+const inventorySource = source('../src/modules/orders/order-inventory.service.ts');
 const controllerSource = source('../src/modules/payment/payment.controller.ts');
 const moduleSource = source('../src/modules/payment/payment.module.ts');
 const envSource = source('../.env.example');
@@ -43,9 +44,16 @@ test('payOS credentials chỉ nằm ở backend env và provider dùng official 
   assert.match(moduleSource, /PayOsService/);
 });
 
-test('DonHang.Id là payOS orderCode và create chỉ chạy sau GET recovery', () => {
-  assert.match(providerSource, /getPayment\(input\.orderId\)/);
-  assert.match(providerSource, /orderCode: input\.orderId/);
+test('payOS orderCode suy ra reversible từ MaDonHang, không dùng DonHang.Id', () => {
+  const service = new PayOsService();
+  const display = 'KK-20261005-DB6E9B';
+  const providerOrderCode = service.providerOrderCode(display);
+  assert.ok(Number.isSafeInteger(providerOrderCode));
+  assert.ok(providerOrderCode > 0);
+  assert.equal(service.kaitoKidOrderCode(providerOrderCode), display);
+  assert.doesNotMatch(providerSource, /getPayment\(input\.orderId\)/);
+  assert.doesNotMatch(providerSource, /orderCode:\s*input\.orderId/);
+  assert.match(providerSource, /orderCode:\s*providerOrderCode/);
   assert.match(providerSource, /paymentRequests\.create/);
   assert.match(providerSource, /maxRetries: 0/);
 });
@@ -54,6 +62,8 @@ test('payOS business code 101 được hiểu là chưa có payment và chuyển
   const restoreEnv = withPayOsEnv();
   try {
     const service = new PayOsService();
+    const display = 'KK-20261005-ABC123';
+    const providerOrderCode = service.providerOrderCode(display);
     let createCalls = 0;
     service.sdk = {
       paymentRequests: {
@@ -89,8 +99,7 @@ test('payOS business code 101 được hiểu là chưa có payment và chuyển
     };
 
     const payment = await service.ensurePayment({
-      orderId: 123,
-      orderCode: 'KK-TEST-123',
+      orderCode: display,
       amount: 150000,
       customerName: 'Test Customer',
       customerEmail: 'test@example.com',
@@ -98,7 +107,7 @@ test('payOS business code 101 được hiểu là chưa có payment và chuyển
     });
 
     assert.equal(createCalls, 1);
-    assert.equal(payment.orderCode, 123);
+    assert.equal(payment.orderCode, providerOrderCode);
     assert.equal(payment.amount, 150000);
     assert.equal(payment.status, 'PENDING');
   } finally {
@@ -110,6 +119,8 @@ test('payOS create code 231 recover payment đã tồn tại thay vì trả 502'
   const restoreEnv = withPayOsEnv();
   try {
     const service = new PayOsService();
+    const display = 'KK-20261005-DEF456';
+    const providerOrderCode = service.providerOrderCode(display);
     let getCalls = 0;
     let createCalls = 0;
     service.sdk = {
@@ -123,7 +134,7 @@ test('payOS create code 231 recover payment đã tồn tại thay vì trả 502'
             throw error;
           }
           return {
-            orderCode: 456,
+            orderCode: providerOrderCode,
             amount: 275000,
             status: 'PENDING',
             paymentLinkId: 'existing-link',
@@ -151,8 +162,7 @@ test('payOS create code 231 recover payment đã tồn tại thay vì trả 502'
     };
 
     const payment = await service.ensurePayment({
-      orderId: 456,
-      orderCode: 'KK-TEST-456',
+      orderCode: display,
       amount: 275000,
       customerName: 'Test Customer',
       customerEmail: 'test@example.com',
@@ -161,7 +171,7 @@ test('payOS create code 231 recover payment đã tồn tại thay vì trả 502'
 
     assert.equal(createCalls, 1);
     assert.ok(getCalls >= 2);
-    assert.equal(payment.orderCode, 456);
+    assert.equal(payment.orderCode, providerOrderCode);
     assert.equal(payment.amount, 275000);
     assert.equal(payment.paymentLinkId, 'existing-link');
     assert.equal(payment.status, 'PENDING');
@@ -182,6 +192,7 @@ test('webhook payOS là public route nhưng bắt buộc verify signature', () =
   const webhookBlock = controllerSource.match(/@Post\("payos\/webhook"\)[\s\S]*?@Post\("mark-paid/)?.[0] ?? '';
   assert.doesNotMatch(webhookBlock, /UseGuards\(JwtAuthGuard\)/);
   assert.match(paymentSource, /this\.payos\.verifyWebhook\(payload\)/);
+  assert.match(paymentSource, /kaitoKidOrderCode\(verified\.orderCode\)/);
   assert.match(paymentSource, /verified\.currency !== "VND"/);
   assert.match(paymentSource, /Số tiền webhook payOS không khớp/);
 });
@@ -203,5 +214,16 @@ test('cancel và expiry đối soát payOS trước khi hoàn tồn kho/coupon',
   const expiryBlock = paymentSource.match(/private async expireOwnedOrderIfNeeded[\s\S]*?private async expireLocalOrder/)?.[0] ?? '';
   assert.match(expiryBlock, /findPayOsPayment/);
   assert.match(expiryBlock, /cancelPayment/);
-  assert.match(expiryBlock, /Fail closed/);
+});
+
+test('đơn pending bị hủy hoặc hết hạn được restore stock và trả sản phẩm lại giỏ', () => {
+  assert.match(inventorySource, /restoreStockAndCartInTransaction/);
+  assert.match(inventorySource, /INSERT INTO GioHang/);
+  assert.match(inventorySource, /SoLuongDaGiu = COALESCE\(SoLuongDaGiu, 0\) \+ \?/);
+  assert.match(inventorySource, /reservationExpiresAt\(\)/);
+
+  const expiryLocal = paymentSource.match(/private async expireLocalOrder[\s\S]*?private async cancelLocalOrder/)?.[0] ?? '';
+  const cancelLocal = paymentSource.match(/private async cancelLocalOrder[\s\S]*?private async findPayOsPayment/)?.[0] ?? '';
+  assert.match(expiryLocal, /restoreStockAndCartInTransaction/);
+  assert.match(cancelLocal, /restoreStockAndCartInTransaction/);
 });
