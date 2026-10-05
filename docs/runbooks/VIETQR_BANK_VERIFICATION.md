@@ -75,3 +75,15 @@ Không dùng ảnh QR tĩnh để suy ra hoặc xác minh tên chủ tài khoả
 - chỉ nhập chữ số, không khoảng trắng/dấu chấm;
 - một số bank không hỗ trợ lookup; UI KaitoKid đã loại các bank đó khỏi danh sách selectable;
 - nếu VietQR rate-limit, đợi rồi thử lại; không bỏ qua bước xác minh bằng cách nhập tay account holder.
+
+## Acceptance local bắt buộc trước merge
+
+- chọn ngân hàng thật từ dropdown, không nhập chuỗi tự do;
+- nhập STK thật → lookup phải trả đúng chủ tài khoản;
+- đổi STK hoặc đổi ngân hàng → trạng thái verified cũ bị xóa ngay;
+- nhập sai STK → báo lỗi và không cho lưu Payment;
+- reload Admin sau khi lưu phải giữ đúng bank BIN/code/STK/chủ tài khoản;
+- tạo đơn ATM trên Web + Mobile và xác nhận VietQR động dùng đúng bank/STK/số tiền/nội dung;
+- QR upload/URL chỉ được dùng khi ảnh VietQR động tải lỗi.
+
+CI PR #75 đã khóa `admin-vietqr-contract.test.mjs`; build/API/Web/Mobile pass không thay thế acceptance lookup thật vì credential thật không được đưa vào CI.
