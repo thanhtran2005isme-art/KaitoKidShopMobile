@@ -319,6 +319,15 @@ export default function CheckoutAddressScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
+  const leaveAddressScreen = () => {
+    releaseWebFocus();
+    if (router.canGoBack()) {
+      router.back();
+      return;
+    }
+    router.replace('/account');
+  };
+
   const resetLocationSelection = () => {
     districtRequestRef.current += 1;
     wardRequestRef.current += 1;
@@ -548,8 +557,7 @@ export default function CheckoutAddressScreen() {
 
   const choose = (address: CheckoutAddress) => {
     setSelectedAddress(address);
-    releaseWebFocus();
-    router.back();
+    leaveAddressScreen();
   };
 
   const setDefault = async (address: CheckoutAddress) => {
@@ -579,42 +587,49 @@ export default function CheckoutAddressScreen() {
     }
   };
 
+  const deleteAddress = async (address: CheckoutAddress) => {
+    if (!token || busyId !== null) return;
+
+    setBusyId(address.id);
+    setError(null);
+
+    try {
+      await checkoutApi.deleteAddress(token, address.id);
+      const remaining = addresses.filter((item) => item.id !== address.id);
+      setAddresses(remaining);
+
+      if (selectedId === address.id) {
+        setSelectedAddress(
+          remaining.find((item) => item.isDefault) || remaining[0] || null,
+        );
+      }
+    } catch (deleteError) {
+      setError(messageFrom(deleteError, 'Không thể xóa địa chỉ.'));
+    } finally {
+      setBusyId(null);
+    }
+  };
+
   const remove = (address: CheckoutAddress) => {
     if (!token || busyId !== null) return;
 
-    Alert.alert(
-      'Xóa địa chỉ?',
-      'Địa chỉ này sẽ bị xóa khỏi sổ địa chỉ của bạn.',
-      [
-        { text: 'Hủy', style: 'cancel' },
-        {
-          text: 'Xóa',
-          style: 'destructive',
-          onPress: () => {
-            void (async () => {
-              setBusyId(address.id);
-              setError(null);
+    const message = 'Địa chỉ này sẽ bị xóa khỏi sổ địa chỉ của bạn.';
 
-              try {
-                await checkoutApi.deleteAddress(token, address.id);
-                setAddresses((current) =>
-                  current.filter((item) => item.id !== address.id),
-                );
-                if (selectedId === address.id) {
-                  setSelectedAddress(null);
-                }
-              } catch (deleteError) {
-                setError(
-                  messageFrom(deleteError, 'Không thể xóa địa chỉ.'),
-                );
-              } finally {
-                setBusyId(null);
-              }
-            })();
-          },
-        },
-      ],
-    );
+    if (Platform.OS === 'web') {
+      if (window.confirm('Xóa địa chỉ?\n\n' + message)) {
+        void deleteAddress(address);
+      }
+      return;
+    }
+
+    Alert.alert('Xóa địa chỉ?', message, [
+      { text: 'Hủy', style: 'cancel' },
+      {
+        text: 'Xóa',
+        style: 'destructive',
+        onPress: () => void deleteAddress(address),
+      },
+    ]);
   };
 
   if (!token) {
@@ -653,12 +668,9 @@ export default function CheckoutAddressScreen() {
           contentContainerStyle={styles.content}>
           <View style={styles.header}>
             <Pressable
-              accessibilityLabel="Quay lại checkout"
+              accessibilityLabel="Quay lại"
               hitSlop={10}
-              onPress={() => {
-                releaseWebFocus();
-                router.back();
-              }}
+              onPress={leaveAddressScreen}
               style={({ pressed }) => [
                 styles.backButton,
                 pressed && styles.pressed,
@@ -798,7 +810,7 @@ export default function CheckoutAddressScreen() {
                               busy && styles.disabled,
                             ]}>
                             <Text style={styles.smallActionDangerText}>
-                              Xóa
+                              {busy ? 'Đang xóa...' : 'Xóa'}
                             </Text>
                           </Pressable>
                         </View>
