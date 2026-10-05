@@ -78,6 +78,13 @@ export class ShippingController {
   @Post("lalamove/webhook")
   @HttpCode(HttpStatus.OK)
   lalamoveWebhook(@Body() body: Record<string, unknown>) {
+    // Lalamove validates a newly configured webhook URL with an initial
+    // request that can contain no body and requires HTTP 200. Only that
+    // empty validation request bypasses HMAC verification; every real event
+    // still goes through LalamoveShippingService.handleWebhook().
+    if (!body || Object.keys(body).length === 0) {
+      return { received: true, validation: true };
+    }
     return this.lalamove.handleWebhook(body);
   }
 
