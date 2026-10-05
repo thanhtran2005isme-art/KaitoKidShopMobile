@@ -10,6 +10,14 @@ export interface ProductVariant {
   sku: string;
 }
 
+export interface ProductVariantInventory {
+  size: string;
+  color: string;
+  stock: number;
+  reserved: number;
+  available: number;
+}
+
 export interface Product {
   id: number;
   name: string;
@@ -21,6 +29,8 @@ export interface Product {
   price: number;
   oldPrice: number | null;
   stock: number;
+  /** Tồn kho khả dụng cấp sản phẩm, đã trừ phần đang được giữ chỗ. */
+  availableStock?: number;
   status: 'active' | 'out-of-stock' | 'draft';
   image: string;
   images?: string[];
@@ -40,6 +50,8 @@ export interface Product {
   colors?: string[];
   sizes?: string[];
   variants?: ProductVariant[];
+  /** Tồn kho khả dụng theo đúng cặp size/màu. */
+  variantInventory?: ProductVariantInventory[];
   specs?: string;
   createdAt?: string;
   updatedAt?: string;
