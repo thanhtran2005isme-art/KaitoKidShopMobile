@@ -115,6 +115,15 @@ test("carrier delivered never equals customer receipt confirmation", () => {
   assert.doesNotMatch(receiptAwareSource, /"return_requested"/);
 });
 
+test("same-timestamp or out-of-order Lalamove events cannot regress carrier progress", () => {
+  assert.match(receiptAwareSource, /LALAMOVE_PROGRESS_RANK/);
+  assert.match(receiptAwareSource, /restoreCarrierProgressBoundary/);
+  assert.match(receiptAwareSource, /currentRank < beforeRank/);
+  assert.match(receiptAwareSource, /beforeShipping === "delivered"/);
+  assert.match(receiptAwareSource, /"carrier_cancelled", "cancelled", "failed"/);
+  assert.match(receiptAwareSource, /SET TrangThaiVanChuyen = \?, NgayCapNhat = \?/);
+});
+
 test("customer cancel asks Lalamove first and propagates forbidden cancellation", () => {
   assert.match(lifecycleSource, /"DELETE"/);
   assert.match(

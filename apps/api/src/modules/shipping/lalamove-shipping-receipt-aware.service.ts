@@ -11,6 +11,13 @@ interface ReceiptBoundaryRow {
   completedAt: Date | string | null;
 }
 
+const LALAMOVE_PROGRESS_RANK: Record<string, number> = {
+  ready_to_pick: 1,
+  lalamove_on_going: 2,
+  delivering: 3,
+  delivered: 4,
+};
+
 function record(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value)
     ? value as Record<string, unknown>
@@ -34,6 +41,11 @@ function normalized(value: string | null | undefined): string {
  * `received_by_customer`; timestamp legacy/Admin đơn lẻ không đủ authority.
  * Sau khi khách xác nhận/khiếu nại hoặc Admin hoàn tất return, polling/webhook
  * carrier không được phép ghi đè state hậu mãi.
+ *
+ * Webhook Lalamove có thể phát nhiều event cùng timestamp (ví dụ
+ * ORDER_STATUS_CHANGED=COMPLETED và POD_STATUS_CHANGED=PICKED_UP). Vì vậy ngoài
+ * stale-time guard ở lớp dưới, lớp này còn khóa tiến trình carrier theo rank để
+ * event đến sau nhưng ở bước thấp hơn không làm trạng thái bị lùi.
  */
 @Injectable()
 export class ReceiptAwareLalamoveShippingService extends HardenedLalamoveShippingService {
@@ -48,6 +60,7 @@ export class ReceiptAwareLalamoveShippingService extends HardenedLalamoveShippin
     const result = await super.track(userId, orderCode);
 
     if (before?.shippingProvider?.toLowerCase() === "lalamove") {
+      await this.restoreCarrierProgressBoundary(before);
       await this.restoreReceiptBoundary(before);
       return ShippingService.prototype.track.call(this, userId, orderCode);
     }
@@ -64,9 +77,53 @@ export class ReceiptAwareLalamoveShippingService extends HardenedLalamoveShippin
     return this.withReceiptQueue(externalOrderId, async () => {
       const before = await this.loadByTrackingCode(externalOrderId);
       const result = await super.handleWebhook(body);
-      if (before) await this.restoreReceiptBoundary(before);
+      if (before) {
+        await this.restoreCarrierProgressBoundary(before);
+        await this.restoreReceiptBoundary(before);
+      }
       return result;
     });
+  }
+
+  private async restoreCarrierProgressBoundary(before: ReceiptBoundaryRow) {
+    const orderId = Number(before.id);
+    if (!Number.isSafeInteger(orderId) || orderId <= 0) return;
+
+    const rows = await this.receiptDb.$queryRawUnsafe<ReceiptBoundaryRow[]>(
+      `SELECT Id AS id, TrangThai AS status,
+              TrangThaiVanChuyen AS shippingStatus,
+              NhaVanChuyen AS shippingProvider,
+              NgayHoanThanh AS completedAt
+       FROM DonHang WHERE Id = ? LIMIT 1`,
+      orderId,
+    );
+    const current = rows[0];
+    if (!current) return;
+
+    const beforeShipping = normalized(before.shippingStatus);
+    const currentShipping = normalized(current.shippingStatus);
+    const beforeRank = LALAMOVE_PROGRESS_RANK[beforeShipping];
+    const currentRank = LALAMOVE_PROGRESS_RANK[currentShipping];
+
+    const progressRegressed =
+      Number.isFinite(beforeRank) &&
+      Number.isFinite(currentRank) &&
+      currentRank < beforeRank;
+
+    const deliveredRegressedToTerminalFailure =
+      beforeShipping === "delivered" &&
+      ["carrier_cancelled", "cancelled", "failed"].includes(currentShipping);
+
+    if (!progressRegressed && !deliveredRegressedToTerminalFailure) return;
+
+    await this.receiptDb.$executeRawUnsafe(
+      `UPDATE DonHang
+       SET TrangThaiVanChuyen = ?, NgayCapNhat = ?
+       WHERE Id = ?`,
+      before.shippingStatus,
+      new Date(),
+      orderId,
+    );
   }
 
   private async restoreReceiptBoundary(before: ReceiptBoundaryRow) {
