@@ -125,10 +125,23 @@ export const cartApi = {
     }
   },
 
-  /** Đánh giá combo discount (≥2 SP cùng category → giảm thêm 10%) */
+  /** Đánh giá combo discount cho toàn bộ giỏ. */
   async getComboDiscount(): Promise<ApiResponse<ComboDiscountResult>> {
     try {
       const response = await apiClient.get<ComboDiscountResult>('/api/cart/combo-discount');
+      return { success: true, data: response.data };
+    } catch (error) {
+      return { success: false, error: getErrorMessage(error) };
+    }
+  },
+
+  /** Đánh giá combo chỉ trên đúng CartItemIds được checkout. */
+  async getComboDiscountSelected(itemIds: number[]): Promise<ApiResponse<ComboDiscountResult>> {
+    try {
+      const response = await apiClient.post<ComboDiscountResult>(
+        '/api/cart/combo-discount/selected',
+        { itemIds },
+      );
       return { success: true, data: response.data };
     } catch (error) {
       return { success: false, error: getErrorMessage(error) };
