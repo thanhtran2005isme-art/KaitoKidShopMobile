@@ -29,6 +29,7 @@ export default function PaymentStep({ orderCode, total, bankAccounts, allowSimul
   const [instructionQrUrl, setInstructionQrUrl] = useState('');
   const [instructionContent, setInstructionContent] = useState('');
   const [instructionTotal, setInstructionTotal] = useState<number | null>(null);
+  const [qrFallbackActive, setQrFallbackActive] = useState(false);
 
   // Tài khoản nhận tiền phải lấy từ backend theo chính order của khách.
   // Customer tuyệt đối không đọc /api/admin/settings.
@@ -98,8 +99,20 @@ export default function PaymentStep({ orderCode, total, bankAccounts, allowSimul
   const generatedQrUrl = primaryBank
     ? buildVietQrUrl(primaryBank, payableTotal, transferContent)
     : '';
-  // QR do Admin upload/dán URL là nguồn ưu tiên; nếu không có thì sinh VietQR động.
-  const qrUrl = instructionQrUrl || primaryBank?.qrImage?.trim() || generatedQrUrl;
+  const fallbackQrUrl = instructionQrUrl || primaryBank?.qrImage?.trim() || '';
+  const qrUrl = qrFallbackActive ? fallbackQrUrl : (generatedQrUrl || fallbackQrUrl);
+
+  // Mỗi đơn luôn thử VietQR động trước. Ảnh QR Admin chỉ là phương án dự phòng
+  // khi ảnh VietQR động thực sự tải lỗi.
+  useEffect(() => {
+    setQrFallbackActive(false);
+  }, [generatedQrUrl, fallbackQrUrl]);
+
+  const handleQrError = () => {
+    if (!qrFallbackActive && fallbackQrUrl && fallbackQrUrl !== generatedQrUrl) {
+      setQrFallbackActive(true);
+    }
+  };
 
   const handleSimulatePaid = async () => {
     const r = await paymentApi.simulatePaid(orderCode);
@@ -204,9 +217,13 @@ export default function PaymentStep({ orderCode, total, bankAccounts, allowSimul
             <div className="ivy-payment-qr">
               <h3>Quét mã QR để thanh toán</h3>
               <div className="ivy-payment-qr__frame">
-                <img src={qrUrl} alt="VietQR" loading="lazy" decoding="async" />
+                <img src={qrUrl} alt="VietQR" loading="lazy" decoding="async" onError={handleQrError} />
               </div>
-              <p className="ivy-payment-qr__hint">Quét bằng app ngân hàng để thanh toán nhanh chóng</p>
+              <p className="ivy-payment-qr__hint">
+                {qrFallbackActive
+                  ? 'VietQR động không tải được, đang dùng mã QR dự phòng của cửa hàng.'
+                  : 'Mã VietQR được tạo tự động theo đúng số tiền và nội dung đơn hàng.'}
+              </p>
               <a href={qrUrl} download={`QR-${orderCode}.png`} className="ivy-btn-primary">
                 <i className="fa fa-download"></i> Tải QR về máy
               </a>
