@@ -11,7 +11,7 @@ interface CartContextType {
   totalItems: number;
   subtotal: number;
   loading: boolean;
-  addItem: (product: Product, size: string, color: string, qty?: number) => Promise<void>;
+  addItem: (product: Product, size: string, color: string, qty?: number) => Promise<boolean>;
   updateQuantity: (cartItemId: number, qty: number) => Promise<void>;
   removeItem: (cartItemId: number) => Promise<void>;
   removeMany: (cartItemIds: number[]) => Promise<number>;
@@ -66,7 +66,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const addItem = async (product: Product, size: string, color: string, qty = 1) => {
     if (!user) {
       // Chưa login - không thể thêm vào cart backend
-      return;
+      return false;
     }
     const result = await cartApi.addToCart({
       productId: product.id,
@@ -74,9 +74,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
       color,
       quantity: qty,
     });
-    if (result.success) {
-      await refreshCart();
-    }
+    if (!result.success) return false;
+    await refreshCart();
+    return true;
   };
 
   const updateQuantity = async (cartItemId: number, qty: number) => {
