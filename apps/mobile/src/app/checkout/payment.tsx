@@ -24,6 +24,48 @@ import type {
   PaymentStatus,
 } from '@/types/checkout';
 
+const BANK_CODE_MAP: Record<string, string> = {
+  mbbank: 'MB',
+  'mb bank': 'MB',
+  mb: 'MB',
+  vietcombank: 'VCB',
+  vcb: 'VCB',
+  techcombank: 'TCB',
+  tcb: 'TCB',
+  bidv: 'BIDV',
+  vietinbank: 'CTG',
+  ctg: 'CTG',
+  vtb: 'CTG',
+  agribank: 'AGRIBANK',
+  agri: 'AGRIBANK',
+  acb: 'ACB',
+  sacombank: 'STB',
+  stb: 'STB',
+  tpbank: 'TPB',
+  tpb: 'TPB',
+  vpbank: 'VPB',
+  vpb: 'VPB',
+  mbank: 'MB',
+};
+
+function buildVietQrUrl(
+  bankName: string,
+  accountNumber: string,
+  accountHolder: string,
+  amount: number,
+  content: string,
+) {
+  const key = bankName.toLowerCase().trim();
+  const bankCode =
+    BANK_CODE_MAP[key] || bankName.toUpperCase().replace(/\s+/g, '');
+  return (
+    `https://img.vietqr.io/image/${encodeURIComponent(bankCode)}-${encodeURIComponent(accountNumber)}-compact2.png` +
+    `?amount=${encodeURIComponent(String(Math.round(amount)))}` +
+    `&addInfo=${encodeURIComponent(content)}` +
+    `&accountName=${encodeURIComponent(accountHolder)}`
+  );
+}
+
 function money(value: number) {
   return Math.round(value).toLocaleString('vi-VN') + 'đ';
 }
@@ -59,6 +101,7 @@ export default function CheckoutPaymentScreen() {
   const [retryKey, setRetryKey] = useState(0);
   const [actionBusy, setActionBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [useFallbackQr, setUseFallbackQr] = useState(false);
 
   const terminal = useMemo(
     () =>
@@ -127,6 +170,10 @@ export default function CheckoutPaymentScreen() {
       active = false;
     };
   }, [orderCode, retryKey, router, token]);
+
+  useEffect(() => {
+    setUseFallbackQr(false);
+  }, [instructions?.orderCode, instructions?.qrUrl]);
 
   useEffect(() => {
     if (!token || !orderCode || loading) return;
@@ -331,7 +378,25 @@ export default function CheckoutPaymentScreen() {
     status?.status === 'cancelled' ||
     (status != null && secondsLeft <= 0);
   const bank = instructions?.bankAccount;
-  const qrUrl = resolveMediaUrl(instructions?.qrUrl);
+  const fallbackQrUrl = resolveMediaUrl(
+    instructions?.qrUrl || bank?.qrImage,
+  );
+  const generatedQrUrl =
+    bank && instructions
+      ? buildVietQrUrl(
+          bank.bankName,
+          bank.accountNumber,
+          bank.accountHolder,
+          instructions.total,
+          instructions.transferContent,
+        )
+      : '';
+  const qrUrl =
+    useFallbackQr && fallbackQrUrl
+      ? fallbackQrUrl
+      : generatedQrUrl || fallbackQrUrl;
+  const usingUploadedQrFallback =
+    useFallbackQr && Boolean(fallbackQrUrl) && qrUrl === fallbackQrUrl;
 
   return (
     <SafeAreaView edges={['top']} style={styles.safeArea}>
@@ -341,7 +406,7 @@ export default function CheckoutPaymentScreen() {
         <View style={styles.header}>
           <Text style={styles.eyebrow}>THANH TOÁN ĐƠN {orderCode}</Text>
           <Text style={styles.title}>
-            {instructions?.qrUrl
+            {generatedQrUrl
               ? 'Chuyển khoản / VietQR'
               : 'Chuyển khoản ngân hàng'}
           </Text>
@@ -443,13 +508,19 @@ export default function CheckoutPaymentScreen() {
                           'Mã VietQR cho đơn ' + orderCode
                         }
                         contentFit="contain"
+                        onError={() => {
+                          if (!useFallbackQr && fallbackQrUrl) {
+                            setUseFallbackQr(true);
+                          }
+                        }}
                         source={{ uri: qrUrl }}
                         style={styles.qrImage}
                       />
                     </View>
                     <Text style={styles.qrHint}>
-                      Nếu QR không tải được, bạn vẫn có thể chuyển khoản thủ
-                      công bằng thông tin phía trên.
+                      {usingUploadedQrFallback
+                        ? 'VietQR động không tải được, đang dùng mã QR dự phòng của cửa hàng.'
+                        : 'Mã VietQR được tạo theo đúng số tiền và nội dung của đơn này.'}
                     </Text>
                   </View>
                 ) : null}
