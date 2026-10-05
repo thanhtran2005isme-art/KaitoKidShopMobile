@@ -26,7 +26,7 @@ export function orderStatusMeta(status?: string | null): {
     case 'completed':
       return { label: 'Hoàn tất', tone: 'success' };
     case 'returned':
-      return { label: 'Đã hoàn hàng', tone: 'neutral' };
+      return { label: 'Đã trả hàng', tone: 'danger' };
     case 'cancelled':
       return { label: 'Đã hủy', tone: 'danger' };
     default:
@@ -60,15 +60,13 @@ export function shippingStatusMeta(status?: string | null): {
       return { label: 'Đang giao', tone: 'info' };
     case 'delivered':
     case 'completed':
-      return { label: 'Đơn vị vận chuyển báo đã giao', tone: 'success' };
+      return { label: 'Đã giao hàng', tone: 'success' };
     case 'received_by_customer':
       return { label: 'Bạn đã xác nhận nhận hàng', tone: 'success' };
     case 'delivery_disputed':
-      return { label: 'Bạn đã báo chưa nhận được hàng', tone: 'danger' };
-    case 'return_requested':
-      return { label: 'Đã gửi yêu cầu hoàn hàng', tone: 'warning' };
+      return { label: 'Đang đối soát chưa nhận hàng', tone: 'warning' };
     case 'returned':
-      return { label: 'Đã hoàn hàng', tone: 'neutral' };
+      return { label: 'Đã trả hàng', tone: 'danger' };
     case 'carrier_cancelled':
       return { label: 'Đã hủy vận đơn', tone: 'danger' };
     case 'cancelled':
@@ -137,14 +135,14 @@ export function paymentLabel(order: CustomerOrder) {
     return 'Chờ chuyển khoản';
   }
 
-  return order.customerReceiptConfirmed || order.status === 'completed'
+  return order.status === 'completed' || order.status === 'returned'
     ? 'Đã thanh toán khi nhận hàng'
     : 'Thanh toán khi nhận hàng';
 }
 
 export function canResumeAtmPayment(order: CustomerOrder) {
   if ((order.paymentMethod || '').toUpperCase() !== 'ATM') return false;
-  if (order.paidAt || order.status === 'cancelled') return false;
+  if (order.paidAt || order.status === 'cancelled' || order.status === 'returned') return false;
   if (!order.paymentExpiresAt) return order.status === 'pending';
 
   return new Date(order.paymentExpiresAt).getTime() > Date.now();

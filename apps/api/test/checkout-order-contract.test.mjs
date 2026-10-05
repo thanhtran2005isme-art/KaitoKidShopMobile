@@ -24,6 +24,9 @@ const ordersControllerSource = source("../src/modules/orders/orders.controller.t
 const afterSalesSource = source("../src/modules/orders/order-after-sales.service.ts");
 const reviewsSource = source("../src/modules/reviews/reviews.service.ts");
 const simulatorSource = source("../src/modules/shipping/shipping-status-simulator.service.ts");
+const adminAfterSalesSource = source("../src/modules/admin/admin-order-after-sales.service.ts");
+const adminBoundarySource = source("../src/modules/admin/admin-order-status-boundary.interceptor.ts");
+const adminModuleSource = source("../src/modules/admin/admin.module.ts");
 
 test("coupon percent giữ min-order, usage và max-discount của C#", () => {
   const now = new Date("2026-09-30T12:00:00Z");
@@ -94,12 +97,7 @@ test("mock shipping giữ branch + phụ phí cân nặng", () => {
     ghtkToken: null,
     ghtkPickProvince: null,
     ghtkPickDistrict: null,
-    kaitoKidBranches: [{
-      code: "HN",
-      name: "KaitoKid Hà Nội",
-      province: "Hà Nội",
-      active: true,
-    }],
+    kaitoKidBranches: [{ code: "HN", name: "KaitoKid Hà Nội", province: "Hà Nội", active: true }],
     mockOnlyServeBranches: true,
     mockFeeSameProvince: 22_000,
     mockFeeNearbyProvince: 35_000,
@@ -119,7 +117,6 @@ test("mock shipping giữ branch + phụ phí cân nặng", () => {
   assert.equal(options[0].fee, 32_000);
   assert.equal(options[0].leadTimeHours, 6);
 });
-
 
 test("GHN normalizer bỏ quận/huyện/phường + khoảng trắng như C#", () => {
   assert.equal(normalizeGhnName("Quận Cầu Giấy"), "caugiay");
@@ -151,13 +148,14 @@ test("receipt authority requires received_by_customer history marker, not timest
   assert.match(afterSalesSource, /hasMarker\(tx, orderId, "received_by_customer"\)/);
 });
 
-test("return request uses history marker and does not invent a DonHang enum state", () => {
-  assert.match(afterSalesSource, /FROM LichSuTrangThaiVanChuyen/);
-  assert.match(afterSalesSource, /TrangThai = 'return_requested'/);
-  assert.doesNotMatch(
-    afterSalesSource,
-    /UPDATE DonHang[\s\S]*?SET TrangThai = 'return_requested'/,
-  );
+test("return request uses latest workflow marker instead of permanent requested boolean", () => {
+  assert.match(afterSalesSource, /return_approved/);
+  assert.match(afterSalesSource, /return_rejected/);
+  assert.match(afterSalesSource, /return_received_restock/);
+  assert.match(afterSalesSource, /return_received_quarantine/);
+  assert.match(afterSalesSource, /latestReturnById/);
+  assert.match(afterSalesSource, /returnStatus: currentReturnStatus/);
+  assert.doesNotMatch(afterSalesSource, /UPDATE DonHang[\s\S]*?SET TrangThai = 'return_requested'/);
 });
 
 test("review requires customer-confirmed receipt marker", () => {
@@ -167,4 +165,38 @@ test("review requires customer-confirmed receipt marker", () => {
   assert.match(reviewsSource, /h\.TrangThai = 'received_by_customer'/);
   assert.match(reviewsSource, /khách chưa xác nhận đã nhận hàng/);
   assert.match(afterSalesSource, /const canReview = status === "completed" && receiptConfirmed/);
+});
+
+test("Admin legacy status endpoint cannot forge completed or returned", () => {
+  assert.match(adminBoundarySource, /status === "completed"/);
+  assert.match(adminBoundarySource, /status === "returned"/);
+  assert.match(adminBoundarySource, /Chỉ khách xác nhận đã nhận hàng/);
+  assert.match(adminModuleSource, /APP_INTERCEPTOR/);
+  assert.match(adminModuleSource, /AdminOrderStatusBoundaryInterceptor/);
+});
+
+test("Admin return decision is audit-only before physical goods arrive", () => {
+  assert.match(adminAfterSalesSource, /return_approved/);
+  assert.match(adminAfterSalesSource, /return_rejected/);
+  const decisionBlock = adminAfterSalesSource.match(/async decideReturn[\s\S]*?async receiveReturn/)?.[0] ?? "";
+  assert.doesNotMatch(decisionBlock, /UPDATE SanPham/);
+  assert.doesNotMatch(decisionBlock, /UPDATE TonKhoBienThe/);
+  assert.doesNotMatch(decisionBlock, /TrangThai = 'returned'/);
+});
+
+test("Admin receive return separates sellable restock from quarantine", () => {
+  assert.match(adminAfterSalesSource, /disposition === "restock" \? before \+ quantity : before/);
+  assert.match(adminAfterSalesSource, /return_received_restock/);
+  assert.match(adminAfterSalesSource, /return_received_quarantine/);
+  assert.match(adminAfterSalesSource, /quarantine, không tăng tồn bán được/);
+  assert.match(adminAfterSalesSource, /LoaiThayDoi: "return"/);
+  assert.match(adminAfterSalesSource, /SoLuongDaBan = GREATEST\(0, SoLuongDaBan - \?\)/);
+  assert.match(adminAfterSalesSource, /SET TrangThai = 'returned', TrangThaiVanChuyen = 'returned'/);
+});
+
+test("refund flow is explicit manual audit and never pretends to call a gateway", () => {
+  assert.match(adminAfterSalesSource, /refund_pending/);
+  assert.match(adminAfterSalesSource, /refund_completed_manual/);
+  assert.match(adminAfterSalesSource, /Admin xác nhận đã hoàn tiền thủ công/);
+  assert.doesNotMatch(adminAfterSalesSource, /refundGateway|paymentGateway\.refund|vnpay.*refund/i);
 });

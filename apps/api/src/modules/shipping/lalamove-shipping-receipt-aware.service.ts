@@ -32,9 +32,8 @@ function normalized(value: string | null | undefined): string {
  * vẫn ở `shipping` cho tới khi khách gọi confirm-received. Bằng chứng khách
  * nhận hàng phải có cả `NgayHoanThanh` và history marker
  * `received_by_customer`; timestamp legacy/Admin đơn lẻ không đủ authority.
- * Sau khi khách xác nhận/khiếu nại, polling hoặc webhook của carrier không được
- * phép ghi đè state do khách tạo. Yêu cầu hoàn hàng lưu ở shipping history,
- * không cần tạo thêm giá trị enum cho DonHang.TrangThai.
+ * Sau khi khách xác nhận/khiếu nại hoặc Admin hoàn tất return, polling/webhook
+ * carrier không được phép ghi đè state hậu mãi.
  */
 @Injectable()
 export class ReceiptAwareLalamoveShippingService extends HardenedLalamoveShippingService {
@@ -105,7 +104,7 @@ export class ReceiptAwareLalamoveShippingService extends HardenedLalamoveShippin
     if (beforeStatus === "returned" || currentStatus === "returned") {
       await this.receiptDb.$executeRawUnsafe(
         `UPDATE DonHang
-         SET TrangThai = 'returned', NgayCapNhat = ?
+         SET TrangThai = 'returned', TrangThaiVanChuyen = 'returned', NgayCapNhat = ?
          WHERE Id = ?`,
         new Date(),
         orderId,

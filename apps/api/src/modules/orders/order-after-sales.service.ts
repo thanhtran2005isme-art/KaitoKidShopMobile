@@ -4,6 +4,21 @@ import type { SqlClient } from "../../common/sql-client.js";
 import { PrismaService } from "../../database/prisma.service.js";
 
 const RETURN_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+const RETURN_MARKERS = [
+  "return_requested",
+  "return_approved",
+  "return_rejected",
+  "return_received_restock",
+  "return_received_quarantine",
+] as const;
+
+type CustomerReturnStatus =
+  | "none"
+  | "requested"
+  | "approved"
+  | "rejected"
+  | "received_restock"
+  | "received_quarantine";
 
 interface AfterSalesRow {
   id: unknown;
@@ -24,6 +39,17 @@ function asDate(value: Date | string | null): Date | null {
 
 function normalized(value: string | null | undefined): string {
   return (value ?? "").trim().toLowerCase();
+}
+
+function returnStatus(marker?: string): CustomerReturnStatus {
+  switch (marker) {
+    case "return_requested": return "requested";
+    case "return_approved": return "approved";
+    case "return_rejected": return "rejected";
+    case "return_received_restock": return "received_restock";
+    case "return_received_quarantine": return "received_quarantine";
+    default: return "none";
+  }
 }
 
 @Injectable()
@@ -52,21 +78,30 @@ export class OrderAfterSalesService {
       ...ids,
     );
     const markerRows = await this.db.$queryRawUnsafe<Array<{
+      id: unknown;
       orderId: unknown;
       status: string;
+      at: Date | string;
     }>>(
-      `SELECT DonHangId AS orderId, TrangThai AS status
+      `SELECT Id AS id, DonHangId AS orderId, TrangThai AS status, ThoiGian AS at
        FROM LichSuTrangThaiVanChuyen
        WHERE DonHangId IN (${marks})
-         AND TrangThai IN ('received_by_customer','return_requested')`,
+         AND TrangThai IN (
+           'received_by_customer',
+           'return_requested','return_approved','return_rejected',
+           'return_received_restock','return_received_quarantine'
+         )
+       ORDER BY ThoiGian ASC, Id ASC`,
       ...ids,
     );
     const receiptIds = new Set<number>();
-    const returnIds = new Set<number>();
+    const latestReturnById = new Map<number, CustomerReturnStatus>();
     for (const marker of markerRows) {
       const id = toNumber(marker.orderId);
       if (marker.status === "received_by_customer") receiptIds.add(id);
-      if (marker.status === "return_requested") returnIds.add(id);
+      if ((RETURN_MARKERS as readonly string[]).includes(marker.status)) {
+        latestReturnById.set(id, returnStatus(marker.status));
+      }
     }
 
     const byId = new Map(rows.map((row) => [toNumber(row.id), row]));
@@ -75,7 +110,7 @@ export class OrderAfterSalesService {
         order,
         byId.get(order.id),
         receiptIds.has(order.id),
-        returnIds.has(order.id),
+        latestReturnById.get(order.id) ?? "none",
       ),
     );
   }
@@ -225,13 +260,15 @@ export class OrderAfterSalesService {
         throw new BadRequestException("Đã quá thời hạn hoàn hàng 7 ngày kể từ lúc nhận hàng.");
       }
 
-      const duplicate = await tx.$queryRawUnsafe<Array<{ id: unknown }>>(
-        `SELECT Id AS id FROM LichSuTrangThaiVanChuyen
-         WHERE DonHangId = ? AND TrangThai = 'return_requested'
-         LIMIT 1`,
-        orderId,
-      );
-      if (duplicate.length > 0) return { changed: false, deadline };
+      const latest = await this.latestReturnMarker(tx, orderId);
+      if (latest === "return_requested" || latest === "return_approved") {
+        return { changed: false, deadline };
+      }
+      if (latest) {
+        throw new BadRequestException(
+          "Yêu cầu hoàn hàng trước đó đã được xử lý; không thể tạo yêu cầu mới cho cùng đơn.",
+        );
+      }
 
       await tx.$executeRawUnsafe(
         `INSERT INTO LichSuTrangThaiVanChuyen
@@ -247,7 +284,7 @@ export class OrderAfterSalesService {
     return {
       message: result.changed
         ? "Đã gửi yêu cầu hoàn hàng. KaitoKid sẽ kiểm tra và phản hồi."
-        : "Yêu cầu hoàn hàng đã được ghi nhận trước đó.",
+        : "Yêu cầu hoàn hàng đang được KaitoKid xử lý.",
       returnDeadline: result.deadline,
     };
   }
@@ -256,7 +293,7 @@ export class OrderAfterSalesService {
     order: T,
     row: AfterSalesRow | undefined,
     receiptMarker: boolean,
-    returnRequested: boolean,
+    currentReturnStatus: CustomerReturnStatus,
   ) {
     if (!row) return order;
 
@@ -273,11 +310,12 @@ export class OrderAfterSalesService {
     const returnDeadline = receiptConfirmed && completedAt
       ? new Date(completedAt.getTime() + RETURN_WINDOW_MS)
       : null;
-    const hasOpenReturn = returnRequested && status !== "returned";
+    const hasReturnCase = currentReturnStatus !== "none";
+    const returnRequested = ["requested", "approved"].includes(currentReturnStatus);
     const canRequestReturn =
       status === "completed" &&
       receiptConfirmed &&
-      !hasOpenReturn &&
+      !hasReturnCase &&
       Boolean(returnDeadline && Date.now() <= returnDeadline.getTime());
     const canReview = status === "completed" && receiptConfirmed;
 
@@ -296,7 +334,8 @@ export class OrderAfterSalesService {
       customerReceiptConfirmed: receiptConfirmed,
       canReview,
       canRequestReturn,
-      returnRequested: hasOpenReturn,
+      returnRequested,
+      returnStatus: currentReturnStatus,
       receivedAt: receiptConfirmed ? completedAt : null,
       returnDeadline,
       returnWindowDays: 7,
@@ -306,7 +345,7 @@ export class OrderAfterSalesService {
   private async hasMarker(
     tx: SqlClient,
     orderId: number,
-    status: "received_by_customer" | "return_requested",
+    status: "received_by_customer",
   ): Promise<boolean> {
     const rows = await tx.$queryRawUnsafe<Array<{ id: unknown }>>(
       `SELECT Id AS id FROM LichSuTrangThaiVanChuyen
@@ -316,6 +355,25 @@ export class OrderAfterSalesService {
       status,
     );
     return rows.length > 0;
+  }
+
+  private async latestReturnMarker(
+    tx: SqlClient,
+    orderId: number,
+  ): Promise<string | null> {
+    const rows = await tx.$queryRawUnsafe<Array<{ status: string }>>(
+      `SELECT TrangThai AS status
+       FROM LichSuTrangThaiVanChuyen
+       WHERE DonHangId = ?
+         AND TrangThai IN (
+           'return_requested','return_approved','return_rejected',
+           'return_received_restock','return_received_quarantine'
+         )
+       ORDER BY ThoiGian DESC, Id DESC
+       LIMIT 1`,
+      orderId,
+    );
+    return rows[0]?.status ?? null;
   }
 
   private async lockOrder(

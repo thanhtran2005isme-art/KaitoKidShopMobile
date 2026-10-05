@@ -1,4 +1,5 @@
 import { Module } from "@nestjs/common";
+import { APP_INTERCEPTOR } from "@nestjs/core";
 import {
   AdminAttributesController,
   AdminBannersController,
@@ -34,6 +35,9 @@ import {
   AdminStockReceiptsController,
   AdminVariantStockController,
 } from "./admin-operations.controller.js";
+import { AdminOrderAfterSalesController } from "./admin-order-after-sales.controller.js";
+import { AdminOrderAfterSalesService } from "./admin-order-after-sales.service.js";
+import { AdminOrderStatusBoundaryInterceptor } from "./admin-order-status-boundary.interceptor.js";
 import { AdminStaffGuard } from "./admin-staff.guard.js";
 
 @Module({
@@ -50,6 +54,7 @@ import { AdminStaffGuard } from "./admin-staff.guard.js";
     AdminInventoryController,
     AdminLookbookController,
     AdminMenusController,
+    AdminOrderAfterSalesController,
     AdminOrdersController,
     AdminPagesController,
     AdminProductsController,
@@ -62,6 +67,13 @@ import { AdminStaffGuard } from "./admin-staff.guard.js";
     AdminVariantStockController,
     FlashSalesController,
   ],
-  providers: [AdminStaffGuard],
+  providers: [
+    AdminStaffGuard,
+    AdminOrderAfterSalesService,
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: AdminOrderStatusBoundaryInterceptor,
+    },
+  ],
 })
 export class AdminModule {}

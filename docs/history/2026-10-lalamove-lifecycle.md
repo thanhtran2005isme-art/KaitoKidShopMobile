@@ -19,7 +19,6 @@ Thay đổi durable trên branch `feat/admin-lalamove-carrier`:
 - webhook cùng Lalamove order được serialize trong Node process trước duplicate/stale guard; nếu runtime scale nhiều writer thì phải nâng lên DB/distributed idempotency trước;
 - customer cancel gọi Lalamove trước, chỉ hủy KaitoKid/restore stock-coupon khi carrier cho phép;
 - shipping simulator loại trừ `NhaVanChuyen=lalamove`;
-- thêm contract test cho HMAC, quotation, Place Order, persistence, tracking, cancel, webhook, duplicate-order guard và simulator guard;
 - quyết định chi tiết: `docs/decisions/D025-lalamove-shipment-lifecycle.md`.
 
 ## 2026-10-05 — Tách carrier delivered khỏi customer received
@@ -28,19 +27,39 @@ Sau live UI test, phát hiện `Lalamove COMPLETED` đang đẩy `DonHang.TrangT
 
 Đã bổ sung ranh giới hậu mãi:
 
-- carrier `COMPLETED` chỉ được coi là `delivered`; Customer API trình bày đơn là đang chờ xác nhận nếu chưa có bằng chứng khách nhận hàng;
-- source of truth nhận hàng là **cặp** `received_by_customer` history marker + `NgayHoanThanh`; timestamp đơn lẻ do dữ liệu legacy/Admin không mở review/return;
-- thêm `POST /api/orders/:id/confirm-received`; ghi `NgayHoanThanh`, `received_by_customer` và history marker trong cùng transaction, bắt đầu cửa sổ hoàn hàng 7 ngày;
-- thêm `POST /api/orders/:id/report-not-received`; ghi `delivery_disputed`, giữ order ở `shipping`, xóa timestamp legacy nếu có và không tự hủy/hoàn tồn/coupon/refund;
-- thêm `POST /api/orders/:id/return-request`; chỉ cho phép trong 7 ngày từ mốc khách xác nhận, ghi marker `return_requested` + lý do vào `LichSuTrangThaiVanChuyen` trong transaction, không đổi enum `DonHang.TrangThai`;
-- wrapper receipt-aware giữ `delivery_disputed`, `received_by_customer` và `returned` khỏi bị polling/webhook carrier ghi đè; yêu cầu hoàn được giữ độc lập bằng history marker;
-- review yêu cầu `DonHang.TrangThai=completed`, `NgayHoanThanh IS NOT NULL` và tồn tại marker `received_by_customer`;
-- Customer Web có action trực tiếp `Đã nhận hàng`, `Chưa nhận được hàng`, `Đánh giá`, `Hoàn hàng`; tracking reload danh sách ngay sau sync;
-- Mobile Order Detail được đồng bộ cùng contract backend: xác nhận nhận, báo chưa nhận, đánh giá và gửi lý do hoàn hàng trong 7 ngày; quyền action không tự suy từ label;
-- simulator non-Lalamove khi đi tới `delivered` tiếp tục giữ business order ở `shipping`, không tự hoàn tất đơn;
-- dữ liệu cũ `completed + delivered/completed` nhưng chưa có marker khách nhận được trình bày lại như đang chờ khách xác nhận, không reset DB;
+- carrier `COMPLETED` chỉ được coi là `delivered`; Customer API trình bày đơn là đang chờ xác nhận nếu thiếu customer receipt marker;
+- `POST /api/orders/:id/confirm-received` là action duy nhất ghi customer receipt + `NgayHoanThanh` và bắt đầu cửa sổ hoàn hàng 7 ngày;
+- `POST /api/orders/:id/report-not-received` ghi `delivery_disputed`, giữ order ở `shipping`, không tự hủy/hoàn tồn/coupon/refund;
+- `POST /api/orders/:id/return-request` ghi `return_requested` vào history, không đổi enum `DonHang.TrangThai`;
+- receipt-aware Lalamove wrapper không coi timestamp legacy/Admin là customer receipt nếu thiếu marker `received_by_customer`;
+- review yêu cầu customer receipt marker + `NgayHoanThanh` + `completed`;
+- Customer Web + Mobile có action `Đã nhận hàng`, `Chưa nhận được hàng`, `Đánh giá`, `Yêu cầu hoàn hàng` theo quyền backend;
+- simulator non-Lalamove tới `delivered` vẫn giữ order ở `shipping`;
 - không thêm bảng/cột/enum mới; quyết định durable ở `docs/decisions/D026-customer-receipt-return-window.md`.
+
+## 2026-10-05 — Khép kín Admin after-sales: duyệt → nhận hàng → quarantine/restock → refund audit
+
+Rà Admin thật phát hiện endpoint status legacy và UI vẫn cho `shipping → completed`, tức có thể bypass D026. Đồng thời customer `returnRequested` trước đó chỉ kiểm tra marker đã từng tồn tại nên case bị từ chối vẫn có thể hiển thị như đang chờ.
+
+Đã thiết kế/triển khai trên branch:
+
+- chặn Admin tự đặt `completed` hoặc `returned` qua endpoint status legacy bằng interceptor chạy sau auth/guards;
+- thêm Admin after-sales API riêng:
+  - xem case/timeline;
+  - duyệt `return_approved`;
+  - từ chối `return_rejected`;
+  - nhận hàng thực tế với `return_received_restock` hoặc `return_received_quarantine`;
+  - ghi `refund_pending` và `refund_completed_manual`;
+- quyết định duyệt/từ chối không đụng tồn kho;
+- chỉ sau khi hàng hoàn thực tế quay về mới đổi business order sang `returned`;
+- `restock` cộng lại tồn sản phẩm + biến thể và giảm số đã bán;
+- `quarantine` không cộng tồn bán được, vẫn giảm số đã bán và ghi audit `TonKho_LichSu.LoaiThayDoi='return'`;
+- hoàn hàng không tự trả lượt coupon;
+- hệ thống không giả refund gateway: `refund_completed_manual` chỉ là audit sau khi Admin có mã tham chiếu/biên nhận thực tế;
+- Admin Orders dùng workspace hậu mãi riêng và không còn nút chuyển nhanh `shipping → completed`;
+- Customer projection dùng marker hoàn hàng mới nhất, không dùng boolean “đã từng request” vĩnh viễn;
+- Mobile nhận nhãn `returned` và không tiếp tục thanh toán ATM cho đơn đã trả.
 
 ## Gate còn mở
 
-Không merge PR #75 cho tới khi chạy thật sandbox với credentials `pk_test/sk_test`, webhook public và xác nhận flow cả Customer Web `:5173` lẫn Mobile/Expo `:8081`. Việc static review/contract source không được ghi nhận thay cho sandbox E2E.
+Không merge PR #75 cho tới khi chạy thật sandbox với credentials `pk_test/sk_test`, webhook public và xác nhận flow cả Customer Web `:5173` lẫn Mobile/Expo `:8081`. Static review/contract source không thay thế sandbox E2E.

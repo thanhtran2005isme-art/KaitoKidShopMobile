@@ -1,5 +1,13 @@
 import type { CreatedOrder } from '@/types/checkout';
 
+export type CustomerReturnStatus =
+  | 'none'
+  | 'requested'
+  | 'approved'
+  | 'rejected'
+  | 'received_restock'
+  | 'received_quarantine';
+
 export type CustomerOrder = CreatedOrder & {
   canCancel: boolean;
   trackingCode?: string | null;
@@ -12,6 +20,7 @@ export type CustomerOrder = CreatedOrder & {
   canReview?: boolean;
   canRequestReturn?: boolean;
   returnRequested?: boolean;
+  returnStatus?: CustomerReturnStatus;
   receivedAt?: string | null;
   returnDeadline?: string | null;
   returnWindowDays?: number;
