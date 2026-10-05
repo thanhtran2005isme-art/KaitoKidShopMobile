@@ -33,7 +33,7 @@ docs           durable project context
 
 `apps/api` chạy mặc định ở port `5300` và chứa các module Auth, Staff/RBAC, catalog, cart/reservation, checkout/order, coupon, payment, shipping, account, addresses, wishlist, reviews, notifications, referral, search/recommendation, chat/realtime, admin/CMS/inventory/stock receipts và media/static.
 
-Realtime dùng Socket.IO trên cùng origin với path:
+Realtime chat dùng Socket.IO trên cùng origin với path:
 
 ```text
 /chatHub
@@ -102,6 +102,7 @@ Online payment hiện hành trên PR #75 là payOS:
 - QR/payment link được backend tạo/khôi phục và trả qua owner-scoped payment instructions;
 - `POST /api/payment/payos/webhook` là public provider callback nhưng bắt buộc verify checksum + amount + currency + order mapping;
 - `NgayThanhToan`/`confirmed` chỉ được set qua verified provider/reconcile path hoặc admin/dev compatibility path hiện có;
+- Web/Mobile poll payment status khoảng 3 giây khi pending để refresh UI; polling không phải payment authority và không thay webhook verification;
 - cancel/expiry của online payment phải provider-first rồi mới commerce-second;
 - online shipment chỉ được tạo sau khi paid;
 - runtime online payment chỉ bật khi đủ payOS credentials và `payosEnabled` không bị đặt `false`;
