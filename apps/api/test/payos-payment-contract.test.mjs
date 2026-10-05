@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
+import { PayOsService } from '../dist/modules/payment/payos.service.js';
+
 function source(path) {
   return readFileSync(new URL(path, import.meta.url), 'utf8');
 }
@@ -27,6 +29,75 @@ test('DonHang.Id là payOS orderCode và create chỉ chạy sau GET recovery', 
   assert.match(providerSource, /orderCode: input\.orderId/);
   assert.match(providerSource, /paymentRequests\.create/);
   assert.match(providerSource, /maxRetries: 0/);
+});
+
+test('payOS business code 101 được hiểu là chưa có payment và chuyển sang create', async () => {
+  const previous = {
+    clientId: process.env.PAYOS_CLIENT_ID,
+    apiKey: process.env.PAYOS_API_KEY,
+    checksumKey: process.env.PAYOS_CHECKSUM_KEY,
+  };
+  process.env.PAYOS_CLIENT_ID = 'test-client';
+  process.env.PAYOS_API_KEY = 'test-api';
+  process.env.PAYOS_CHECKSUM_KEY = 'test-checksum';
+
+  try {
+    const service = new PayOsService();
+    let createCalls = 0;
+    service.sdk = {
+      paymentRequests: {
+        async get() {
+          const error = new Error('HTTP 200, Mã thanh toán không tồn tại (code: 101)');
+          error.status = 200;
+          error.code = '101';
+          error.desc = 'Mã thanh toán không tồn tại';
+          throw error;
+        },
+        async create(input) {
+          createCalls += 1;
+          return {
+            orderCode: input.orderCode,
+            amount: input.amount,
+            description: input.description,
+            status: 'PENDING',
+            paymentLinkId: 'payos-test-link',
+            checkoutUrl: 'https://pay.payos.vn/web/payos-test-link',
+            qrCode: '000201TEST',
+            currency: 'VND',
+          };
+        },
+        async cancel() {
+          throw new Error('not used');
+        },
+      },
+      webhooks: {
+        verify(value) {
+          return value;
+        },
+      },
+    };
+
+    const payment = await service.ensurePayment({
+      orderId: 123,
+      orderCode: 'KK-TEST-123',
+      amount: 150000,
+      customerName: 'Test Customer',
+      customerEmail: 'test@example.com',
+      paymentExpiresAt: new Date(Date.now() + 15 * 60 * 1000),
+    });
+
+    assert.equal(createCalls, 1);
+    assert.equal(payment.orderCode, 123);
+    assert.equal(payment.amount, 150000);
+    assert.equal(payment.status, 'PENDING');
+  } finally {
+    if (previous.clientId === undefined) delete process.env.PAYOS_CLIENT_ID;
+    else process.env.PAYOS_CLIENT_ID = previous.clientId;
+    if (previous.apiKey === undefined) delete process.env.PAYOS_API_KEY;
+    else process.env.PAYOS_API_KEY = previous.apiKey;
+    if (previous.checksumKey === undefined) delete process.env.PAYOS_CHECKSUM_KEY;
+    else process.env.PAYOS_CHECKSUM_KEY = previous.checksumKey;
+  }
 });
 
 test('QR payOS được backend render thành data URL cho Web và Mobile', () => {
