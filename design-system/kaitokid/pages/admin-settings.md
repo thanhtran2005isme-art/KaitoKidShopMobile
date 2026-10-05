@@ -1,27 +1,36 @@
-# Admin Settings — Payment bank verification
+# Admin Settings — Payment / Bank Account
 
-Page: `/admin/settings` → tab Thanh toán.
+## Mục tiêu
 
-## Durable rules
+Cấu hình tài khoản nhận chuyển khoản phải giảm tối đa lỗi nhập tay và không cho Admin tự khai báo tên ngân hàng/chủ tài khoản không được xác minh.
 
-- Không dùng text input tự do cho tên ngân hàng; phải chọn từ catalog VietQR do backend trả.
-- Chỉ hiện bank hỗ trợ cả chuyển khoản VietQR và account lookup.
-- Số tài khoản dùng numeric input, 6–19 chữ số.
-- Đổi bank hoặc STK phải xóa trạng thái verified/account holder cũ.
-- Account holder là read-only và chỉ được điền từ kết quả lookup backend.
-- Có state rõ ràng: chưa xác minh / đang xác minh / đã xác minh / lỗi.
-- Khi bật chuyển khoản, nút Save phải xác minh lại mọi bank slot; bất kỳ slot nào fail thì không lưu Payment.
-- Chi nhánh là metadata tùy chọn, không được dùng để chứng minh tài khoản hợp lệ.
-- VietQR động theo đơn là QR chính; ảnh QR Admin chỉ là fallback.
-- Credential VietQR không bao giờ xuất hiện ở Web bundle hoặc response Admin.
+## Bank selector
 
-## Interaction
+- Tên ngân hàng không phải text input.
+- Dùng catalog ngân hàng từ backend/VietQR, option hiển thị logo + short name + tên đầy đủ khi có.
+- Giá trị nghiệp vụ lưu theo BIN/code chuẩn; không dựa vào casing hoặc chuỗi tên hiển thị.
+- Chỉ cho chọn ngân hàng có `transferSupported` và `lookupSupported`.
 
-1. Mở tab Payment → tải bank catalog.
-2. Chọn bank → reset holder + verified state.
-3. Nhập STK → chỉ giữ chữ số; onBlur tự lookup khi đủ điều kiện.
-4. Có nút `Xác minh tài khoản` để retry rõ ràng.
-5. Thành công → show account holder + success state.
-6. Save → re-verify all active bank slots trước khi persist.
+## Account verification
 
-Giữ form responsive, persistent labels, field-local feedback và control cao tối thiểu 44px theo `MASTER.md`/`docs/UI_UX.md`.
+- Số tài khoản: chỉ chữ số, 6–19 ký tự.
+- Khi đổi ngân hàng hoặc số tài khoản, phải clear `accountHolder` + `verifiedAt` ngay.
+- CTA `Xác minh tài khoản` gọi backend lookup.
+- Thành công: hiển thị trạng thái verified, tự điền chủ tài khoản từ provider và khóa field đó.
+- Thất bại: lỗi đặt ngay trong bank card; không fallback sang nhập tay tên chủ tài khoản.
+- Khi bấm lưu Payment, toàn bộ bank slot được xác minh lại trước khi persist.
+
+## Legacy config
+
+Bank slot cũ chỉ có `bankName/accountNumber/accountHolder` được phép hiển thị để người quản trị nhận biết dữ liệu cũ, nhưng phải được xem là **chưa xác minh**. Admin phải chọn lại ngân hàng chuẩn và lookup thành công trước lần lưu kế tiếp.
+
+## QR
+
+QR upload/URL là phần riêng. Ảnh QR không được dùng để suy ra tên ngân hàng hoặc chủ tài khoản. Checkout có thể ưu tiên VietQR động theo từng đơn và dùng QR tĩnh như fallback theo payment contract hiện hành.
+
+## Trạng thái UI
+
+- catalog loading/error/retry;
+- lookup idle/loading/verified/error;
+- button save disabled/loading trong lúc verify;
+- thông báo lỗi cụ thể, không dùng toast chung chung làm nguồn trạng thái duy nhất.
