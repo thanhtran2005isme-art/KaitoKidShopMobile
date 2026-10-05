@@ -56,6 +56,11 @@ export interface EnsurePayOsPaymentInput {
   paymentExpiresAt: Date | string | null;
 }
 
+interface CachedQrPayment {
+  payment: PayOsPayment;
+  expiresAtMs: number;
+}
+
 function record(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value)
     ? (value as Record<string, unknown>)
@@ -77,12 +82,14 @@ function numberValue(value: unknown): number {
   return 0;
 }
 
-const ORDER_SUFFIX_BASE = 0x1000000; // 16^6, vừa đủ suffix 6 ký tự hex.
+const ORDER_SUFFIX_BASE = 0x1000000;
+const QR_CACHE_FALLBACK_TTL_MS = 20 * 60_000;
 
 @Injectable()
 export class PayOsService {
   private sdk: PayOsSdkClient | null = null;
   private readonly ensureFlights = new Map<string, Promise<PayOsPayment>>();
+  private readonly qrCache = new Map<number, CachedQrPayment>();
 
   isConfigured(): boolean {
     return Boolean(
@@ -92,14 +99,6 @@ export class PayOsService {
     );
   }
 
-  /**
-   * payOS yêu cầu orderCode integer, còn KaitoKid dùng mã dạng
-   * KK-YYYYMMDD-XXXXXX. Không dùng DonHang.Id vì AUTO_INCREMENT có thể bị
-   * reset/reuse ở local, trong khi payOS vẫn giữ payment request cũ.
-   *
-   * Encoding giữ nguyên toàn bộ YYYYMMDD + 24-bit suffix nên deterministic,
-   * reversible và vẫn nằm trong Number.MAX_SAFE_INTEGER.
-   */
   providerOrderCode(orderCode: string): number {
     const match = /^KK-(\d{8})-([0-9A-F]{6})$/i.exec(orderCode.trim());
     if (!match || !this.validDateKey(match[1])) {
@@ -126,12 +125,6 @@ export class PayOsService {
     return `KK-${dayText}-${suffix.toString(16).toUpperCase().padStart(6, "0")}`;
   }
 
-  /**
-   * Coalesce các request instructions đồng thời của cùng một order.
-   * React StrictMode có thể mount/effect hai lần ở development; nếu hai request
-   * cùng chạy GET(101) -> CREATE thì request thứ hai sẽ nhận payOS code 231.
-   * Single-flight đảm bảo trong một Node process chỉ có một GET/CREATE chain.
-   */
   async ensurePayment(input: EnsurePayOsPaymentInput): Promise<PayOsPayment> {
     const normalizedOrderCode = input.orderCode.trim().toUpperCase();
     const existingFlight = this.ensureFlights.get(normalizedOrderCode);
@@ -186,19 +179,15 @@ export class PayOsService {
       const created = await this.client().paymentRequests.create(payload);
       const normalized = this.normalizePayment(created);
       this.assertSameAmount(normalized, input.amount);
-      return normalized;
+      return this.rememberQr(normalized, input.paymentExpiresAt);
     } catch (error) {
       if (this.isAlreadyExists(error)) {
-        // CREATE 231 có thể xảy ra sau request đồng thời, response CREATE trước
-        // bị mất hoặc provider chưa đồng bộ GET ngay. Poll hữu hạn cùng đúng
-        // providerOrderCode; chỉ nhận payment khi amount khớp.
         const recovered = await this.recoverExistingPayment(
           providerOrderCode,
           input.amount,
         );
         if (recovered) return recovered;
       }
-
       throw this.providerError("Không thể tạo yêu cầu thanh toán payOS", error);
     }
   }
@@ -207,11 +196,9 @@ export class PayOsService {
     this.assertOrderId(providerOrderCode);
     try {
       const value = await this.client().paymentRequests.get(providerOrderCode);
-      return this.normalizePayment(value);
+      return this.mergeCachedQr(this.normalizePayment(value));
     } catch (error) {
       if (this.isNotFound(error)) {
-        // payOS có thể trả HTTP 200 nhưng business code 101 khi orderCode
-        // chưa có payment request.
         throw new NotFoundException("Yêu cầu thanh toán payOS chưa tồn tại");
       }
       throw this.providerError("Không thể đọc trạng thái payOS", error);
@@ -228,6 +215,7 @@ export class PayOsService {
         providerOrderCode,
         reason.slice(0, 255),
       );
+      this.qrCache.delete(providerOrderCode);
       return this.normalizePayment(value);
     } catch (error) {
       throw this.providerError("Không thể hủy yêu cầu thanh toán payOS", error);
@@ -263,11 +251,11 @@ export class PayOsService {
   }
 
   async qrDataUrl(payment: PayOsPayment): Promise<string | null> {
-    // Create response có qrCode trực tiếp. GET hiện có thể chỉ trả paymentLinkId,
-    // nên khi reload dùng Hosted Checkout làm fallback QR ổn định.
-    const source = payment.qrCode || payment.checkoutUrl;
-    if (!source) return null;
-    return QRCode.toDataURL(source, {
+    // Chỉ raw qrCode do payOS trả từ CREATE mới là QR thanh toán ngân hàng.
+    // checkoutUrl là URL web; encode URL đó thành QR sẽ khiến app ngân hàng báo
+    // sai định dạng nên tuyệt đối không dùng làm fallback QR.
+    if (!payment.qrCode) return null;
+    return QRCode.toDataURL(payment.qrCode, {
       errorCorrectionLevel: "M",
       margin: 1,
       width: 420,
@@ -318,12 +306,48 @@ export class PayOsService {
     };
   }
 
+  private rememberQr(
+    payment: PayOsPayment,
+    paymentExpiresAt: Date | string | null,
+  ): PayOsPayment {
+    if (!payment.qrCode || !Number.isSafeInteger(payment.orderCode)) return payment;
+    const requestedExpiry = paymentExpiresAt
+      ? new Date(paymentExpiresAt).getTime()
+      : Number.NaN;
+    const expiresAtMs = Number.isFinite(requestedExpiry)
+      ? Math.max(Date.now() + 60_000, requestedExpiry + 60_000)
+      : Date.now() + QR_CACHE_FALLBACK_TTL_MS;
+    this.qrCache.set(payment.orderCode, { payment, expiresAtMs });
+    return payment;
+  }
+
+  private mergeCachedQr(payment: PayOsPayment): PayOsPayment {
+    const cached = this.qrCache.get(payment.orderCode);
+    if (!cached) return payment;
+    if (cached.expiresAtMs <= Date.now()) {
+      this.qrCache.delete(payment.orderCode);
+      return payment;
+    }
+    if (Math.round(cached.payment.amount) !== Math.round(payment.amount)) {
+      this.qrCache.delete(payment.orderCode);
+      return payment;
+    }
+    return {
+      ...payment,
+      qrCode: payment.qrCode ?? cached.payment.qrCode,
+      checkoutUrl: payment.checkoutUrl ?? cached.payment.checkoutUrl,
+      paymentLinkId: payment.paymentLinkId ?? cached.payment.paymentLinkId,
+      description: payment.description ?? cached.payment.description,
+      bin: payment.bin ?? cached.payment.bin,
+      accountNumber: payment.accountNumber ?? cached.payment.accountNumber,
+      accountName: payment.accountName ?? cached.payment.accountName,
+    };
+  }
+
   private async recoverExistingPayment(
     providerOrderCode: number,
     amount: number,
   ): Promise<PayOsPayment | null> {
-    // payOS có thể báo CREATE=231 trước khi GET cùng orderCode nhìn thấy payment.
-    // Tổng backoff ~7.75s, vẫn dưới SDK timeout nhưng đủ cho eventual consistency.
     const delaysMs = [0, 250, 500, 1000, 2000, 4000];
     for (const delayMs of delaysMs) {
       if (delayMs > 0) await this.sleep(delayMs);
@@ -372,10 +396,7 @@ export class PayOsService {
       /\/+$/,
       "",
     );
-    const query = new URLSearchParams({
-      payment: kind,
-      orderCode,
-    }).toString();
+    const query = new URLSearchParams({ payment: kind, orderCode }).toString();
     return `${base}/orders?${query}`;
   }
 
