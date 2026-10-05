@@ -64,8 +64,6 @@ export class PaymentService {
         : settings.enableBank
           ? "legacy_bank"
           : null,
-      // Giữ field cũ để client cũ không vỡ contract. Khi payOS active,
-      // VietQR tự ghép URL không còn là source of truth.
       vietQrConfigured:
         !settings.enablePayOs &&
         settings.bankAccounts.some((account) => Boolean(account.qrImage?.trim())),
@@ -88,7 +86,6 @@ export class PaymentService {
       }
 
       const payment = await this.payos.ensurePayment({
-        orderId: toNumber(order.id),
         orderCode: order.orderCode,
         amount: toNumber(order.total),
         customerName: order.customerName,
@@ -109,13 +106,13 @@ export class PaymentService {
         checkoutUrl: payment.checkoutUrl,
         qrCode: payment.qrCode,
         qrMode: payment.qrCode ? "payos_vietqr" : "payos_checkout",
-        transferContent: payment.description ?? `DH${toNumber(order.id)}`,
+        transferContent:
+          payment.description ?? `DH${order.orderCode.slice(-6)}`,
         bankAccount: bank,
         qrUrl,
       };
     }
 
-    // Legacy fallback chỉ dùng khi payOS chưa cấu hình.
     const bank = settings.bankAccounts[0];
     if (!bank) {
       throw new BadRequestException(
@@ -142,7 +139,7 @@ export class PaymentService {
       await this.shipping.appendHistory(
         toNumber(expired.order.id),
         "cancelled",
-        "Hết hạn thanh toán — provider đã xác nhận chưa nhận tiền",
+        "Hết hạn thanh toán — provider đã xác nhận chưa nhận tiền; sản phẩm đã được trả lại giỏ",
         null,
       );
     }
@@ -151,11 +148,19 @@ export class PaymentService {
 
   async handlePayOsWebhook(payload: unknown) {
     const verified = await this.payos.verifyWebhook(payload);
+    const kaitoKidOrderCode = this.payos.kaitoKidOrderCode(verified.orderCode);
 
-    // payOS dùng payload mẫu có chữ ký hợp lệ khi confirm webhook URL.
-    // Nếu orderCode không tồn tại tại KaitoKid, ACK 200 nhưng tuyệt đối không
-    // tạo/cập nhật order giả.
-    const order = await this.getOrderById(verified.orderCode);
+    // Sample webhook hoặc payment cũ dùng local AUTO_INCREMENT không thể map
+    // sang MaDonHang mới: ACK/ignore, tuyệt đối không đoán theo DonHang.Id.
+    if (!kaitoKidOrderCode) {
+      return {
+        received: true,
+        ignored: true,
+        reason: "unknown_order",
+      };
+    }
+
+    const order = await this.getOrderByCode(kaitoKidOrderCode);
     if (!order) {
       return {
         received: true,
@@ -186,8 +191,8 @@ export class PaymentService {
       };
     }
 
-    const result = await this.confirmPaidByOrderId(
-      verified.orderCode,
+    const result = await this.confirmPaidByOrderCode(
+      order.orderCode,
       verified.amount,
       "payos_webhook",
     );
@@ -211,10 +216,10 @@ export class PaymentService {
       current.paymentMethod.toUpperCase() === "ATM" &&
       this.payos.isConfigured()
     ) {
-      const provider = await this.findPayOsPayment(toNumber(current.id));
+      const provider = await this.findPayOsPayment(current.orderCode);
       if (provider?.status === "PAID") {
-        await this.confirmPaidByOrderId(
-          toNumber(current.id),
+        await this.confirmPaidByOrderCode(
+          current.orderCode,
           toNumber(current.total),
           "payos_reconcile",
         );
@@ -224,12 +229,12 @@ export class PaymentService {
       }
       if (provider?.status === "PENDING") {
         const cancelled = await this.payos.cancelPayment(
-          toNumber(current.id),
+          this.payos.providerOrderCode(current.orderCode),
           "Khach hang huy giao dich KaitoKid",
         );
         if (cancelled.status === "PAID") {
-          await this.confirmPaidByOrderId(
-            toNumber(current.id),
+          await this.confirmPaidByOrderCode(
+            current.orderCode,
             toNumber(current.total),
             "payos_reconcile",
           );
@@ -247,7 +252,6 @@ export class PaymentService {
           `Trạng thái payOS ${provider.status} chưa cho phép hủy đơn`,
         );
       }
-      // provider=null nghĩa payment link chưa từng được tạo, có thể hủy local.
     }
 
     const result = await this.cancelLocalOrder(userId, orderCode);
@@ -255,7 +259,7 @@ export class PaymentService {
     await this.shipping.appendHistory(
       result.id,
       "cancelled",
-      "Khách đã hủy giao dịch",
+      "Khách đã hủy giao dịch; sản phẩm đã được trả lại giỏ",
       null,
     );
     return { message: "Đã hủy đơn hàng", orderCode };
@@ -298,7 +302,7 @@ export class PaymentService {
         await this.shipping.appendHistory(
           toNumber(result.order.id),
           "cancelled",
-          "Hết hạn thanh toán — sweeper đã đối soát provider và hủy đơn",
+          "Hết hạn thanh toán — sweeper đã đối soát provider, hủy đơn và trả sản phẩm lại giỏ",
           null,
         );
       }
@@ -319,13 +323,13 @@ export class PaymentService {
     );
   }
 
-  private async confirmPaidByOrderId(
-    orderId: number,
+  private async confirmPaidByOrderCode(
+    orderCode: string,
     expectedAmount: number,
     source: PaymentConfirmSource,
   ) {
     return this.confirmPaidByLookup(
-      { orderId },
+      { orderCode },
       null,
       source,
       expectedAmount,
@@ -479,10 +483,10 @@ export class PaymentService {
       order.paymentMethod.toUpperCase() === "ATM" &&
       this.payos.isConfigured()
     ) {
-      const provider = await this.findPayOsPayment(toNumber(order.id));
+      const provider = await this.findPayOsPayment(order.orderCode);
       if (provider?.status === "PAID") {
-        await this.confirmPaidByOrderId(
-          toNumber(order.id),
+        await this.confirmPaidByOrderCode(
+          order.orderCode,
           toNumber(order.total),
           "payos_reconcile",
         );
@@ -493,12 +497,12 @@ export class PaymentService {
       }
       if (provider?.status === "PENDING") {
         const cancelled = await this.payos.cancelPayment(
-          toNumber(order.id),
+          this.payos.providerOrderCode(order.orderCode),
           "Het han thanh toan KaitoKid",
         );
         if (cancelled.status === "PAID") {
-          await this.confirmPaidByOrderId(
-            toNumber(order.id),
+          await this.confirmPaidByOrderCode(
+            order.orderCode,
             toNumber(order.total),
             "payos_reconcile",
           );
@@ -508,13 +512,11 @@ export class PaymentService {
           };
         }
         if (cancelled.status !== "CANCELLED") {
-          // Fail closed: không hoàn tồn/coupon khi provider chưa xác nhận terminal.
           return { order, cancelled: false };
         }
       } else if (provider && provider.status !== "CANCELLED") {
         return { order, cancelled: false };
       }
-      // provider=null: payment link chưa từng được tạo; local expiry là an toàn.
     }
 
     return this.expireLocalOrder(userId, orderCode);
@@ -549,7 +551,7 @@ export class PaymentService {
       }
 
       const id = toNumber(order.id);
-      await this.inventory.restoreStockInTransaction(tx, id);
+      await this.inventory.restoreStockAndCartInTransaction(tx, id, userId);
       await this.coupons.restoreUsageWithClient(tx, order.couponCode);
       await tx.$executeRawUnsafe(
         `UPDATE DonHang
@@ -589,7 +591,7 @@ export class PaymentService {
       }
 
       const id = toNumber(order.id);
-      await this.inventory.restoreStockInTransaction(tx, id);
+      await this.inventory.restoreStockAndCartInTransaction(tx, id, userId);
       await this.coupons.restoreUsageWithClient(tx, order.couponCode);
       await tx.$executeRawUnsafe(
         `UPDATE DonHang
@@ -604,9 +606,11 @@ export class PaymentService {
     });
   }
 
-  private async findPayOsPayment(orderId: number): Promise<PayOsPayment | null> {
+  private async findPayOsPayment(orderCode: string): Promise<PayOsPayment | null> {
     try {
-      return await this.payos.getPayment(orderId);
+      return await this.payos.getPayment(
+        this.payos.providerOrderCode(orderCode),
+      );
     } catch (error) {
       if (this.providerStatus(error) === 404) return null;
       throw error;
@@ -633,12 +637,14 @@ export class PaymentService {
     return rows[0] ?? null;
   }
 
-  private async getOrderById(orderId: number): Promise<PaymentOrderRow | null> {
+  private async getOrderByCode(
+    orderCode: string,
+  ): Promise<PaymentOrderRow | null> {
     const rows = await this.prisma.$queryRawUnsafe<PaymentOrderRow[]>(
       `${this.orderSelect()}
-       WHERE Id = ?
+       WHERE MaDonHang = ?
        LIMIT 1`,
-      orderId,
+      orderCode,
     );
     return rows[0] ?? null;
   }
