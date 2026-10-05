@@ -79,6 +79,19 @@ export default function CheckoutPaymentScreen() {
     config?.paymentProvider === 'payos' ||
     config?.payOsConfigured === true;
 
+  async function syncPaymentStatus(activeToken: string, activeOrderCode: string) {
+    const next = await checkoutApi.getPaymentStatus(activeToken, activeOrderCode);
+    setStatus(next);
+    setSecondsLeft(Math.max(0, next.secondsLeft));
+    if (next.paidAt) {
+      router.replace({
+        pathname: '/order-success/[orderCode]',
+        params: { orderCode: activeOrderCode },
+      });
+    }
+    return next;
+  }
+
   useEffect(() => {
     if (!token || !orderCode) {
       setLoading(false);
@@ -191,15 +204,7 @@ export default function CheckoutPaymentScreen() {
     setActionBusy(true);
     setError(null);
     try {
-      const next = await checkoutApi.getPaymentStatus(token, orderCode);
-      setStatus(next);
-      setSecondsLeft(Math.max(0, next.secondsLeft));
-      if (next.paidAt) {
-        router.replace({
-          pathname: '/order-success/[orderCode]',
-          params: { orderCode },
-        });
-      }
+      await syncPaymentStatus(token, orderCode);
     } catch (refreshError) {
       setError(messageFrom(refreshError, 'Không thể kiểm tra trạng thái thanh toán.'));
     } finally {
@@ -213,9 +218,7 @@ export default function CheckoutPaymentScreen() {
     setError(null);
     try {
       await checkoutApi.cancelPayment(token, orderCode);
-      const next = await checkoutApi.getPaymentStatus(token, orderCode);
-      setStatus(next);
-      setSecondsLeft(Math.max(0, next.secondsLeft));
+      await syncPaymentStatus(token, orderCode);
     } catch (cancelError) {
       setError(
         messageFrom(
@@ -234,7 +237,7 @@ export default function CheckoutPaymentScreen() {
     setError(null);
     try {
       await checkoutApi.simulatePaid(token, orderCode);
-      await refreshStatus();
+      await syncPaymentStatus(token, orderCode);
     } catch (simulateError) {
       setError(
         messageFrom(
@@ -242,18 +245,19 @@ export default function CheckoutPaymentScreen() {
           'Không thể mô phỏng thanh toán trong môi trường này.',
         ),
       );
+    } finally {
       setActionBusy(false);
     }
   }
 
   async function openPayOs() {
     const url = instructions?.checkoutUrl?.trim();
-    if (!url || actionBusy) return;
+    if (!url || !token || !orderCode || actionBusy) return;
     setActionBusy(true);
     setError(null);
     try {
       await WebBrowser.openBrowserAsync(url);
-      await refreshStatus();
+      await syncPaymentStatus(token, orderCode);
     } catch (browserError) {
       setError(messageFrom(browserError, 'Không thể mở trang thanh toán payOS.'));
     } finally {
@@ -267,6 +271,8 @@ export default function CheckoutPaymentScreen() {
         <View style={styles.centerState}>
           <Text style={styles.stateTitle}>Cần đăng nhập để xem thanh toán</Text>
           <Pressable
+            accessibilityLabel="Đăng nhập để tiếp tục thanh toán"
+            accessibilityRole="button"
             onPress={() =>
               router.replace({
                 pathname: '/auth/login',
@@ -320,6 +326,7 @@ export default function CheckoutPaymentScreen() {
           <Text style={styles.stateText}>{error}</Text>
           <Pressable
             accessibilityLabel="Thử tải lại thông tin thanh toán"
+            accessibilityRole="button"
             onPress={() => setRetryKey((value) => value + 1)}
             style={styles.primaryButton}>
             <Text style={styles.primaryButtonText}>Thử lại</Text>
@@ -370,7 +377,11 @@ export default function CheckoutPaymentScreen() {
               Đơn đã hủy hoặc hết thời gian thanh toán. Backend chỉ hoàn tồn
               kho/coupon sau khi đã đối soát payOS chưa nhận tiền.
             </Text>
-            <Pressable onPress={() => router.replace('/')} style={styles.darkButton}>
+            <Pressable
+              accessibilityLabel="Tiếp tục mua sắm"
+              accessibilityRole="button"
+              onPress={() => router.replace('/')}
+              style={styles.darkButton}>
               <Text style={styles.darkButtonText}>Tiếp tục mua sắm</Text>
             </Pressable>
           </View>
@@ -441,6 +452,7 @@ export default function CheckoutPaymentScreen() {
             {isPayOs && instructions?.checkoutUrl ? (
               <Pressable
                 accessibilityLabel="Mở trang thanh toán payOS"
+                accessibilityRole="button"
                 disabled={actionBusy}
                 onPress={() => void openPayOs()}
                 style={({ pressed }) => [
@@ -466,6 +478,7 @@ export default function CheckoutPaymentScreen() {
             <View style={styles.actions}>
               <Pressable
                 accessibilityLabel="Kiểm tra lại trạng thái thanh toán"
+                accessibilityRole="button"
                 disabled={actionBusy}
                 onPress={() => void refreshStatus()}
                 style={({ pressed }) => [
@@ -481,6 +494,7 @@ export default function CheckoutPaymentScreen() {
               {config?.allowSimulatePaid ? (
                 <Pressable
                   accessibilityLabel="Mô phỏng đã thanh toán trong môi trường phát triển"
+                  accessibilityRole="button"
                   disabled={actionBusy}
                   onPress={() => void simulatePaid()}
                   style={({ pressed }) => [
@@ -494,6 +508,7 @@ export default function CheckoutPaymentScreen() {
 
               <Pressable
                 accessibilityLabel="Hủy giao dịch thanh toán"
+                accessibilityRole="button"
                 disabled={actionBusy}
                 onPress={() => void cancelPayment()}
                 style={({ pressed }) => [
