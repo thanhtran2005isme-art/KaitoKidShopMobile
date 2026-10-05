@@ -6,6 +6,7 @@ export interface PaymentStatus {
   status: string;          // pending | confirmed | shipping | completed | cancelled
   paidAt?: string | null;
   paymentMethod: string;
+  paymentProvider?: 'payos' | string | null;
   paymentExpiresAt?: string | null;
   secondsLeft: number;
   total: number;
@@ -16,6 +17,8 @@ export interface PaymentConfig {
   supportedMethods?: string[];
   bankTransferConfigured?: boolean;
   vietQrConfigured?: boolean;
+  payOsConfigured?: boolean;
+  paymentProvider?: 'payos' | 'legacy_bank' | null;
 }
 
 export interface PaymentInstructionBankAccount {
@@ -32,13 +35,19 @@ export interface PaymentInstructions {
   total: number;
   paymentExpiresAt?: string | null;
   secondsLeft: number;
+  provider?: 'payos' | 'legacy_bank' | string;
+  paymentLinkId?: string | null;
+  paymentStatus?: string | null;
+  checkoutUrl?: string | null;
+  qrCode?: string | null;
+  qrMode?: 'payos_vietqr' | 'payos_checkout' | string;
   transferContent: string;
-  bankAccount: PaymentInstructionBankAccount;
+  bankAccount?: PaymentInstructionBankAccount | null;
   qrUrl?: string | null;
 }
 
 export const paymentApi = {
-  /** Cấu hình hiển thị payment do backend trả về (vd: có cho phép mô phỏng paid hay không) */
+  /** Cấu hình payment public do backend trả về; không bao giờ chứa payOS secret. */
   async getConfig(): Promise<ApiResponse<PaymentConfig>> {
     try {
       const res = await apiClient.get<PaymentConfig>('/api/payment/config');
@@ -46,7 +55,7 @@ export const paymentApi = {
     } catch (e) { return { success: false, error: getErrorMessage(e) }; }
   },
 
-  /** Thông tin chuyển khoản authoritative của chính đơn hàng đang thanh toán. */
+  /** Payment instructions authoritative của chính đơn hàng đang thanh toán. */
   async getInstructions(orderCode: string): Promise<ApiResponse<PaymentInstructions>> {
     try {
       const res = await apiClient.get<PaymentInstructions>(
@@ -56,7 +65,7 @@ export const paymentApi = {
     } catch (e) { return { success: false, error: getErrorMessage(e) }; }
   },
 
-  /** Poll trạng thái thanh toán + còn bao nhiêu giây */
+  /** Poll KaitoKid backend; webhook payOS mới là nguồn xác nhận paid. */
   async getStatus(orderCode: string): Promise<ApiResponse<PaymentStatus>> {
     try {
       const res = await apiClient.get<PaymentStatus>(`/api/payment/status/${encodeURIComponent(orderCode)}`);
@@ -64,7 +73,7 @@ export const paymentApi = {
     } catch (e) { return { success: false, error: getErrorMessage(e) }; }
   },
 
-  /** Khách tự hủy giao dịch (chưa thanh toán) */
+  /** Khách tự hủy giao dịch; backend provider-first trước khi hoàn tồn/coupon. */
   async cancel(orderCode: string): Promise<ApiResponse<{ message: string }>> {
     try {
       const res = await apiClient.post(`/api/payment/cancel/${encodeURIComponent(orderCode)}`);
@@ -72,7 +81,7 @@ export const paymentApi = {
     } catch (e) { return { success: false, error: getErrorMessage(e) }; }
   },
 
-  /** Dev demo — chính chủ đơn click để mô phỏng webhook ngân hàng */
+  /** Dev-only; production endpoint bị ẩn nếu backend không cho phép. */
   async simulatePaid(orderCode: string): Promise<ApiResponse<{ message: string }>> {
     try {
       const res = await apiClient.post(`/api/payment/simulate-paid/${encodeURIComponent(orderCode)}`);
@@ -80,7 +89,7 @@ export const paymentApi = {
     } catch (e) { return { success: false, error: getErrorMessage(e) }; }
   },
 
-  /** ADMIN ONLY — mô phỏng webhook ngân hàng đã nhận tiền (dùng demo) */
+  /** ADMIN ONLY — manual compatibility action, không thay thế webhook payOS. */
   async markPaid(orderCode: string): Promise<ApiResponse<{ message: string }>> {
     try {
       const res = await apiClient.post(`/api/payment/mark-paid/${encodeURIComponent(orderCode)}`);
