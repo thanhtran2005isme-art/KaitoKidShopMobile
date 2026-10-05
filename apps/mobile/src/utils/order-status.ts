@@ -80,6 +80,69 @@ export function shippingStatusMeta(status?: string | null): {
   }
 }
 
+export function afterSalesStatusMeta(order: CustomerOrder): {
+  label: string;
+  description: string;
+  tone: StatusTone;
+} | null {
+  if (order.refundStatus === 'completed') {
+    return {
+      label: 'Đã ghi nhận hoàn tiền',
+      description: 'KaitoKid đã xác nhận hoàn tiền thủ công cho yêu cầu hậu mãi này.',
+      tone: 'success',
+    };
+  }
+
+  if (order.refundStatus === 'pending') {
+    const disposition =
+      order.returnStatus === 'received_quarantine'
+        ? 'Hàng hoàn đã được tiếp nhận và đưa vào khu cách ly kiểm tra.'
+        : order.returnStatus === 'received_restock'
+          ? 'Hàng hoàn đã được tiếp nhận và nhập lại tồn bán được.'
+          : 'Hàng hoàn đã được tiếp nhận.';
+    return {
+      label: 'Đang chờ hoàn tiền',
+      description: disposition + ' Hoàn tiền đang chờ xử lý xác nhận.',
+      tone: 'warning',
+    };
+  }
+
+  switch (order.returnStatus) {
+    case 'requested':
+      return {
+        label: 'Yêu cầu hoàn hàng đang chờ duyệt',
+        description: 'KaitoKid đang kiểm tra yêu cầu. Chưa có thay đổi tồn kho hoặc hoàn tiền.',
+        tone: 'warning',
+      };
+    case 'approved':
+      return {
+        label: 'Yêu cầu hoàn hàng đã được duyệt',
+        description: 'Vui lòng hoàn trả hàng theo hướng dẫn. Tồn kho chỉ cập nhật sau khi KaitoKid thực nhận hàng.',
+        tone: 'info',
+      };
+    case 'rejected':
+      return {
+        label: 'Yêu cầu hoàn hàng bị từ chối',
+        description: 'Yêu cầu đã được KaitoKid xử lý và không tiếp tục sang bước nhận hàng hoàn.',
+        tone: 'danger',
+      };
+    case 'received_restock':
+      return {
+        label: 'Đã nhận hàng hoàn',
+        description: 'Hàng hoàn đã được kiểm tra và nhập lại tồn bán được.',
+        tone: 'success',
+      };
+    case 'received_quarantine':
+      return {
+        label: 'Đã nhận hàng hoàn · đang cách ly',
+        description: 'Hàng hoàn đã được tiếp nhận nhưng không cộng vào tồn bán được.',
+        tone: 'warning',
+      };
+    default:
+      return null;
+  }
+}
+
 export function matchesOrderFilter(order: CustomerOrder, filter: OrderFilter) {
   const status = (order.status || '').toLowerCase();
 
