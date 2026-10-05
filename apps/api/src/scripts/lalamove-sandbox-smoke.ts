@@ -23,6 +23,44 @@ function required(name: string): string {
   return value;
 }
 
+function assertE164(name: string, value: string): string {
+  if (!/^\+[1-9]\d{1,14}$/.test(value)) {
+    throw new Error(
+      `${name} phải theo chuẩn E.164, ví dụ +84901234567 (không khoảng trắng, không số 0 sau mã quốc gia).`,
+    );
+  }
+  return value;
+}
+
+function optionalCoordinate(name: string, value: string, min: number, max: number): string {
+  const number = Number(value);
+  if (!Number.isFinite(number) || number < min || number > max) {
+    throw new Error(`${name} không hợp lệ; giá trị phải nằm trong khoảng ${min}..${max}.`);
+  }
+  return value;
+}
+
+function deliveryStop(
+  address: string,
+  latEnv: string,
+  lngEnv: string,
+): JsonRecord {
+  const lat = env(latEnv);
+  const lng = env(lngEnv);
+  if (Boolean(lat) !== Boolean(lng)) {
+    throw new Error(`Phải khai báo đồng thời ${latEnv} và ${lngEnv}, hoặc bỏ cả hai.`);
+  }
+  if (!lat || !lng) return { address };
+
+  return {
+    address,
+    coordinates: {
+      lat: optionalCoordinate(latEnv, lat, -90, 90),
+      lng: optionalCoordinate(lngEnv, lng, -180, 180),
+    },
+  };
+}
+
 async function json(response: Response): Promise<JsonRecord> {
   const raw = await response.text();
   if (!raw) return {};
@@ -37,6 +75,11 @@ function fail(step: string, response: Response, payload: JsonRecord): never {
   const message = text(payload.message)
     || text(record(payload.errors).message)
     || `HTTP ${response.status}`;
+  if (message === "ERR_REVERSE_GEOCODE_FAILURE") {
+    throw new Error(
+      `${step} thất bại: ${message}. Hãy bổ sung cặp LAT/LNG cho pickup/drop-off trong apps/api/.env.`,
+    );
+  }
   throw new Error(`${step} thất bại: ${message}`);
 }
 
@@ -63,11 +106,27 @@ async function main() {
 
   const pickupAddress = required("LALAMOVE_PICKUP_ADDRESS");
   const pickupName = env("LALAMOVE_PICKUP_NAME", "KaitoKid Sandbox");
-  const pickupPhone = required("LALAMOVE_PICKUP_PHONE");
+  const pickupPhone = assertE164(
+    "LALAMOVE_PICKUP_PHONE",
+    required("LALAMOVE_PICKUP_PHONE"),
+  );
   const dropoffAddress = required("LALAMOVE_SANDBOX_DROPOFF_ADDRESS");
   const dropoffName = env("LALAMOVE_SANDBOX_DROPOFF_NAME", "KaitoKid Test Customer");
-  const dropoffPhone = required("LALAMOVE_SANDBOX_DROPOFF_PHONE");
+  const dropoffPhone = assertE164(
+    "LALAMOVE_SANDBOX_DROPOFF_PHONE",
+    required("LALAMOVE_SANDBOX_DROPOFF_PHONE"),
+  );
   const serviceType = env("LALAMOVE_SERVICE_TYPE", "MOTORCYCLE");
+  const pickupStop = deliveryStop(
+    pickupAddress,
+    "LALAMOVE_PICKUP_LAT",
+    "LALAMOVE_PICKUP_LNG",
+  );
+  const dropoffStop = deliveryStop(
+    dropoffAddress,
+    "LALAMOVE_SANDBOX_DROPOFF_LAT",
+    "LALAMOVE_SANDBOX_DROPOFF_LNG",
+  );
 
   console.log("[1/4] Create quotation...");
   const quotationResponse = await lalamoveRequest(
@@ -78,10 +137,7 @@ async function main() {
       data: {
         serviceType,
         language: "vi_VN",
-        stops: [
-          { address: pickupAddress },
-          { address: dropoffAddress },
-        ],
+        stops: [pickupStop, dropoffStop],
       },
     },
   );
