@@ -34,6 +34,18 @@ export interface VietQrAccountLookupDTO {
   accountName: string;
 }
 
+type VietQrLookupApiResponse =
+  | {
+      readonly success: true;
+      readonly data: VietQrAccountLookupDTO;
+      readonly error?: never;
+    }
+  | {
+      readonly success: false;
+      readonly data?: never;
+      readonly error: string;
+    };
+
 interface PublicPaymentConfig {
   allowSimulatePaid: boolean;
   supportedMethods?: string[];
@@ -94,7 +106,7 @@ export const settingsApi = {
   async lookupBankAccount(
     bankBin: string,
     accountNumber: string,
-  ): Promise<ApiResponse<VietQrAccountLookupDTO>> {
+  ): Promise<VietQrLookupApiResponse> {
     try {
       const response = await adminApiClient.post<VietQrAccountLookupDTO>(
         '/api/admin/payment/lookup-account',
