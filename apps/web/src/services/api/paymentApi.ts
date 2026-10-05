@@ -46,6 +46,16 @@ export interface PaymentInstructions {
   qrUrl?: string | null;
 }
 
+const PAYOS_RETRY_DELAYS_MS = [5_000, 10_000, 20_000] as const;
+
+function sleep(delayMs: number) {
+  return new Promise<void>((resolve) => window.setTimeout(resolve, delayMs));
+}
+
+function isRetryablePayOsThrottle(message: string) {
+  return /\b429\b|\b503\b|giới hạn tần suất|too many requests/i.test(message);
+}
+
 export const paymentApi = {
   /** Cấu hình payment public do backend trả về; không bao giờ chứa payOS secret. */
   async getConfig(): Promise<ApiResponse<PaymentConfig>> {
@@ -55,17 +65,31 @@ export const paymentApi = {
     } catch (e) { return { success: false, error: getErrorMessage(e) }; }
   },
 
-  /** Payment instructions authoritative của chính đơn hàng đang thanh toán. */
+  /**
+   * Payment instructions authoritative của chính đơn hàng đang thanh toán.
+   * payOS có rate limit; 429/503 được retry hữu hạn với backoff thay vì spam F5.
+   */
   async getInstructions(orderCode: string): Promise<ApiResponse<PaymentInstructions>> {
-    try {
-      const res = await apiClient.get<PaymentInstructions>(
-        `/api/payment/instructions/${encodeURIComponent(orderCode)}`,
-      );
-      return { success: true, data: res.data };
-    } catch (e) { return { success: false, error: getErrorMessage(e) }; }
+    let lastError = 'Không thể tải thông tin thanh toán.';
+    for (let attempt = 0; attempt <= PAYOS_RETRY_DELAYS_MS.length; attempt += 1) {
+      try {
+        const res = await apiClient.get<PaymentInstructions>(
+          `/api/payment/instructions/${encodeURIComponent(orderCode)}`,
+        );
+        return { success: true, data: res.data };
+      } catch (e) {
+        lastError = getErrorMessage(e);
+        const delay = PAYOS_RETRY_DELAYS_MS[attempt];
+        if (delay === undefined || !isRetryablePayOsThrottle(lastError)) {
+          return { success: false, error: lastError };
+        }
+        await sleep(delay);
+      }
+    }
+    return { success: false, error: lastError };
   },
 
-  /** Poll KaitoKid backend; webhook payOS mới là nguồn xác nhận paid. */
+  /** Poll KaitoKid backend; backend có thể fallback-reconcile payOS nếu webhook chậm. */
   async getStatus(orderCode: string): Promise<ApiResponse<PaymentStatus>> {
     try {
       const res = await apiClient.get<PaymentStatus>(`/api/payment/status/${encodeURIComponent(orderCode)}`);
