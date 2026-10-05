@@ -10,6 +10,7 @@ Last updated: 2026-10-05
 - Brand: KaitoKid Shop Fashion — Nam/Nữ/Trẻ em/nhiều lứa tuổi theo D020
 - Commit Node migration đã merge vào `main`: `2cad95ed5c9f959dffa206260b3325950a6e2dee`
 - Runtime/source migration C# -> NestJS đã được project owner xác nhận PASS cho source/build, protected Auth/RBAC, commerce/admin race, payment terminal race, Socket.IO realtime, Web/Mobile/Admin smoke, soak và rollback trước khi merge PR #40.
+- Work-in-progress lớn hiện tại: PR #75 `feat/admin-lalamove-carrier`, vẫn Draft/Open. Nhánh này chứa Lalamove lifecycle, receipt/after-sales, Mobile address parity và payment cutover từ VietQR thủ công sang payOS theo D027.
 
 ## Current structure
 
@@ -41,8 +42,11 @@ Legacy ASP.NET Core `backend/` đã retire trong retirement change. SQL/schema a
 - Secrets: `apps/api/.env` (gitignored)
 - Template: `apps/api/.env.example`
 - Local CORS cho phép loopback `localhost`/`127.0.0.1` dùng port dev động khi cùng scheme đã được allow; không mở rộng sang origin/LAN tùy ý.
-- JSON body limit hiện là 16 MB để admin có thể lưu cấu hình ngân hàng chứa QR base64 mà không bị HTTP 413.
-- Admin Payment lấy danh sách ngân hàng từ VietQR `/v2/banks`; xác minh BIN + STK qua `/v2/lookup`. `VIETQR_CLIENT_ID` và `VIETQR_API_KEY` chỉ nằm ở backend/deployment secrets, không gửi về Web/Mobile.
+- JSON body limit hiện là 16 MB để tương thích Admin settings/media hiện có.
+- Online payment trên PR #75 dùng payOS SDK chính thức trong Node. Secrets `PAYOS_CLIENT_ID`, `PAYOS_API_KEY`, `PAYOS_CHECKSUM_KEY` chỉ ở backend/deployment.
+- payOS webhook public: `POST /api/payment/payos/webhook`; endpoint không dùng KaitoKid JWT nhưng bắt buộc verify checksum signature, currency, amount và order mapping trước khi xác nhận paid.
+- `DonHang.Id` là integer `orderCode` gửi sang payOS; `MaDonHang` tiếp tục là display code cho customer.
+- Payment DB compatibility code hiện vẫn là `ATM`; client nhận thêm `paymentProvider='payos'`. Không tự hiểu `ATM` là manual VietQR khi payOS đã cấu hình.
 
 Node là background worker owner duy nhất; critical workers vẫn điều khiển bằng feature flags.
 
@@ -56,7 +60,9 @@ Node là background worker owner duy nhất; critical workers vẫn điều khi�
 - `ShoppingContext` phải chờ `AuthContext` restore session xong trước khi xử lý trạng thái no-token/logout.
 - Partial checkout giữ continuity qua reload bằng cách chỉ persist `CartItemIds` đã chọn: Expo Web dùng `localStorage`, native dùng `expo-secure-store`. Sau restore, Mobile tải cart thật từ backend rồi giữ các ID còn hợp lệ; logout xóa selection đã persist.
 - Không persist snapshot sản phẩm/giá/tồn kho/coupon/shipping làm source of truth ở checkout; backend vẫn authoritative theo D015 và D024.
-- Lựa chọn thẻ tín dụng/thẻ ghi nợ hiện chỉ nối tới form UI/local validation. Backend payment contract thực tế vẫn chỉ nhận các method được `PaymentConfig` bật (hiện COD/ATM); chưa được coi là card gateway thật.
+- Online payment screen trên PR #75 hiển thị QR/payment link payOS do backend cấp, có thể mở hosted checkout bằng `expo-web-browser`, và poll KaitoKid backend khoảng 3 giây khi pending. Sau verified webhook làm `paidAt` xuất hiện, Mobile tự chuyển sang Order Success.
+- Mobile không đọc SMS, notification ngân hàng hoặc biến động số dư để xác định paid.
+- Lựa chọn thẻ tín dụng/thẻ ghi nợ cũ vẫn chỉ là UI/local validation; chưa phải card gateway riêng.
 
 ### Web/Admin
 
@@ -64,8 +70,8 @@ Node là background worker owner duy nhất; critical workers vẫn điều khi�
 - Customer + Staff/Admin cùng gọi Node `:5300`
 - Staff auth dùng chung `adminApiClient`; không fallback về legacy `localhost:5053`.
 - Chat realtime gọi Socket.IO Node `/chatHub`.
-- Admin không nhập tự do tên ngân hàng/chủ tài khoản: chọn ngân hàng từ catalog VietQR, STK chỉ nhận 6–19 chữ số và account holder chỉ được điền từ kết quả lookup. Mọi lần lưu Payment khi bật chuyển khoản đều xác minh lại toàn bộ bank slot.
-- QR checkout ưu tiên VietQR động theo từng đơn; ảnh QR Admin upload/dán URL chỉ là fallback nếu ảnh động tải lỗi.
+- Customer Web payment trên PR #75 dùng owner-scoped `GET /api/payment/instructions/:orderCode`; QR/payment link payOS đến từ backend và Web poll KaitoKid backend khoảng 3 giây để refresh UI sau webhook.
+- Admin bank/VietQR verification code của giai đoạn trước PR #75 hiện là legacy migration surface. Khi payOS credentials hoạt động, nó không còn là payment authority cho customer checkout và cần được retire/simplify thay vì mở rộng thêm.
 
 ## Database
 
@@ -82,6 +88,8 @@ database/migrations/
 ```
 
 Các migration quan trọng hiện có gồm cart reservation, discovery seed, multi-audience/media và registration email verification.
+
+D027/payOS không thêm bảng/cột mới; dùng `DonHang.Id`, `TongTien`, `HetHanThanhToan`, `NgayThanhToan`, `TrangThai` hiện có.
 
 Không chạy Prisma reset/dev/db push trên DB có dữ liệu.
 
@@ -120,14 +128,22 @@ scripts\node-realtime-runtime-gate.bat
 
 Sau đó smoke Web customer + Admin + Mobile bằng **Node-only**. Không khởi động/khôi phục C# vì source runtime đã retire.
 
+Payment payOS acceptance riêng xem:
+
+```text
+docs/runbooks/PAYOS_PAYMENT_E2E.md
+```
+
 ## Important business invariants
 
 - Cart reserve product + variant; available = stock - reserved.
 - Partial checkout theo selected `CartItemIds`.
 - Checkout selection có thể persist qua reload, nhưng chỉ lưu ID; dữ liệu commerce authoritative vẫn lấy lại từ backend.
 - Pricing/coupon/combo/shipping/payment authoritative ở backend.
+- payOS signed webhook/reconcile là authority để set `NgayThanhToan`; return/cancel URL từ browser không được tự đánh dấu paid.
+- Với online payment, cancel/expiry phải provider-first; chỉ restore stock/coupon sau khi payOS xác nhận chưa paid/cancelled.
+- Online paid mới được tạo shipment; duplicate webhook không được double-create shipment.
 - Payment/order cancellation/restock idempotent dưới race.
-- Tài khoản nhận chuyển khoản mới phải được chọn từ catalog VietQR và xác minh lookup trước khi Admin lưu; account holder không phải dữ liệu gõ tay.
 - Tracking/cancel/reorder owner-only.
 - Review exact completed order + purchased variant.
 - Delete account releases reservations first.
@@ -140,7 +156,8 @@ Sau đó smoke Web customer + Admin + Mobile bằng **Node-only**. Không khởi
 1. Read `AGENTS.md`.
 2. Read this file.
 3. Read `docs/ARCHITECTURE.md`, `docs/BRAND.md`, relevant decisions/troubleshooting.
-4. Inspect current `main` + recent Git history.
-5. Do not infer a C# fallback from old migration docs; `apps/api` is the current backend source of truth.
-6. One task/fix/phase = one aggregate commit by default; AI commit descriptions in Vietnamese.
-7. Khi một fix làm thay đổi architecture, operations hoặc durable behavior, cập nhật docs liên quan trong cùng task/PR; cosmetic-only fix không cần tạo quyết định mới.
+4. Nếu tiếp tục PR #75, đọc D025, D026, **D027** và các runbook Lalamove/payOS trước khi sửa code.
+5. Inspect current `main` + recent Git history; PR #75 chưa merge thì không coi behavior nhánh là `main` source of truth.
+6. Do not infer a C# fallback from old migration docs; `apps/api` is the current backend source of truth.
+7. One task/fix/phase = one aggregate commit by default; AI commit descriptions in Vietnamese.
+8. Khi một fix làm thay đổi architecture, operations hoặc durable behavior, cập nhật docs liên quan trong cùng task/PR; cosmetic-only fix không cần tạo quyết định mới.
