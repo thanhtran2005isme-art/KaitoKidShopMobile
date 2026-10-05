@@ -81,6 +81,23 @@ Automated validation trên code head `7f8755d0ebc3080c385ad27b02400341a43ac6af`:
 - API checkout/Lalamove/after-sales contracts run `37252559011`: **PASS**;
 - Client checks run `37252559002`: Customer Web lint/build **PASS**, Mobile lint/typecheck **PASS**.
 
+## 2026-10-05 — Live webhook phát hiện race cùng timestamp và khóa state regression
+
+Live Sandbox của đơn `KK-20261005-B5C55A` cho thấy Lalamove gửi `ORDER_STATUS_CHANGED: COMPLETED` và `POD_STATUS_CHANGED: PICKED_UP` cùng timestamp `10:43:02`. Cả hai webhook đều `Succeeded` và event IDs đều được persist, nhưng stale guard cũ chỉ chặn khi `eventAt < latestEventAt`. Vì timestamp bằng nhau, event `PICKED_UP` đến sau có thể ghi đè `delivered` thành `delivering`; polling GET sau đó mới sửa lại `COMPLETED`.
+
+Đã harden thêm tại receipt-aware lifecycle:
+
+- thêm rank tiến trình `ready_to_pick < lalamove_on_going < delivering < delivered`;
+- sau webhook/owner tracking, nếu state mới có rank thấp hơn state trước thì khôi phục state trước;
+- `delivered` cũng không được lùi về `carrier_cancelled/cancelled/failed` do event đến muộn;
+- guard chạy trước receipt boundary nên vẫn giữ nguyên authority của `delivery_disputed`, `received_by_customer`, `returned` và `cancelled` business states;
+- thêm contract test `same-timestamp or out-of-order Lalamove events cannot regress carrier progress`;
+- commit code: `2ef13f8e769f988e5416f08dc18360ddc44926d9`;
+- API checkout/Lalamove contracts run `37261408154`: **PASS**;
+- Client checks run `37261407825`: Mobile lint/typecheck **PASS**, Web lint/build **PASS**.
+
+Live gate `duplicate/out-of-order webhook không regress state` vẫn phải test lại bằng một đơn Sandbox mới trước khi tick PASS.
+
 ## Gate còn mở
 
 Không merge PR #75 cho tới khi chạy thật sandbox với credentials `pk_test/sk_test`, webhook public và xác nhận flow cả Customer Web `:5173` lẫn Mobile/Expo `:8081`. Static review/contract source không thay thế sandbox E2E.
