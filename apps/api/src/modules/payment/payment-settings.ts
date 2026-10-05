@@ -58,6 +58,17 @@ function readBool(
   return fallback;
 }
 
+function readBoolAliases(
+  map: Map<string, string>,
+  codes: string[],
+  fallback: boolean,
+): boolean {
+  for (const code of codes) {
+    if (map.has(code)) return readBool(map, code, fallback);
+  }
+  return fallback;
+}
+
 export async function loadPaymentSettings(
   client: SqlClient,
 ): Promise<PaymentSettings> {
@@ -110,10 +121,15 @@ export async function loadPaymentSettings(
   }
 
   return {
-    enableCod: readBool(map, "enableCOD", true),
+    // Admin Web hiện lưu codEnabled/bankEnabled; vẫn đọc alias legacy để
+    // tương thích dữ liệu cũ đã tồn tại trong CauHinhCuaHang.
+    enableCod: readBoolAliases(map, ["codEnabled", "enableCOD"], true),
     enableBank:
-      readBool(map, "enableBankTransfer", accounts.length > 0) &&
-      accounts.length > 0,
+      readBoolAliases(
+        map,
+        ["bankEnabled", "enableBankTransfer"],
+        accounts.length > 0,
+      ) && accounts.length > 0,
     bankAccounts: accounts,
   };
 }

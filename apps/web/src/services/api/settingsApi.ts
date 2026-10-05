@@ -1,5 +1,4 @@
-import { adminApiClient } from '../apiClient';
-import { getErrorMessage } from '../apiClient';
+import apiClient, { adminApiClient, getErrorMessage } from '../apiClient';
 import type { ApiResponse } from '../../types/api';
 
 export interface SettingDTO {
@@ -18,10 +17,24 @@ export interface UpsertSettingDTO {
   moTa?: string;
 }
 
+interface PublicPaymentConfig {
+  allowSimulatePaid: boolean;
+  supportedMethods?: string[];
+  bankTransferConfigured?: boolean;
+}
+
 export const settingsApi = {
-  /** Lấy tất cả settings */
+  /** Lấy tất cả settings. Payment public không được đọc endpoint Admin protected. */
   async getAll(group?: string): Promise<ApiResponse<SettingDTO[]>> {
     try {
+      if (group === 'payment') {
+        // Checkout cũ chỉ dùng call này để preload bankAccounts. Thông tin nhận tiền
+        // authoritative được PaymentStep lấy qua /api/payment/instructions/:orderCode.
+        // Chỉ đọc public config để tránh request trái quyền tới /api/admin/settings.
+        await apiClient.get<PublicPaymentConfig>('/api/payment/config');
+        return { success: true, data: [] };
+      }
+
       const params = group ? { group } : {};
       const response = await adminApiClient.get<SettingDTO[]>('/api/admin/settings', { params });
       return { success: true, data: response.data };

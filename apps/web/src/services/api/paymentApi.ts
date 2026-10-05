@@ -13,6 +13,28 @@ export interface PaymentStatus {
 
 export interface PaymentConfig {
   allowSimulatePaid: boolean;
+  supportedMethods?: string[];
+  bankTransferConfigured?: boolean;
+  vietQrConfigured?: boolean;
+}
+
+export interface PaymentInstructionBankAccount {
+  id: number;
+  bankName: string;
+  accountNumber: string;
+  accountHolder: string;
+  branch?: string | null;
+  qrImage?: string | null;
+}
+
+export interface PaymentInstructions {
+  orderCode: string;
+  total: number;
+  paymentExpiresAt?: string | null;
+  secondsLeft: number;
+  transferContent: string;
+  bankAccount: PaymentInstructionBankAccount;
+  qrUrl?: string | null;
 }
 
 export const paymentApi = {
@@ -20,6 +42,16 @@ export const paymentApi = {
   async getConfig(): Promise<ApiResponse<PaymentConfig>> {
     try {
       const res = await apiClient.get<PaymentConfig>('/api/payment/config');
+      return { success: true, data: res.data };
+    } catch (e) { return { success: false, error: getErrorMessage(e) }; }
+  },
+
+  /** Thông tin chuyển khoản authoritative của chính đơn hàng đang thanh toán. */
+  async getInstructions(orderCode: string): Promise<ApiResponse<PaymentInstructions>> {
+    try {
+      const res = await apiClient.get<PaymentInstructions>(
+        `/api/payment/instructions/${encodeURIComponent(orderCode)}`,
+      );
       return { success: true, data: res.data };
     } catch (e) { return { success: false, error: getErrorMessage(e) }; }
   },

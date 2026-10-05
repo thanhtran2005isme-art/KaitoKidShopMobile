@@ -12,6 +12,7 @@ import { buildVietQrUrl, type BankAccount } from './types';
 interface Props {
   orderCode: string;
   total: number;
+  /** Legacy fallback: nguồn authoritative được tải theo order từ backend. */
   bankAccounts: BankAccount[];
   /** Backend cho phép gọi simulate-paid không (chỉ dev). Production luôn ẩn. */
   allowSimulatePaid: boolean;
@@ -22,6 +23,49 @@ export default function PaymentStep({ orderCode, total, bankAccounts, allowSimul
   const navigate = useNavigate();
   const [secondsLeft, setSecondsLeft] = useState(900);
   const [expired, setExpired] = useState(false);
+  const [instructionLoading, setInstructionLoading] = useState(true);
+  const [instructionError, setInstructionError] = useState('');
+  const [instructionBank, setInstructionBank] = useState<BankAccount | null>(null);
+  const [instructionQrUrl, setInstructionQrUrl] = useState('');
+  const [instructionContent, setInstructionContent] = useState('');
+  const [instructionTotal, setInstructionTotal] = useState<number | null>(null);
+
+  // Tài khoản nhận tiền phải lấy từ backend theo chính order của khách.
+  // Customer tuyệt đối không đọc /api/admin/settings.
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadInstructions = async () => {
+      setInstructionLoading(true);
+      setInstructionError('');
+      const result = await paymentApi.getInstructions(orderCode);
+      if (cancelled) return;
+
+      if (!result.success || !result.data) {
+        setInstructionError(result.error || 'Không thể tải thông tin chuyển khoản.');
+        setInstructionLoading(false);
+        return;
+      }
+
+      const bank = result.data.bankAccount;
+      setInstructionBank({
+        id: bank.id,
+        bankName: bank.bankName,
+        accountNumber: bank.accountNumber,
+        accountHolder: bank.accountHolder,
+        branch: bank.branch || '',
+        qrImage: bank.qrImage || undefined,
+      });
+      setInstructionQrUrl(result.data.qrUrl?.trim() || '');
+      setInstructionContent(result.data.transferContent);
+      setInstructionTotal(result.data.total);
+      setSecondsLeft(result.data.secondsLeft);
+      setInstructionLoading(false);
+    };
+
+    void loadInstructions();
+    return () => { cancelled = true; };
+  }, [orderCode]);
 
   // Poll backend mỗi 5s
   useEffect(() => {
@@ -48,9 +92,14 @@ export default function PaymentStep({ orderCode, total, bankAccounts, allowSimul
     return () => window.clearInterval(t);
   }, [expired]);
 
-  const primaryBank = bankAccounts[0];
-  const transferContent = `DH${orderCode}`;
-  const qrUrl = primaryBank ? buildVietQrUrl(primaryBank, total, transferContent) : '';
+  const primaryBank = instructionBank || bankAccounts[0];
+  const transferContent = instructionContent || `DH${orderCode}`;
+  const payableTotal = instructionTotal ?? total;
+  const generatedQrUrl = primaryBank
+    ? buildVietQrUrl(primaryBank, payableTotal, transferContent)
+    : '';
+  // QR do Admin upload/dán URL là nguồn ưu tiên; nếu không có thì sinh VietQR động.
+  const qrUrl = instructionQrUrl || primaryBank?.qrImage?.trim() || generatedQrUrl;
 
   const handleSimulatePaid = async () => {
     const r = await paymentApi.simulatePaid(orderCode);
@@ -104,6 +153,10 @@ export default function PaymentStep({ orderCode, total, bankAccounts, allowSimul
           </div>
         )}
 
+        {!expired && instructionLoading && !primaryBank && (
+          <div className="ivy-payment-no-bank">Đang tải thông tin chuyển khoản...</div>
+        )}
+
         {!expired && primaryBank && (
           <div className="ivy-payment-step__body">
             <div className="ivy-payment-info">
@@ -113,7 +166,7 @@ export default function PaymentStep({ orderCode, total, bankAccounts, allowSimul
               <div className="ivy-payment-info__rows">
                 <div>
                   <span className="ivy-label">Số tiền</span>
-                  <div className="ivy-amount-pill">{formatCurrency(total)}</div>
+                  <div className="ivy-amount-pill">{formatCurrency(payableTotal)}</div>
                 </div>
                 <div>
                   <span className="ivy-label">Ngân hàng</span>
@@ -151,7 +204,7 @@ export default function PaymentStep({ orderCode, total, bankAccounts, allowSimul
             <div className="ivy-payment-qr">
               <h3>Quét mã QR để thanh toán</h3>
               <div className="ivy-payment-qr__frame">
-                <img src={qrUrl} alt="VietQR"  loading="lazy" decoding="async" />
+                <img src={qrUrl} alt="VietQR" loading="lazy" decoding="async" />
               </div>
               <p className="ivy-payment-qr__hint">Quét bằng app ngân hàng để thanh toán nhanh chóng</p>
               <a href={qrUrl} download={`QR-${orderCode}.png`} className="ivy-btn-primary">
@@ -161,9 +214,9 @@ export default function PaymentStep({ orderCode, total, bankAccounts, allowSimul
           </div>
         )}
 
-        {!expired && !primaryBank && (
+        {!expired && !instructionLoading && !primaryBank && (
           <div className="ivy-payment-no-bank">
-            Phương thức chuyển khoản chưa được cấu hình. Vui lòng liên hệ shop.
+            {instructionError || 'Phương thức chuyển khoản chưa được cấu hình. Vui lòng liên hệ shop.'}
           </div>
         )}
 
