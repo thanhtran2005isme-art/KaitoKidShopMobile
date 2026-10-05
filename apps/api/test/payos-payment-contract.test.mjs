@@ -115,6 +115,74 @@ test('payOS business code 101 được hiểu là chưa có payment và chuyển
   }
 });
 
+test('hai ensurePayment đồng thời cho cùng đơn chỉ create payOS đúng một lần', async () => {
+  const restoreEnv = withPayOsEnv();
+  try {
+    const service = new PayOsService();
+    const display = 'KK-20261005-2E2370';
+    const providerOrderCode = service.providerOrderCode(display);
+    let getCalls = 0;
+    let createCalls = 0;
+
+    service.sdk = {
+      paymentRequests: {
+        async get() {
+          getCalls += 1;
+          await new Promise((resolve) => setTimeout(resolve, 20));
+          const error = new Error('HTTP 200, Mã thanh toán không tồn tại (code: 101)');
+          error.status = 200;
+          error.code = '101';
+          throw error;
+        },
+        async create(input) {
+          createCalls += 1;
+          await new Promise((resolve) => setTimeout(resolve, 20));
+          return {
+            orderCode: input.orderCode,
+            amount: input.amount,
+            description: input.description,
+            status: 'PENDING',
+            paymentLinkId: 'single-flight-link',
+            checkoutUrl: 'https://pay.payos.vn/web/single-flight-link',
+            qrCode: '000201SINGLEFLIGHT',
+            currency: 'VND',
+          };
+        },
+        async cancel() {
+          throw new Error('not used');
+        },
+      },
+      webhooks: {
+        verify(value) {
+          return value;
+        },
+      },
+    };
+
+    const input = {
+      orderCode: display,
+      amount: 199000,
+      customerName: 'Strict Mode Customer',
+      customerEmail: 'strict@example.com',
+      paymentExpiresAt: new Date(Date.now() + 15 * 60 * 1000),
+    };
+
+    const [first, second] = await Promise.all([
+      service.ensurePayment(input),
+      service.ensurePayment(input),
+    ]);
+
+    assert.equal(getCalls, 1);
+    assert.equal(createCalls, 1);
+    assert.equal(first.orderCode, providerOrderCode);
+    assert.equal(second.orderCode, providerOrderCode);
+    assert.equal(first.paymentLinkId, 'single-flight-link');
+    assert.equal(second.paymentLinkId, 'single-flight-link');
+  } finally {
+    restoreEnv();
+  }
+});
+
 test('payOS create code 231 recover payment đã tồn tại thay vì trả 502', async () => {
   const restoreEnv = withPayOsEnv();
   try {
