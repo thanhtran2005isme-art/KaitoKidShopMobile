@@ -17,7 +17,7 @@
     "test:catalog": "npm run build && node --test test/catalog-contract.test.mjs",
     "test:customer-aux": "npm run build && node --test test/customer-aux-contract.test.mjs",
     "test:cart-reservation": "npm run build && node --test test/cart-reservation-contract.test.mjs",
-    "test:checkout-order": "npm run build && node --test test/checkout-order-contract.test.mjs test/lalamove-shipping-contract.test.mjs test/payment-settings-contract.test.mjs test/admin-vietqr-contract.test.mjs test/payos-payment-contract.test.mjs test/payos-status-reconcile-contract.test.mjs test/payment-runtime-cutover-contract.test.mjs",
+    "test:checkout-order": "npm run build && node --test test/checkout-order-contract.test.mjs test/lalamove-shipping-contract.test.mjs test/payment-settings-contract.test.mjs test/admin-vietqr-contract.test.mjs test/payos-payment-contract.test.mjs test/payos-status-reconcile-contract.test.mjs test/payos-rate-limit-contract.test.mjs test/payment-runtime-cutover-contract.test.mjs",
     "test:auth-rbac": "npm run build && node --test test/auth-rbac-contract.test.mjs",
     "test:realtime-cutover": "npm run build && node --test test/realtime-cutover-contract.test.mjs",
     "test:admin-migration": "npm run build && node --test test/admin-migration-contract.test.mjs",
