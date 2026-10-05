@@ -2,7 +2,7 @@
 
 > **Trạng thái:** Superseded cho Customer payment bởi D027/payOS từ 2026-10-05.
 
-Runbook này được giữ lại để giải thích phần code/config VietQR đã tồn tại trong giai đoạn trước của PR #75. Nó **không còn là acceptance path của online payment hiện hành**.
+Runbook này chỉ còn để giải thích phần code/config VietQR đã tồn tại trong giai đoạn trước của PR #75. Nó **không còn là acceptance path, provider hay merge gate của online payment hiện hành**.
 
 ## Trước D027
 
@@ -49,6 +49,16 @@ Durable decision:
 docs/decisions/D027-payos-payment-lifecycle.md
 ```
 
+## Runtime cutover
+
+Từ cutover D027:
+
+- `PAYOS_CLIENT_ID` + `PAYOS_API_KEY` + `PAYOS_CHECKSUM_KEY` quyết định provider availability;
+- `payosEnabled=false` có thể tắt online payment dù credentials tồn tại;
+- `bankEnabled`, `enableBankTransfer`, `bankAccounts` legacy không còn quyền bật ATM cho đơn mới;
+- Web/Mobile không tự ghép VietQR làm payment authority;
+- QR upload/URL Admin không còn là payment path chính.
+
 ## Legacy code/config còn trong migration window
 
 Các surface sau có thể vẫn còn trên branch trong lúc cleanup để không phá dữ liệu/config cũ:
@@ -60,7 +70,7 @@ Các surface sau có thể vẫn còn trên branch trong lúc cleanup để khô
 - Admin bank selector/account-holder verification/QR upload;
 - `bankAccounts` trong `CauHinhCuaHang`.
 
-Khi payOS đã cấu hình, các phần trên **không được** dùng làm payment authority cho Customer checkout và không được mở rộng thêm như kiến trúc hiện hành.
+Chúng chỉ phục vụ compatibility/migration. Không dùng các phần trên để kết luận rằng online payment mới cần customer tự chuyển khoản thủ công.
 
 ## Không còn là merge gate
 
@@ -71,4 +81,4 @@ Các acceptance cũ sau đây không còn quyết định việc merge payment c
 - QR upload làm fallback customer payment;
 - Customer Web/Mobile phụ thuộc Admin bank account.
 
-Chúng được thay bằng payOS credential + public webhook + signed payment E2E trong `PAYOS_PAYMENT_E2E.md`.
+Chúng được thay bằng payOS credentials + public webhook + signed payment E2E trong `PAYOS_PAYMENT_E2E.md`.
