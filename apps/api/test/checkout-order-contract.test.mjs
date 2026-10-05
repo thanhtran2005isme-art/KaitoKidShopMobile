@@ -23,6 +23,7 @@ function source(path) {
 const ordersControllerSource = source("../src/modules/orders/orders.controller.ts");
 const afterSalesSource = source("../src/modules/orders/order-after-sales.service.ts");
 const reviewsSource = source("../src/modules/reviews/reviews.service.ts");
+const simulatorSource = source("../src/modules/shipping/shipping-status-simulator.service.ts");
 
 test("coupon percent giữ min-order, usage và max-discount của C#", () => {
   const now = new Date("2026-09-30T12:00:00Z");
@@ -125,6 +126,12 @@ test("GHN normalizer bỏ quận/huyện/phường + khoảng trắng như C#", 
   assert.equal(normalizeGhnName("Phường Dịch Vọng"), "dichvong");
 });
 
+test("carrier delivered does not complete commerce order before customer receipt", () => {
+  assert.match(simulatorSource, /shippingStatus === "delivering" \|\| shippingStatus === "delivered"/);
+  assert.match(simulatorSource, /return "shipping"/);
+  assert.doesNotMatch(simulatorSource, /shippingStatus === "delivered"\) return "completed"/);
+});
+
 test("customer receipt is explicit and starts the seven-day return window", () => {
   assert.match(ordersControllerSource, /@Post\(":id\/confirm-received"\)/);
   assert.match(ordersControllerSource, /@Post\(":id\/report-not-received"\)/);
@@ -134,7 +141,14 @@ test("customer receipt is explicit and starts the seven-day return window", () =
   assert.match(afterSalesSource, /NgayHoanThanh = \?/);
   assert.match(afterSalesSource, /TrangThaiVanChuyen = 'delivery_disputed'/);
   assert.match(afterSalesSource, /TrangThai = 'return_requested'/);
-  assert.match(afterSalesSource, /không tự động hoàn tiền|không tự hủy|đối soát/i);
+});
+
+test("receipt authority requires received_by_customer history marker, not timestamp alone", () => {
+  assert.match(afterSalesSource, /received_by_customer/);
+  assert.match(afterSalesSource, /const receiptConfirmed = receiptMarker && Boolean\(completedAt\)/);
+  assert.match(afterSalesSource, /\["delivered", "completed"\]/);
+  assert.match(afterSalesSource, /NgayHoanThanh = NULL/);
+  assert.match(afterSalesSource, /hasMarker\(tx, orderId, "received_by_customer"\)/);
 });
 
 test("return request uses history marker and does not invent a DonHang enum state", () => {
@@ -146,9 +160,11 @@ test("return request uses history marker and does not invent a DonHang enum stat
   );
 });
 
-test("review requires customer-confirmed receipt and remains valid during return review", () => {
+test("review requires customer-confirmed receipt marker", () => {
   assert.match(reviewsSource, /TrangThai = 'completed'/);
   assert.match(reviewsSource, /NgayHoanThanh IS NOT NULL/);
+  assert.match(reviewsSource, /EXISTS \(/);
+  assert.match(reviewsSource, /h\.TrangThai = 'received_by_customer'/);
   assert.match(reviewsSource, /khách chưa xác nhận đã nhận hàng/);
-  assert.match(afterSalesSource, /const canReview = Boolean\(completedAt\) && status === "completed"/);
+  assert.match(afterSalesSource, /const canReview = status === "completed" && receiptConfirmed/);
 });

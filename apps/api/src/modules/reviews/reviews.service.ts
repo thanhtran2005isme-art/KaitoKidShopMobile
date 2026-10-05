@@ -96,11 +96,16 @@ export class ReviewsService {
 
     return this.prisma.$transaction(async (tx) => {
       const orders = await tx.$queryRawUnsafe<Array<{ id: unknown }>>(
-        `SELECT Id AS id
-         FROM DonHang
-         WHERE Id = ? AND NguoiDungId = ?
-           AND TrangThai = 'completed'
-           AND NgayHoanThanh IS NOT NULL
+        `SELECT d.Id AS id
+         FROM DonHang d
+         WHERE d.Id = ? AND d.NguoiDungId = ?
+           AND d.TrangThai = 'completed'
+           AND d.NgayHoanThanh IS NOT NULL
+           AND EXISTS (
+             SELECT 1 FROM LichSuTrangThaiVanChuyen h
+             WHERE h.DonHangId = d.Id
+               AND h.TrangThai = 'received_by_customer'
+           )
          LIMIT 1`,
         orderId,
         userId,

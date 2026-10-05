@@ -2,7 +2,6 @@ import { BadRequestException, Injectable } from "@nestjs/common";
 import { toNumber } from "../../common/db-value.js";
 import type { SqlClient } from "../../common/sql-client.js";
 import { PrismaService } from "../../database/prisma.service.js";
-import { ShippingService } from "../shipping/shipping.service.js";
 
 const RETURN_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -29,10 +28,7 @@ function normalized(value: string | null | undefined): string {
 
 @Injectable()
 export class OrderAfterSalesService {
-  constructor(
-    private readonly db: PrismaService,
-    private readonly shipping: ShippingService,
-  ) {}
+  constructor(private readonly db: PrismaService) {}
 
   async decorateMany<T extends { id: number; status: string }>(
     userId: number,
@@ -55,16 +51,32 @@ export class OrderAfterSalesService {
       userId,
       ...ids,
     );
-    const returnRows = await this.db.$queryRawUnsafe<Array<{ orderId: unknown }>>(
-      `SELECT DISTINCT DonHangId AS orderId
+    const markerRows = await this.db.$queryRawUnsafe<Array<{
+      orderId: unknown;
+      status: string;
+    }>>(
+      `SELECT DonHangId AS orderId, TrangThai AS status
        FROM LichSuTrangThaiVanChuyen
-       WHERE DonHangId IN (${marks}) AND TrangThai = 'return_requested'`,
+       WHERE DonHangId IN (${marks})
+         AND TrangThai IN ('received_by_customer','return_requested')`,
       ...ids,
     );
-    const openReturnIds = new Set(returnRows.map((row) => toNumber(row.orderId)));
+    const receiptIds = new Set<number>();
+    const returnIds = new Set<number>();
+    for (const marker of markerRows) {
+      const id = toNumber(marker.orderId);
+      if (marker.status === "received_by_customer") receiptIds.add(id);
+      if (marker.status === "return_requested") returnIds.add(id);
+    }
+
     const byId = new Map(rows.map((row) => [toNumber(row.id), row]));
     return orders.map((order) =>
-      this.decorate(order, byId.get(order.id), openReturnIds.has(order.id)),
+      this.decorate(
+        order,
+        byId.get(order.id),
+        receiptIds.has(order.id),
+        returnIds.has(order.id),
+      ),
     );
   }
 
@@ -79,11 +91,18 @@ export class OrderAfterSalesService {
   async confirmReceived(userId: number, orderId: number) {
     const completedAt = await this.db.$transaction(async (tx) => {
       const order = await this.lockOrder(tx, userId, orderId);
-      const existing = asDate(order.completedAt);
-      if (existing) return existing;
+      const alreadyConfirmed = await this.hasMarker(
+        tx,
+        orderId,
+        "received_by_customer",
+      );
+      if (alreadyConfirmed) {
+        const existing = asDate(order.completedAt);
+        if (existing) return existing;
+      }
 
       const shippingStatus = normalized(order.shippingStatus);
-      if (!["delivered", "delivery_disputed"].includes(shippingStatus)) {
+      if (!["delivered", "completed", "delivery_disputed"].includes(shippingStatus)) {
         throw new BadRequestException(
           "Chỉ có thể xác nhận đã nhận hàng sau khi đơn vị vận chuyển báo đã giao.",
         );
@@ -105,15 +124,18 @@ export class OrderAfterSalesService {
         orderId,
         userId,
       );
+      if (!alreadyConfirmed) {
+        await tx.$executeRawUnsafe(
+          `INSERT INTO LichSuTrangThaiVanChuyen
+             (DonHangId, TrangThai, MoTa, ViTri, ThoiGian)
+           VALUES (?, 'received_by_customer', ?, 'Khách hàng', ?)`,
+          orderId,
+          "Khách hàng xác nhận đã nhận hàng",
+          now,
+        );
+      }
       return now;
     });
-
-    await this.shipping.appendHistory(
-      orderId,
-      "received_by_customer",
-      "Khách hàng xác nhận đã nhận hàng",
-      "Khách hàng",
-    );
 
     return {
       message: "Đã xác nhận nhận hàng.",
@@ -125,7 +147,7 @@ export class OrderAfterSalesService {
   async reportNotReceived(userId: number, orderId: number) {
     const changed = await this.db.$transaction(async (tx) => {
       const order = await this.lockOrder(tx, userId, orderId);
-      if (asDate(order.completedAt)) {
+      if (await this.hasMarker(tx, orderId, "received_by_customer")) {
         throw new BadRequestException(
           "Đơn hàng đã được xác nhận nhận hàng nên không thể báo chưa nhận.",
         );
@@ -133,7 +155,7 @@ export class OrderAfterSalesService {
 
       const shippingStatus = normalized(order.shippingStatus);
       if (shippingStatus === "delivery_disputed") return false;
-      if (shippingStatus !== "delivered") {
+      if (!["delivered", "completed"].includes(shippingStatus)) {
         throw new BadRequestException(
           "Chỉ có thể báo chưa nhận khi đơn vị vận chuyển đã đánh dấu giao thành công.",
         );
@@ -147,23 +169,23 @@ export class OrderAfterSalesService {
         `UPDATE DonHang
          SET TrangThai = 'shipping',
              TrangThaiVanChuyen = 'delivery_disputed',
+             NgayHoanThanh = NULL,
              NgayCapNhat = ?
          WHERE Id = ? AND NguoiDungId = ?`,
         now,
         orderId,
         userId,
       );
+      await tx.$executeRawUnsafe(
+        `INSERT INTO LichSuTrangThaiVanChuyen
+           (DonHangId, TrangThai, MoTa, ViTri, ThoiGian)
+         VALUES (?, 'delivery_disputed', ?, 'Khách hàng', ?)`,
+        orderId,
+        "Khách hàng báo chưa nhận được hàng dù đơn vị vận chuyển đã báo giao thành công",
+        now,
+      );
       return true;
     });
-
-    if (changed) {
-      await this.shipping.appendHistory(
-        orderId,
-        "delivery_disputed",
-        "Khách hàng báo chưa nhận được hàng dù đơn vị vận chuyển đã báo giao thành công",
-        "Khách hàng",
-      );
-    }
 
     return {
       message: changed
@@ -186,11 +208,16 @@ export class OrderAfterSalesService {
       if (normalized(order.status) !== "completed") {
         throw new BadRequestException("Chỉ đơn hàng đã nhận mới có thể yêu cầu hoàn hàng.");
       }
+      if (!(await this.hasMarker(tx, orderId, "received_by_customer"))) {
+        throw new BadRequestException(
+          "Khách hàng chưa xác nhận đã nhận hàng nên chưa thể yêu cầu hoàn hàng.",
+        );
+      }
 
       const completedAt = asDate(order.completedAt);
       if (!completedAt) {
         throw new BadRequestException(
-          "Đơn hàng chưa có xác nhận nhận hàng của khách nên chưa thể yêu cầu hoàn hàng.",
+          "Đơn hàng chưa có mốc xác nhận nhận hàng hợp lệ.",
         );
       }
       const deadline = new Date(completedAt.getTime() + RETURN_WINDOW_MS);
@@ -228,6 +255,7 @@ export class OrderAfterSalesService {
   private decorate<T extends { id: number; status: string }>(
     order: T,
     row: AfterSalesRow | undefined,
+    receiptMarker: boolean,
     returnRequested: boolean,
   ) {
     if (!row) return order;
@@ -235,42 +263,59 @@ export class OrderAfterSalesService {
     const status = normalized(row.status);
     const shippingStatus = normalized(row.shippingStatus);
     const completedAt = asDate(row.completedAt);
+    const receiptConfirmed = receiptMarker && Boolean(completedAt);
+    const carrierSaysDelivered = ["delivered", "completed"].includes(shippingStatus);
     const waitingCustomerReceipt =
-      !completedAt && ["delivered", "delivery_disputed"].includes(shippingStatus);
+      !receiptConfirmed &&
+      (status === "completed" || carrierSaysDelivered || shippingStatus === "delivery_disputed");
     const effectiveStatus =
       waitingCustomerReceipt && status === "completed" ? "shipping" : status;
-    const returnDeadline = completedAt
+    const returnDeadline = receiptConfirmed && completedAt
       ? new Date(completedAt.getTime() + RETURN_WINDOW_MS)
       : null;
     const hasOpenReturn = returnRequested && status !== "returned";
     const canRequestReturn =
       status === "completed" &&
-      Boolean(completedAt) &&
+      receiptConfirmed &&
       !hasOpenReturn &&
       Boolean(returnDeadline && Date.now() <= returnDeadline.getTime());
-    const canReview = Boolean(completedAt) && status === "completed";
+    const canReview = status === "completed" && receiptConfirmed;
 
     return {
       ...order,
       status: effectiveStatus,
       canConfirmReceived:
-        waitingCustomerReceipt && !["cancelled", "returned"].includes(status),
+        !receiptConfirmed &&
+        ["delivered", "completed", "delivery_disputed"].includes(shippingStatus) &&
+        !["cancelled", "returned"].includes(status),
       canReportNotReceived:
-        !completedAt && shippingStatus === "delivered" && !["cancelled", "returned"].includes(status),
+        !receiptConfirmed &&
+        carrierSaysDelivered &&
+        !["cancelled", "returned"].includes(status),
       deliveryIssueReported: shippingStatus === "delivery_disputed",
-      customerReceiptConfirmed: Boolean(completedAt),
+      customerReceiptConfirmed: receiptConfirmed,
       canReview,
       canRequestReturn,
       returnRequested: hasOpenReturn,
-      receivedAt: completedAt,
+      receivedAt: receiptConfirmed ? completedAt : null,
       returnDeadline,
       returnWindowDays: 7,
     };
   }
 
-  private returnDeadline(raw: Date | string | null) {
-    const completedAt = asDate(raw);
-    return completedAt ? new Date(completedAt.getTime() + RETURN_WINDOW_MS) : null;
+  private async hasMarker(
+    tx: SqlClient,
+    orderId: number,
+    status: "received_by_customer" | "return_requested",
+  ): Promise<boolean> {
+    const rows = await tx.$queryRawUnsafe<Array<{ id: unknown }>>(
+      `SELECT Id AS id FROM LichSuTrangThaiVanChuyen
+       WHERE DonHangId = ? AND TrangThai = ?
+       LIMIT 1`,
+      orderId,
+      status,
+    );
+    return rows.length > 0;
   }
 
   private async lockOrder(

@@ -28,14 +28,17 @@ Sau live UI test, phát hiện `Lalamove COMPLETED` đang đẩy `DonHang.TrangT
 
 Đã bổ sung ranh giới hậu mãi:
 
-- carrier `COMPLETED` chỉ được coi là `delivered`; Customer API trình bày đơn là đang chờ xác nhận nếu `NgayHoanThanh IS NULL`;
-- thêm `POST /api/orders/:id/confirm-received`; chỉ hành động này mới ghi `NgayHoanThanh`, chuyển `received_by_customer` và bắt đầu cửa sổ hoàn hàng 7 ngày;
-- thêm `POST /api/orders/:id/report-not-received`; ghi `delivery_disputed`, giữ order ở `shipping`, không tự hủy/hoàn tồn/coupon/refund;
-- thêm `POST /api/orders/:id/return-request`; chỉ cho phép trong 7 ngày từ `NgayHoanThanh`, ghi marker `return_requested` + lý do vào `LichSuTrangThaiVanChuyen` trong transaction, không đổi enum `DonHang.TrangThai`;
+- carrier `COMPLETED` chỉ được coi là `delivered`; Customer API trình bày đơn là đang chờ xác nhận nếu chưa có bằng chứng khách nhận hàng;
+- source of truth nhận hàng là **cặp** `received_by_customer` history marker + `NgayHoanThanh`; timestamp đơn lẻ do dữ liệu legacy/Admin không mở review/return;
+- thêm `POST /api/orders/:id/confirm-received`; ghi `NgayHoanThanh`, `received_by_customer` và history marker trong cùng transaction, bắt đầu cửa sổ hoàn hàng 7 ngày;
+- thêm `POST /api/orders/:id/report-not-received`; ghi `delivery_disputed`, giữ order ở `shipping`, xóa timestamp legacy nếu có và không tự hủy/hoàn tồn/coupon/refund;
+- thêm `POST /api/orders/:id/return-request`; chỉ cho phép trong 7 ngày từ mốc khách xác nhận, ghi marker `return_requested` + lý do vào `LichSuTrangThaiVanChuyen` trong transaction, không đổi enum `DonHang.TrangThai`;
 - wrapper receipt-aware giữ `delivery_disputed`, `received_by_customer` và `returned` khỏi bị polling/webhook carrier ghi đè; yêu cầu hoàn được giữ độc lập bằng history marker;
-- review yêu cầu `NgayHoanThanh IS NOT NULL` và `DonHang.TrangThai=completed`; vẫn đánh giá được khi yêu cầu hoàn đang chờ vì order không bị đổi sang status giả;
+- review yêu cầu `DonHang.TrangThai=completed`, `NgayHoanThanh IS NOT NULL` và tồn tại marker `received_by_customer`;
 - Customer Web có action trực tiếp `Đã nhận hàng`, `Chưa nhận được hàng`, `Đánh giá`, `Hoàn hàng`; tracking reload danh sách ngay sau sync;
-- dữ liệu cũ `completed + delivered + NgayHoanThanh NULL` được tương thích bằng effective state, không reset DB;
+- Mobile Order Detail được đồng bộ cùng contract backend: xác nhận nhận, báo chưa nhận, đánh giá và gửi lý do hoàn hàng trong 7 ngày; quyền action không tự suy từ label;
+- simulator non-Lalamove khi đi tới `delivered` tiếp tục giữ business order ở `shipping`, không tự hoàn tất đơn;
+- dữ liệu cũ `completed + delivered/completed` nhưng chưa có marker khách nhận được trình bày lại như đang chờ khách xác nhận, không reset DB;
 - không thêm bảng/cột/enum mới; quyết định durable ở `docs/decisions/D026-customer-receipt-return-window.md`.
 
 ## Gate còn mở

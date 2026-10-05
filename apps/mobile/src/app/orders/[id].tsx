@@ -4,11 +4,14 @@ import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -29,6 +32,13 @@ import {
   shippingStatusMeta,
 } from '@/utils/order-status';
 
+type OrderAction =
+  | 'cancel'
+  | 'reorder'
+  | 'confirm-received'
+  | 'report-not-received'
+  | 'return-request';
+
 function messageFrom(error: unknown, fallback: string) {
   return error instanceof Error && error.message ? error.message : fallback;
 }
@@ -44,8 +54,9 @@ export default function OrderDetailScreen() {
   const [order, setOrder] = useState<CustomerOrder | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [actionBusy, setActionBusy] =
-    useState<'cancel' | 'reorder' | null>(null);
+  const [actionBusy, setActionBusy] = useState<OrderAction | null>(null);
+  const [showReturnForm, setShowReturnForm] = useState(false);
+  const [returnReason, setReturnReason] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   const loadOrder = useCallback(
@@ -109,6 +120,102 @@ export default function OrderDetailScreen() {
         },
       ],
     );
+  };
+
+  const confirmReceived = () => {
+    if (!token || !order || !order.canConfirmReceived || actionBusy) return;
+
+    Alert.alert(
+      'Xác nhận đã nhận hàng?',
+      'Chỉ xác nhận khi bạn thực sự đã nhận được hàng. Thời hạn yêu cầu hoàn hàng 7 ngày sẽ bắt đầu từ thời điểm này.',
+      [
+        { text: 'Để sau', style: 'cancel' },
+        {
+          text: 'Đã nhận hàng',
+          onPress: () => {
+            void (async () => {
+              setActionBusy('confirm-received');
+              setError(null);
+              try {
+                const result = await ordersApi.confirmReceived(token, order.id);
+                await loadOrder('refresh');
+                Alert.alert(
+                  'Đã xác nhận nhận hàng',
+                  result.returnDeadline
+                    ? 'Bạn có thể yêu cầu hoàn hàng nếu có lỗi đến ' +
+                      formatDateTime(result.returnDeadline) +
+                      '.'
+                    : result.message,
+                );
+              } catch (actionError) {
+                setError(
+                  messageFrom(actionError, 'Không thể xác nhận nhận hàng.'),
+                );
+              } finally {
+                setActionBusy(null);
+              }
+            })();
+          },
+        },
+      ],
+    );
+  };
+
+  const reportNotReceived = () => {
+    if (!token || !order || !order.canReportNotReceived || actionBusy) return;
+
+    Alert.alert(
+      'Bạn chưa nhận được hàng?',
+      'Đơn vị vận chuyển đang báo giao thành công. KaitoKid sẽ ghi nhận khiếu nại để đối soát; đơn không bị tự hủy hoặc hoàn tồn kho.',
+      [
+        { text: 'Đóng', style: 'cancel' },
+        {
+          text: 'Báo chưa nhận',
+          style: 'destructive',
+          onPress: () => {
+            void (async () => {
+              setActionBusy('report-not-received');
+              setError(null);
+              try {
+                const result = await ordersApi.reportNotReceived(token, order.id);
+                await loadOrder('refresh');
+                Alert.alert('Đã ghi nhận', result.message);
+              } catch (actionError) {
+                setError(
+                  messageFrom(actionError, 'Không thể gửi báo cáo chưa nhận hàng.'),
+                );
+              } finally {
+                setActionBusy(null);
+              }
+            })();
+          },
+        },
+      ],
+    );
+  };
+
+  const submitReturnRequest = async () => {
+    if (!token || !order || !order.canRequestReturn || actionBusy) return;
+
+    const reason = returnReason.trim();
+    if (reason.length < 5) {
+      setError('Vui lòng mô tả lỗi hoặc lý do hoàn hàng ít nhất 5 ký tự.');
+      return;
+    }
+
+    setActionBusy('return-request');
+    setError(null);
+    try {
+      const result = await ordersApi.requestReturn(token, order.id, reason);
+      setReturnReason('');
+      setShowReturnForm(false);
+      await loadOrder('refresh');
+      Alert.alert('Đã gửi yêu cầu hoàn hàng', result.message);
+    } catch (actionError) {
+      setError(messageFrom(actionError, 'Không thể gửi yêu cầu hoàn hàng.'));
+    } finally {
+      setActionBusy(null);
+    }
   };
 
   const reorder = async () => {
@@ -245,284 +352,433 @@ export default function OrderDetailScreen() {
 
   const shippingMeta = shippingStatusMeta(order.shippingStatus);
   const canResumePayment = canResumeAtmPayment(order);
+  const showAfterSales =
+    Boolean(order.canConfirmReceived) ||
+    Boolean(order.canReportNotReceived) ||
+    Boolean(order.deliveryIssueReported) ||
+    Boolean(order.customerReceiptConfirmed) ||
+    Boolean(order.canRequestReturn) ||
+    Boolean(order.returnRequested);
 
   return (
     <SafeAreaView edges={['top']} style={styles.safeArea}>
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            tintColor={BRAND_COLORS.primary}
-            onRefresh={() => void loadOrder('refresh')}
-          />
-        }
-        contentContainerStyle={styles.content}>
-        <View style={styles.header}>
-          <Pressable
-            accessibilityLabel="Quay lại danh sách đơn hàng"
-            accessibilityRole="button"
-            hitSlop={8}
-            onPress={() => router.replace('/orders')}
-            style={({ pressed }) => [
-              styles.backButton,
-              pressed && styles.pressed,
-            ]}>
-            <AppIcon color={BRAND_COLORS.ink} name="arrowLeft" size={22} />
-          </Pressable>
-          <View style={styles.headerCopy}>
-            <Text style={styles.eyebrow}>CHI TIẾT ĐƠN HÀNG</Text>
-            <Text style={styles.title}>{order.orderCode}</Text>
-            <Text style={styles.subtitle}>
-              {'Đặt lúc ' + formatDateTime(order.createdAt)}
-            </Text>
-          </View>
-          <OrderStatusBadge status={order.status} />
-        </View>
-
-        {error ? (
-          <View style={styles.errorCard} accessibilityRole="alert">
-            <Text style={styles.errorText}>{error}</Text>
-          </View>
-        ) : null}
-
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <View>
-              <Text style={styles.sectionKicker}>TRẠNG THÁI</Text>
-              <Text style={styles.sectionTitle}>Xử lý & vận chuyển</Text>
-            </View>
-            <OrderStatusBadge
-              kind="shipping"
-              status={order.shippingStatus}
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={styles.flex}>
+        <ScrollView
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              tintColor={BRAND_COLORS.primary}
+              onRefresh={() => void loadOrder('refresh')}
             />
-          </View>
-
-          <View style={styles.statusSummary}>
-            <Text style={styles.statusLabel}>Vận chuyển hiện tại</Text>
-            <Text style={styles.statusValue}>{shippingMeta.label}</Text>
-          </View>
-
-          {order.trackingCode ? (
-            <SummaryRow label="Mã vận đơn" value={order.trackingCode} />
-          ) : null}
-          {order.shippingProvider ? (
-            <SummaryRow
-              label="Nhà vận chuyển"
-              value={order.shippingProvider.toUpperCase()}
-            />
-          ) : null}
-          {order.shippingServiceCode ? (
-            <SummaryRow
-              label="Dịch vụ"
-              value={order.shippingServiceCode}
-            />
-          ) : null}
-
-          <Pressable
-            accessibilityLabel="Theo dõi vận chuyển của đơn hàng"
-            accessibilityRole="button"
-            onPress={() =>
-              router.push({
-                pathname: '/orders/[id]/tracking',
-                params: { id: String(order.id) },
-              })
-            }
-            style={({ pressed }) => [
-              styles.trackButton,
-              pressed && styles.pressed,
-            ]}>
-            <Text style={styles.trackButtonText}>Theo dõi hành trình</Text>
-            <AppIcon color={BRAND_COLORS.primary} name="chevronRight" size={20} />
-          </Pressable>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionKicker}>SẢN PHẨM</Text>
-          <Text style={styles.sectionTitle}>
-            {'Sản phẩm trong đơn (' +
-              order.items.reduce((sum, item) => sum + item.quantity, 0) +
-              ')'}
-          </Text>
-
-          <View style={styles.itemList}>
-            {order.items.map((item, index) => (
-              <View
-                key={item.productId + ':' + index}
-                style={styles.itemRow}>
-                <Image
-                  accessibilityLabel={item.productName}
-                  cachePolicy="memory-disk"
-                  contentFit="cover"
-                  source={resolveMediaUrl(item.productImage)}
-                  style={styles.itemImage}
-                />
-                <View style={styles.itemCopy}>
-                  <Text numberOfLines={2} style={styles.itemName}>
-                    {item.productName}
-                  </Text>
-                  <Text style={styles.itemMeta}>
-                    {'Size ' +
-                      item.size +
-                      ' · ' +
-                      item.color +
-                      ' · SL ' +
-                      item.quantity}
-                  </Text>
-                  {order.status === 'completed' ? (
-                    item.hasReviewed ? (
-                      <Text style={[styles.reviewMeta, styles.reviewMetaDone]}>
-                        Đã đánh giá
-                      </Text>
-                    ) : (
-                      <Pressable
-                        accessibilityLabel={'Viết đánh giá cho ' + item.productName}
-                        accessibilityRole="button"
-                        onPress={() =>
-                          router.push({
-                            pathname: '/review/create',
-                            params: {
-                              orderId: String(order.id),
-                              productId: String(item.productId),
-                              size: item.size,
-                              color: item.color,
-                            },
-                          })
-                        }
-                        style={({ pressed }) => [
-                          styles.reviewButton,
-                          pressed && styles.pressed,
-                        ]}>
-                        <Text style={styles.reviewButtonText}>Viết đánh giá</Text>
-                      </Pressable>
-                    )
-                  ) : null}
-                </View>
-                <Text style={styles.itemPrice}>
-                  {formatMoney(item.price * item.quantity)}
-                </Text>
-              </View>
-            ))}
-          </View>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionKicker}>NGƯỜI NHẬN</Text>
-          <Text style={styles.sectionTitle}>Thông tin giao hàng</Text>
-          <SummaryRow label="Họ tên" value={order.customerName} />
-          <SummaryRow label="Điện thoại" value={order.customerPhone} />
-          <View style={styles.longRow}>
-            <Text style={styles.summaryLabel}>Địa chỉ</Text>
-            <Text style={styles.longValue}>{order.customerAddress}</Text>
-          </View>
-          {order.note ? (
-            <View style={styles.longRow}>
-              <Text style={styles.summaryLabel}>Ghi chú</Text>
-              <Text style={styles.longValue}>{order.note}</Text>
-            </View>
-          ) : null}
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionKicker}>THANH TOÁN</Text>
-          <Text style={styles.sectionTitle}>Trạng thái thanh toán</Text>
-          <SummaryRow
-            label="Phương thức"
-            value={
-              order.paymentMethod.toUpperCase() === 'ATM'
-                ? 'Chuyển khoản / VietQR'
-                : 'Thanh toán khi nhận hàng'
-            }
-          />
-          <SummaryRow label="Trạng thái" value={paymentLabel(order)} />
-          {order.paidAt ? (
-            <SummaryRow
-              label="Thanh toán lúc"
-              value={formatDateTime(order.paidAt)}
-            />
-          ) : null}
-
-          {canResumePayment ? (
+          }
+          contentContainerStyle={styles.content}>
+          <View style={styles.header}>
             <Pressable
+              accessibilityLabel="Quay lại danh sách đơn hàng"
+              accessibilityRole="button"
+              hitSlop={8}
+              onPress={() => router.replace('/orders')}
+              style={({ pressed }) => [
+                styles.backButton,
+                pressed && styles.pressed,
+              ]}>
+              <AppIcon color={BRAND_COLORS.ink} name="arrowLeft" size={22} />
+            </Pressable>
+            <View style={styles.headerCopy}>
+              <Text style={styles.eyebrow}>CHI TIẾT ĐƠN HÀNG</Text>
+              <Text style={styles.title}>{order.orderCode}</Text>
+              <Text style={styles.subtitle}>
+                {'Đặt lúc ' + formatDateTime(order.createdAt)}
+              </Text>
+            </View>
+            <OrderStatusBadge status={order.status} />
+          </View>
+
+          {error ? (
+            <View style={styles.errorCard} accessibilityRole="alert">
+              <Text style={styles.errorText}>{error}</Text>
+            </View>
+          ) : null}
+
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <View>
+                <Text style={styles.sectionKicker}>TRẠNG THÁI</Text>
+                <Text style={styles.sectionTitle}>Xử lý & vận chuyển</Text>
+              </View>
+              <OrderStatusBadge
+                kind="shipping"
+                status={order.shippingStatus}
+              />
+            </View>
+
+            <View style={styles.statusSummary}>
+              <Text style={styles.statusLabel}>Vận chuyển hiện tại</Text>
+              <Text style={styles.statusValue}>{shippingMeta.label}</Text>
+            </View>
+
+            {order.trackingCode ? (
+              <SummaryRow label="Mã vận đơn" value={order.trackingCode} />
+            ) : null}
+            {order.shippingProvider ? (
+              <SummaryRow
+                label="Nhà vận chuyển"
+                value={order.shippingProvider.toUpperCase()}
+              />
+            ) : null}
+            {order.shippingServiceCode ? (
+              <SummaryRow
+                label="Dịch vụ"
+                value={order.shippingServiceCode}
+              />
+            ) : null}
+
+            <Pressable
+              accessibilityLabel="Theo dõi vận chuyển của đơn hàng"
               accessibilityRole="button"
               onPress={() =>
                 router.push({
-                  pathname: '/checkout/payment',
-                  params: { orderCode: order.orderCode },
+                  pathname: '/orders/[id]/tracking',
+                  params: { id: String(order.id) },
                 })
               }
               style={({ pressed }) => [
-                styles.paymentButton,
+                styles.trackButton,
                 pressed && styles.pressed,
               ]}>
-              <Text style={styles.paymentButtonText}>
-                Tiếp tục thanh toán
-              </Text>
+              <Text style={styles.trackButtonText}>Theo dõi hành trình</Text>
+              <AppIcon color={BRAND_COLORS.primary} name="chevronRight" size={20} />
             </Pressable>
-          ) : null}
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionKicker}>TỔNG KẾT</Text>
-          <Text style={styles.sectionTitle}>Chi tiết thanh toán</Text>
-          <SummaryRow label="Tạm tính" value={formatMoney(order.subtotal)} />
-          <SummaryRow
-            label="Phí vận chuyển"
-            value={formatMoney(order.shippingFee)}
-          />
-          {order.discount > 0 ? (
-            <SummaryRow
-              label={order.couponCode ? 'Ưu đãi / ' + order.couponCode : 'Ưu đãi'}
-              value={'−' + formatMoney(order.discount)}
-              success
-            />
-          ) : null}
-          <View style={styles.totalRow}>
-            <Text style={styles.totalLabel}>Tổng thanh toán</Text>
-            <Text style={styles.totalValue}>{formatMoney(order.total)}</Text>
           </View>
-        </View>
 
-        <View style={styles.actions}>
-          <Pressable
-            accessibilityLabel="Mua lại sản phẩm từ đơn này"
-            accessibilityRole="button"
-            disabled={actionBusy !== null}
-            onPress={() => void reorder()}
-            style={({ pressed }) => [
-              styles.primaryAction,
-              pressed && styles.pressed,
-              actionBusy !== null && styles.disabled,
-            ]}>
-            {actionBusy === 'reorder' ? (
-              <ActivityIndicator color="#FFFFFF" />
-            ) : (
-              <Text style={styles.primaryActionText}>Mua lại đơn này</Text>
-            )}
-          </Pressable>
+          {showAfterSales ? (
+            <View style={styles.section}>
+              <Text style={styles.sectionKicker}>SAU GIAO HÀNG</Text>
+              <Text style={styles.sectionTitle}>Xác nhận & hậu mãi</Text>
 
-          {order.canCancel ? (
+              {order.deliveryIssueReported ? (
+                <View style={[styles.noticeCard, styles.noticeDanger]}>
+                  <Text style={styles.noticeTitle}>Đã báo chưa nhận được hàng</Text>
+                  <Text style={styles.noticeText}>
+                    KaitoKid sẽ đối soát với đơn vị vận chuyển. Nếu sau đó bạn nhận được hàng, hãy xác nhận bên dưới.
+                  </Text>
+                </View>
+              ) : null}
+
+              {order.customerReceiptConfirmed ? (
+                <View style={[styles.noticeCard, styles.noticeSuccess]}>
+                  <Text style={styles.noticeTitle}>Bạn đã xác nhận nhận hàng</Text>
+                  <Text style={styles.noticeText}>
+                    {order.receivedAt
+                      ? 'Xác nhận lúc ' + formatDateTime(order.receivedAt) + '.'
+                      : 'Mốc nhận hàng đã được backend xác nhận.'}
+                  </Text>
+                  {order.returnDeadline ? (
+                    <Text style={styles.noticeText}>
+                      {'Có thể yêu cầu hoàn hàng nếu có lỗi đến ' +
+                        formatDateTime(order.returnDeadline) +
+                        '.'}
+                    </Text>
+                  ) : null}
+                </View>
+              ) : null}
+
+              {order.returnRequested ? (
+                <View style={[styles.noticeCard, styles.noticeWarning]}>
+                  <Text style={styles.noticeTitle}>Đã gửi yêu cầu hoàn hàng</Text>
+                  <Text style={styles.noticeText}>
+                    Yêu cầu đang chờ KaitoKid kiểm tra. Hệ thống không tự hoàn tiền hoặc nhập lại hàng lỗi vào tồn bán.
+                  </Text>
+                </View>
+              ) : null}
+
+              {order.canConfirmReceived ? (
+                <Pressable
+                  accessibilityLabel="Xác nhận đã nhận hàng"
+                  accessibilityRole="button"
+                  disabled={actionBusy !== null}
+                  onPress={confirmReceived}
+                  style={({ pressed }) => [
+                    styles.primaryAction,
+                    pressed && styles.pressed,
+                    actionBusy !== null && styles.disabled,
+                  ]}>
+                  {actionBusy === 'confirm-received' ? (
+                    <ActivityIndicator color="#FFFFFF" />
+                  ) : (
+                    <Text style={styles.primaryActionText}>Đã nhận hàng</Text>
+                  )}
+                </Pressable>
+              ) : null}
+
+              {order.canReportNotReceived ? (
+                <Pressable
+                  accessibilityLabel="Báo chưa nhận được hàng"
+                  accessibilityRole="button"
+                  disabled={actionBusy !== null}
+                  onPress={reportNotReceived}
+                  style={({ pressed }) => [
+                    styles.cancelAction,
+                    pressed && styles.pressed,
+                    actionBusy !== null && styles.disabled,
+                  ]}>
+                  {actionBusy === 'report-not-received' ? (
+                    <ActivityIndicator color={BRAND_COLORS.danger} />
+                  ) : (
+                    <Text style={styles.cancelActionText}>Chưa nhận được hàng</Text>
+                  )}
+                </Pressable>
+              ) : null}
+
+              {order.canRequestReturn ? (
+                <>
+                  <Pressable
+                    accessibilityLabel="Mở form yêu cầu hoàn hàng"
+                    accessibilityRole="button"
+                    disabled={actionBusy !== null}
+                    onPress={() => setShowReturnForm((current) => !current)}
+                    style={({ pressed }) => [
+                      styles.secondaryButton,
+                      pressed && styles.pressed,
+                      actionBusy !== null && styles.disabled,
+                    ]}>
+                    <Text style={styles.secondaryButtonText}>
+                      {showReturnForm ? 'Đóng yêu cầu hoàn hàng' : 'Yêu cầu hoàn hàng trong 7 ngày'}
+                    </Text>
+                  </Pressable>
+
+                  {showReturnForm ? (
+                    <View style={styles.returnForm}>
+                      <Text style={styles.returnLabel}>Lý do hoàn hàng *</Text>
+                      <TextInput
+                        accessibilityLabel="Lý do hoàn hàng"
+                        maxLength={500}
+                        multiline
+                        onChangeText={(value) => {
+                          setReturnReason(value);
+                          if (error) setError(null);
+                        }}
+                        placeholder="Ví dụ: sản phẩm lỗi đường may, sai hàng, hư hỏng khi nhận..."
+                        placeholderTextColor="#9CA3AF"
+                        style={styles.returnInput}
+                        textAlignVertical="top"
+                        value={returnReason}
+                      />
+                      <Text style={styles.returnCounter}>{returnReason.length}/500</Text>
+                      <Pressable
+                        accessibilityLabel="Gửi yêu cầu hoàn hàng"
+                        accessibilityRole="button"
+                        disabled={actionBusy !== null}
+                        onPress={() => void submitReturnRequest()}
+                        style={({ pressed }) => [
+                          styles.primaryAction,
+                          pressed && styles.pressed,
+                          actionBusy !== null && styles.disabled,
+                        ]}>
+                        {actionBusy === 'return-request' ? (
+                          <ActivityIndicator color="#FFFFFF" />
+                        ) : (
+                          <Text style={styles.primaryActionText}>Gửi yêu cầu hoàn hàng</Text>
+                        )}
+                      </Pressable>
+                    </View>
+                  ) : null}
+                </>
+              ) : null}
+            </View>
+          ) : null}
+
+          <View style={styles.section}>
+            <Text style={styles.sectionKicker}>SẢN PHẨM</Text>
+            <Text style={styles.sectionTitle}>
+              {'Sản phẩm trong đơn (' +
+                order.items.reduce((sum, item) => sum + item.quantity, 0) +
+                ')'}
+            </Text>
+
+            <View style={styles.itemList}>
+              {order.items.map((item, index) => (
+                <View
+                  key={item.productId + ':' + index}
+                  style={styles.itemRow}>
+                  <Image
+                    accessibilityLabel={item.productName}
+                    cachePolicy="memory-disk"
+                    contentFit="cover"
+                    source={resolveMediaUrl(item.productImage)}
+                    style={styles.itemImage}
+                  />
+                  <View style={styles.itemCopy}>
+                    <Text numberOfLines={2} style={styles.itemName}>
+                      {item.productName}
+                    </Text>
+                    <Text style={styles.itemMeta}>
+                      {'Size ' +
+                        item.size +
+                        ' · ' +
+                        item.color +
+                        ' · SL ' +
+                        item.quantity}
+                    </Text>
+                    {order.canReview === true ? (
+                      item.hasReviewed ? (
+                        <Text style={[styles.reviewMeta, styles.reviewMetaDone]}>
+                          Đã đánh giá
+                        </Text>
+                      ) : (
+                        <Pressable
+                          accessibilityLabel={'Viết đánh giá cho ' + item.productName}
+                          accessibilityRole="button"
+                          onPress={() =>
+                            router.push({
+                              pathname: '/review/create',
+                              params: {
+                                orderId: String(order.id),
+                                productId: String(item.productId),
+                                size: item.size,
+                                color: item.color,
+                              },
+                            })
+                          }
+                          style={({ pressed }) => [
+                            styles.reviewButton,
+                            pressed && styles.pressed,
+                          ]}>
+                          <Text style={styles.reviewButtonText}>Viết đánh giá</Text>
+                        </Pressable>
+                      )
+                    ) : null}
+                  </View>
+                  <Text style={styles.itemPrice}>
+                    {formatMoney(item.price * item.quantity)}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          </View>
+
+          <View style={styles.section}>
+            <Text style={styles.sectionKicker}>NGƯỜI NHẬN</Text>
+            <Text style={styles.sectionTitle}>Thông tin giao hàng</Text>
+            <SummaryRow label="Họ tên" value={order.customerName} />
+            <SummaryRow label="Điện thoại" value={order.customerPhone} />
+            <View style={styles.longRow}>
+              <Text style={styles.summaryLabel}>Địa chỉ</Text>
+              <Text style={styles.longValue}>{order.customerAddress}</Text>
+            </View>
+            {order.note ? (
+              <View style={styles.longRow}>
+                <Text style={styles.summaryLabel}>Ghi chú</Text>
+                <Text style={styles.longValue}>{order.note}</Text>
+              </View>
+            ) : null}
+          </View>
+
+          <View style={styles.section}>
+            <Text style={styles.sectionKicker}>THANH TOÁN</Text>
+            <Text style={styles.sectionTitle}>Trạng thái thanh toán</Text>
+            <SummaryRow
+              label="Phương thức"
+              value={
+                order.paymentMethod.toUpperCase() === 'ATM'
+                  ? 'Chuyển khoản / VietQR'
+                  : 'Thanh toán khi nhận hàng'
+              }
+            />
+            <SummaryRow label="Trạng thái" value={paymentLabel(order)} />
+            {order.paidAt ? (
+              <SummaryRow
+                label="Thanh toán lúc"
+                value={formatDateTime(order.paidAt)}
+              />
+            ) : null}
+
+            {canResumePayment ? (
+              <Pressable
+                accessibilityRole="button"
+                onPress={() =>
+                  router.push({
+                    pathname: '/checkout/payment',
+                    params: { orderCode: order.orderCode },
+                  })
+                }
+                style={({ pressed }) => [
+                  styles.paymentButton,
+                  pressed && styles.pressed,
+                ]}>
+                <Text style={styles.paymentButtonText}>
+                  Tiếp tục thanh toán
+                </Text>
+              </Pressable>
+            ) : null}
+          </View>
+
+          <View style={styles.section}>
+            <Text style={styles.sectionKicker}>TỔNG KẾT</Text>
+            <Text style={styles.sectionTitle}>Chi tiết thanh toán</Text>
+            <SummaryRow label="Tạm tính" value={formatMoney(order.subtotal)} />
+            <SummaryRow
+              label="Phí vận chuyển"
+              value={formatMoney(order.shippingFee)}
+            />
+            {order.discount > 0 ? (
+              <SummaryRow
+                label={order.couponCode ? 'Ưu đãi / ' + order.couponCode : 'Ưu đãi'}
+                value={'−' + formatMoney(order.discount)}
+                success
+              />
+            ) : null}
+            <View style={styles.totalRow}>
+              <Text style={styles.totalLabel}>Tổng thanh toán</Text>
+              <Text style={styles.totalValue}>{formatMoney(order.total)}</Text>
+            </View>
+          </View>
+
+          <View style={styles.actions}>
             <Pressable
-              accessibilityLabel="Hủy đơn hàng"
+              accessibilityLabel="Mua lại sản phẩm từ đơn này"
               accessibilityRole="button"
               disabled={actionBusy !== null}
-              onPress={cancelOrder}
+              onPress={() => void reorder()}
               style={({ pressed }) => [
-                styles.cancelAction,
+                styles.primaryAction,
                 pressed && styles.pressed,
                 actionBusy !== null && styles.disabled,
               ]}>
-              {actionBusy === 'cancel' ? (
-                <ActivityIndicator color={BRAND_COLORS.danger} />
+              {actionBusy === 'reorder' ? (
+                <ActivityIndicator color="#FFFFFF" />
               ) : (
-                <Text style={styles.cancelActionText}>Hủy đơn hàng</Text>
+                <Text style={styles.primaryActionText}>Mua lại đơn này</Text>
               )}
             </Pressable>
-          ) : null}
-        </View>
 
-        <View style={styles.bottomSpace} />
-      </ScrollView>
+            {order.canCancel ? (
+              <Pressable
+                accessibilityLabel="Hủy đơn hàng"
+                accessibilityRole="button"
+                disabled={actionBusy !== null}
+                onPress={cancelOrder}
+                style={({ pressed }) => [
+                  styles.cancelAction,
+                  pressed && styles.pressed,
+                  actionBusy !== null && styles.disabled,
+                ]}>
+                {actionBusy === 'cancel' ? (
+                  <ActivityIndicator color={BRAND_COLORS.danger} />
+                ) : (
+                  <Text style={styles.cancelActionText}>Hủy đơn hàng</Text>
+                )}
+              </Pressable>
+            ) : null}
+          </View>
+
+          <View style={styles.bottomSpace} />
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
@@ -552,6 +808,7 @@ function SummaryRow({
 }
 
 const styles = StyleSheet.create({
+  flex: { flex: 1 },
   safeArea: { flex: 1, backgroundColor: BRAND_COLORS.canvas },
   content: {
     width: '100%',
@@ -656,6 +913,56 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 19,
     fontWeight: '900',
+  },
+  noticeCard: {
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 12,
+    gap: 4,
+  },
+  noticeSuccess: { borderColor: '#BBF7D0', backgroundColor: '#F0FDF4' },
+  noticeWarning: { borderColor: '#FDE68A', backgroundColor: '#FFFBEB' },
+  noticeDanger: { borderColor: '#FECACA', backgroundColor: '#FEF2F2' },
+  noticeTitle: {
+    color: BRAND_COLORS.ink,
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: '900',
+  },
+  noticeText: {
+    color: BRAND_COLORS.muted,
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  returnForm: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: BRAND_COLORS.line,
+    paddingTop: 10,
+    gap: 8,
+  },
+  returnLabel: {
+    color: BRAND_COLORS.ink,
+    fontSize: 12,
+    lineHeight: 17,
+    fontWeight: '900',
+  },
+  returnInput: {
+    minHeight: 110,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: BRAND_COLORS.line,
+    backgroundColor: '#F9FAFB',
+    color: BRAND_COLORS.ink,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  returnCounter: {
+    color: BRAND_COLORS.muted,
+    fontSize: 11,
+    lineHeight: 15,
+    textAlign: 'right',
   },
   itemList: { gap: 10 },
   itemRow: {

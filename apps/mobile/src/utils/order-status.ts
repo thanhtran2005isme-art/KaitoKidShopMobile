@@ -25,6 +25,8 @@ export function orderStatusMeta(status?: string | null): {
       return { label: 'Đang giao', tone: 'info' };
     case 'completed':
       return { label: 'Hoàn tất', tone: 'success' };
+    case 'returned':
+      return { label: 'Đã hoàn hàng', tone: 'neutral' };
     case 'cancelled':
       return { label: 'Đã hủy', tone: 'danger' };
     default:
@@ -58,7 +60,15 @@ export function shippingStatusMeta(status?: string | null): {
       return { label: 'Đang giao', tone: 'info' };
     case 'delivered':
     case 'completed':
-      return { label: 'Đã giao hàng', tone: 'success' };
+      return { label: 'Đơn vị vận chuyển báo đã giao', tone: 'success' };
+    case 'received_by_customer':
+      return { label: 'Bạn đã xác nhận nhận hàng', tone: 'success' };
+    case 'delivery_disputed':
+      return { label: 'Bạn đã báo chưa nhận được hàng', tone: 'danger' };
+    case 'return_requested':
+      return { label: 'Đã gửi yêu cầu hoàn hàng', tone: 'warning' };
+    case 'returned':
+      return { label: 'Đã hoàn hàng', tone: 'neutral' };
     case 'carrier_cancelled':
       return { label: 'Đã hủy vận đơn', tone: 'danger' };
     case 'cancelled':
@@ -83,7 +93,7 @@ export function matchesOrderFilter(order: CustomerOrder, filter: OrderFilter) {
     case 'shipping':
       return status === 'shipping';
     case 'completed':
-      return status === 'completed';
+      return status === 'completed' || status === 'returned';
     case 'cancelled':
       return status === 'cancelled';
   }
@@ -127,7 +137,7 @@ export function paymentLabel(order: CustomerOrder) {
     return 'Chờ chuyển khoản';
   }
 
-  return order.status === 'completed'
+  return order.customerReceiptConfirmed || order.status === 'completed'
     ? 'Đã thanh toán khi nhận hàng'
     : 'Thanh toán khi nhận hàng';
 }

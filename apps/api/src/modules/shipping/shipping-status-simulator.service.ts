@@ -32,7 +32,7 @@ export const SHIPPING_SIMULATION_FLOW: Readonly<Record<string, ShippingSimulatio
   },
   delivering: {
     next: "delivered",
-    description: "Giao hàng thành công",
+    description: "Đơn vị vận chuyển báo giao thành công; chờ khách xác nhận đã nhận hàng",
     location: "Địa chỉ khách",
   },
 };
@@ -51,8 +51,9 @@ function orderStatusForShippingStep(
   if (shippingStatus === "picking" || shippingStatus === "picked") {
     return "confirmed";
   }
-  if (shippingStatus === "delivering") return "shipping";
-  if (shippingStatus === "delivered") return "completed";
+  if (shippingStatus === "delivering" || shippingStatus === "delivered") {
+    return "shipping";
+  }
   return currentOrderStatus;
 }
 

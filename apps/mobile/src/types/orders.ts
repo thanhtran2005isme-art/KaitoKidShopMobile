@@ -5,12 +5,28 @@ export type CustomerOrder = CreatedOrder & {
   trackingCode?: string | null;
   trackingUrl?: string | null;
   shippingStatus?: string | null;
+  canConfirmReceived?: boolean;
+  canReportNotReceived?: boolean;
+  deliveryIssueReported?: boolean;
+  customerReceiptConfirmed?: boolean;
+  canReview?: boolean;
+  canRequestReturn?: boolean;
+  returnRequested?: boolean;
+  receivedAt?: string | null;
+  returnDeadline?: string | null;
+  returnWindowDays?: number;
 };
 
 export type ReorderResult = {
   added: number;
   skipped: number;
   skippedNames: string[];
+};
+
+export type OrderAfterSalesResult = {
+  message: string;
+  receivedAt?: string | null;
+  returnDeadline?: string | null;
 };
 
 export type ShippingHistoryItem = {
