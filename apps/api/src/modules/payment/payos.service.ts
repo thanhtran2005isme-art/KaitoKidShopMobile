@@ -122,7 +122,19 @@ export class PayOsService {
       this.assertSameAmount(normalized, input.amount);
       return normalized;
     } catch (error) {
-      // Create có thể timeout sau khi payOS đã nhận request. Lần request kế tiếp
+      if (this.isAlreadyExists(error)) {
+        // payOS có thể trả GET code 101 rồi ngay sau đó CREATE code 231 nếu
+        // payment request vừa được tạo bởi request khác/request trước đã thành
+        // công nhưng response bị mất. Recover cùng fixed DonHang.Id, không tạo
+        // orderCode mới và chỉ chấp nhận payment có amount khớp.
+        const recovered = await this.recoverExistingPayment(
+          input.orderId,
+          input.amount,
+        );
+        if (recovered) return recovered;
+      }
+
+      // Create có thể timeout sau khi payOS đã nhận request. Request kế tiếp
       // luôn GET theo DonHang.Id trước nên không sinh orderCode thứ hai.
       throw this.providerError("Không thể tạo yêu cầu thanh toán payOS", error);
     }
@@ -241,6 +253,28 @@ export class PayOsService {
     };
   }
 
+  private async recoverExistingPayment(
+    orderId: number,
+    amount: number,
+  ): Promise<PayOsPayment | null> {
+    const delaysMs = [0, 150, 300, 600];
+    for (const delayMs of delaysMs) {
+      if (delayMs > 0) await this.sleep(delayMs);
+      try {
+        const payment = await this.getPayment(orderId);
+        this.assertSameAmount(payment, amount);
+        return payment;
+      } catch (error) {
+        if (!this.isNotFound(error)) throw error;
+      }
+    }
+    return null;
+  }
+
+  private sleep(delayMs: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, delayMs));
+  }
+
   private assertPaymentInput(orderId: number, amount: number): void {
     this.assertOrderId(orderId);
     if (!Number.isFinite(amount) || Math.round(amount) <= 0) {
@@ -281,7 +315,22 @@ export class PayOsService {
   private isNotFound(error: unknown): boolean {
     if (error instanceof NotFoundException) return true;
     const raw = record(error);
-    return numberValue(raw.status) === 404 || numberValue(raw.code) === 101;
+    const message = error instanceof Error ? error.message : String(error);
+    return (
+      numberValue(raw.status) === 404 ||
+      numberValue(raw.code) === 101 ||
+      /\bcode:\s*101\b/i.test(message)
+    );
+  }
+
+  private isAlreadyExists(error: unknown): boolean {
+    const raw = record(error);
+    const message = error instanceof Error ? error.message : String(error);
+    return (
+      numberValue(raw.code) === 231 ||
+      /\bcode:\s*231\b/i.test(message) ||
+      /Đơn thanh toán đã tồn tại/i.test(message)
+    );
   }
 
   private providerError(message: string, error: unknown): BadGatewayException {
