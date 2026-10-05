@@ -25,6 +25,7 @@ import { resolveMediaUrl } from '@/services/api-client';
 import { ordersApi } from '@/services/orders.api';
 import type { CustomerOrder } from '@/types/orders';
 import {
+  afterSalesStatusMeta,
   canResumeAtmPayment,
   formatDateTime,
   formatMoney,
@@ -351,6 +352,7 @@ export default function OrderDetailScreen() {
   }
 
   const shippingMeta = shippingStatusMeta(order.shippingStatus);
+  const afterSalesMeta = afterSalesStatusMeta(order);
   const canResumePayment = canResumeAtmPayment(order);
   const showAfterSales =
     Boolean(order.canConfirmReceived) ||
@@ -358,7 +360,7 @@ export default function OrderDetailScreen() {
     Boolean(order.deliveryIssueReported) ||
     Boolean(order.customerReceiptConfirmed) ||
     Boolean(order.canRequestReturn) ||
-    Boolean(order.returnRequested);
+    Boolean(afterSalesMeta);
 
   return (
     <SafeAreaView edges={['top']} style={styles.safeArea}>
@@ -487,12 +489,20 @@ export default function OrderDetailScreen() {
                 </View>
               ) : null}
 
-              {order.returnRequested ? (
-                <View style={[styles.noticeCard, styles.noticeWarning]}>
-                  <Text style={styles.noticeTitle}>Đã gửi yêu cầu hoàn hàng</Text>
-                  <Text style={styles.noticeText}>
-                    Yêu cầu đang chờ KaitoKid kiểm tra. Hệ thống không tự hoàn tiền hoặc nhập lại hàng lỗi vào tồn bán.
-                  </Text>
+              {afterSalesMeta ? (
+                <View
+                  style={[
+                    styles.noticeCard,
+                    afterSalesMeta.tone === 'success'
+                      ? styles.noticeSuccess
+                      : afterSalesMeta.tone === 'danger'
+                        ? styles.noticeDanger
+                        : afterSalesMeta.tone === 'info'
+                          ? styles.noticeInfo
+                          : styles.noticeWarning,
+                  ]}>
+                  <Text style={styles.noticeTitle}>{afterSalesMeta.label}</Text>
+                  <Text style={styles.noticeText}>{afterSalesMeta.description}</Text>
                 </View>
               ) : null}
 
@@ -923,6 +933,7 @@ const styles = StyleSheet.create({
   noticeSuccess: { borderColor: '#BBF7D0', backgroundColor: '#F0FDF4' },
   noticeWarning: { borderColor: '#FDE68A', backgroundColor: '#FFFBEB' },
   noticeDanger: { borderColor: '#FECACA', backgroundColor: '#FEF2F2' },
+  noticeInfo: { borderColor: '#BFDBFE', backgroundColor: '#EFF6FF' },
   noticeTitle: {
     color: BRAND_COLORS.ink,
     fontSize: 13,
