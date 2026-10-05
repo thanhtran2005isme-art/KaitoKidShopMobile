@@ -148,13 +148,17 @@ test("receipt authority requires received_by_customer history marker, not timest
   assert.match(afterSalesSource, /hasMarker\(tx, orderId, "received_by_customer"\)/);
 });
 
-test("return request uses latest workflow marker instead of permanent requested boolean", () => {
+test("return and refund projection use latest workflow markers", () => {
   assert.match(afterSalesSource, /return_approved/);
   assert.match(afterSalesSource, /return_rejected/);
   assert.match(afterSalesSource, /return_received_restock/);
   assert.match(afterSalesSource, /return_received_quarantine/);
   assert.match(afterSalesSource, /latestReturnById/);
   assert.match(afterSalesSource, /returnStatus: currentReturnStatus/);
+  assert.match(afterSalesSource, /refund_pending/);
+  assert.match(afterSalesSource, /refund_completed_manual/);
+  assert.match(afterSalesSource, /latestRefundById/);
+  assert.match(afterSalesSource, /refundStatus: currentRefundStatus/);
   assert.doesNotMatch(afterSalesSource, /UPDATE DonHang[\s\S]*?SET TrangThai = 'return_requested'/);
 });
 
