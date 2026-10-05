@@ -108,8 +108,10 @@ test("carrier delivered never equals customer receipt confirmation", () => {
   assert.match(receiptAwareSource, /TrangThaiVanChuyen = 'received_by_customer'/);
   assert.match(receiptAwareSource, /NgayHoanThanh = NULL/);
   assert.match(receiptAwareSource, /hasOpenDeliveryDispute/);
-  assert.match(receiptAwareSource, /returned/);
-  assert.match(receiptAwareSource, /không\s+need|không\s+cần|không cần tạo thêm giá trị enum/i);
+  assert.match(
+    receiptAwareSource,
+    /SET TrangThai = 'returned', TrangThaiVanChuyen = 'returned'/,
+  );
   assert.doesNotMatch(receiptAwareSource, /"return_requested"/);
 });
 

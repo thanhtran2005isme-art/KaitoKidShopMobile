@@ -137,7 +137,7 @@ test("customer receipt is explicit and starts the seven-day return window", () =
   assert.match(afterSalesSource, /TrangThaiVanChuyen = 'received_by_customer'/);
   assert.match(afterSalesSource, /NgayHoanThanh = \?/);
   assert.match(afterSalesSource, /TrangThaiVanChuyen = 'delivery_disputed'/);
-  assert.match(afterSalesSource, /TrangThai = 'return_requested'/);
+  assert.match(afterSalesSource, /VALUES \(\?, 'return_requested'/);
 });
 
 test("receipt authority requires received_by_customer history marker, not timestamp alone", () => {
