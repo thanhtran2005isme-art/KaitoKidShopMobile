@@ -1,18 +1,16 @@
-// Step 3 - Trang thanh toán bằng VietQR (sau khi đặt đơn ATM).
-// - Đếm ngược 15 phút
-// - Hiển thị thông tin chuyển khoản + QR
-// - Poll backend để biết khi nào tiền về
+// Step 3 - Thanh toán online sau khi đặt đơn ATM.
+// payOS webhook là authority; Customer Web chỉ poll KaitoKid backend để refresh UI.
 
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { paymentApi } from '../../services/api';
+import { paymentApi, type PaymentInstructions } from '../../services/api';
 import { formatCurrency } from '../../utils/format';
-import { buildVietQrUrl, type BankAccount } from './types';
+import type { BankAccount } from './types';
 
 interface Props {
   orderCode: string;
   total: number;
-  /** Legacy fallback: nguồn authoritative được tải theo order từ backend. */
+  /** Legacy fallback cho đơn/config cũ khi payOS chưa được cấu hình. */
   bankAccounts: BankAccount[];
   /** Backend cho phép gọi simulate-paid không (chỉ dev). Production luôn ẩn. */
   allowSimulatePaid: boolean;
@@ -25,14 +23,10 @@ export default function PaymentStep({ orderCode, total, bankAccounts, allowSimul
   const [expired, setExpired] = useState(false);
   const [instructionLoading, setInstructionLoading] = useState(true);
   const [instructionError, setInstructionError] = useState('');
-  const [instructionBank, setInstructionBank] = useState<BankAccount | null>(null);
-  const [instructionQrUrl, setInstructionQrUrl] = useState('');
-  const [instructionContent, setInstructionContent] = useState('');
-  const [instructionTotal, setInstructionTotal] = useState<number | null>(null);
-  const [qrFallbackActive, setQrFallbackActive] = useState(false);
+  const [instructions, setInstructions] = useState<PaymentInstructions | null>(null);
+  const [actionBusy, setActionBusy] = useState(false);
+  const [actionError, setActionError] = useState('');
 
-  // Tài khoản nhận tiền phải lấy từ backend theo chính order của khách.
-  // Customer tuyệt đối không đọc /api/admin/settings.
   useEffect(() => {
     let cancelled = false;
 
@@ -43,23 +37,12 @@ export default function PaymentStep({ orderCode, total, bankAccounts, allowSimul
       if (cancelled) return;
 
       if (!result.success || !result.data) {
-        setInstructionError(result.error || 'Không thể tải thông tin chuyển khoản.');
+        setInstructionError(result.error || 'Không thể tải thông tin thanh toán.');
         setInstructionLoading(false);
         return;
       }
 
-      const bank = result.data.bankAccount;
-      setInstructionBank({
-        id: bank.id,
-        bankName: bank.bankName,
-        accountNumber: bank.accountNumber,
-        accountHolder: bank.accountHolder,
-        branch: bank.branch || '',
-        qrImage: bank.qrImage || undefined,
-      });
-      setInstructionQrUrl(result.data.qrUrl?.trim() || '');
-      setInstructionContent(result.data.transferContent);
-      setInstructionTotal(result.data.total);
+      setInstructions(result.data);
       setSecondsLeft(result.data.secondsLeft);
       setInstructionLoading(false);
     };
@@ -68,63 +51,85 @@ export default function PaymentStep({ orderCode, total, bankAccounts, allowSimul
     return () => { cancelled = true; };
   }, [orderCode]);
 
-  // Poll backend mỗi 5s
+  // Webhook payOS cập nhật DB. Polling này chỉ làm UI gần realtime và là fallback
+  // khi browser không nhận push nào khác.
   useEffect(() => {
     let cancelled = false;
+    let inFlight = false;
     const tick = async () => {
-      const r = await paymentApi.getStatus(orderCode);
-      if (cancelled || !r.success || !r.data) return;
-      setSecondsLeft(r.data.secondsLeft);
-      if (r.data.status === 'cancelled' || r.data.secondsLeft <= 0) {
-        setExpired(true);
-        return;
+      if (inFlight) return;
+      inFlight = true;
+      try {
+        const r = await paymentApi.getStatus(orderCode);
+        if (cancelled || !r.success || !r.data) return;
+        setSecondsLeft(r.data.secondsLeft);
+        if (r.data.status === 'cancelled' || r.data.secondsLeft <= 0) {
+          setExpired(true);
+          return;
+        }
+        if (r.data.paidAt) onPaid();
+      } finally {
+        inFlight = false;
       }
-      if (r.data.paidAt) onPaid();
     };
     void tick();
-    const interval = window.setInterval(tick, 5000);
+    const interval = window.setInterval(tick, 3000);
     return () => { cancelled = true; window.clearInterval(interval); };
   }, [orderCode, onPaid]);
 
-  // Tick UI mỗi giây giữa các lần poll
   useEffect(() => {
     if (expired) return;
     const t = window.setInterval(() => setSecondsLeft((s) => Math.max(0, s - 1)), 1000);
     return () => window.clearInterval(t);
   }, [expired]);
 
-  const primaryBank = instructionBank || bankAccounts[0];
-  const transferContent = instructionContent || `DH${orderCode}`;
-  const payableTotal = instructionTotal ?? total;
-  const generatedQrUrl = primaryBank
-    ? buildVietQrUrl(primaryBank, payableTotal, transferContent)
-    : '';
-  const fallbackQrUrl = instructionQrUrl || primaryBank?.qrImage?.trim() || '';
-  const qrUrl = qrFallbackActive ? fallbackQrUrl : (generatedQrUrl || fallbackQrUrl);
+  const isPayOs = instructions?.provider === 'payos';
+  const primaryBank = instructions?.bankAccount || bankAccounts[0] || null;
+  const transferContent = instructions?.transferContent || `DH${orderCode}`;
+  const payableTotal = instructions?.total ?? total;
+  const qrUrl = instructions?.qrUrl?.trim() || primaryBank?.qrImage?.trim() || '';
+  const showBankAccount = Boolean(
+    primaryBank?.accountNumber &&
+    primaryBank.accountNumber !== 'Thanh toán trên payOS' &&
+    primaryBank.accountHolder,
+  );
 
-  // Mỗi đơn luôn thử VietQR động trước. Ảnh QR Admin chỉ là phương án dự phòng
-  // khi ảnh VietQR động thực sự tải lỗi.
-  useEffect(() => {
-    setQrFallbackActive(false);
-  }, [generatedQrUrl, fallbackQrUrl]);
-
-  const handleQrError = () => {
-    if (!qrFallbackActive && fallbackQrUrl && fallbackQrUrl !== generatedQrUrl) {
-      setQrFallbackActive(true);
+  const handleSimulatePaid = async () => {
+    if (actionBusy) return;
+    setActionBusy(true);
+    setActionError('');
+    try {
+      const r = await paymentApi.simulatePaid(orderCode);
+      if (!r.success) {
+        setActionError(r.error || 'Không thể mô phỏng thanh toán.');
+        return;
+      }
+      const s = await paymentApi.getStatus(orderCode);
+      if (s.success && s.data?.paidAt) onPaid();
+    } finally {
+      setActionBusy(false);
     }
   };
 
-  const handleSimulatePaid = async () => {
-    const r = await paymentApi.simulatePaid(orderCode);
-    if (r.success) {
-      const s = await paymentApi.getStatus(orderCode);
-      if (s.success && s.data?.paidAt) onPaid();
+  const handleCancel = async () => {
+    if (actionBusy) return;
+    setActionBusy(true);
+    setActionError('');
+    try {
+      const result = await paymentApi.cancel(orderCode);
+      if (!result.success) {
+        setActionError(result.error || 'Không thể hủy giao dịch.');
+        return;
+      }
+      setExpired(true);
+      setSecondsLeft(0);
+    } finally {
+      setActionBusy(false);
     }
   };
 
   return (
     <div className="ivy-checkout-page">
-      {/* Steps - Step 3 active */}
       <div className="ivy-cart-steps">
         <div className="ivy-step done"><div className="ivy-step-num">✓</div><span>Giỏ hàng</span></div>
         <div className="ivy-step-line active"></div>
@@ -139,8 +144,12 @@ export default function PaymentStep({ orderCode, total, bankAccounts, allowSimul
         <div className="ivy-payment-step__header">
           <i className="fa fa-university"></i>
           <div>
-            <h2>Thanh toán qua ngân hàng</h2>
-            <p>Quét mã QR để thanh toán nhanh chóng và an toàn</p>
+            <h2>{isPayOs ? 'Thanh toán qua payOS' : 'Thanh toán qua ngân hàng'}</h2>
+            <p>
+              {isPayOs
+                ? 'Quét QR hoặc mở trang payOS. KaitoKid tự xác nhận sau webhook, không cần bấm “đã thanh toán”.'
+                : 'Quét mã QR để thanh toán nhanh chóng và an toàn'}
+            </p>
           </div>
         </div>
 
@@ -150,7 +159,11 @@ export default function PaymentStep({ orderCode, total, bankAccounts, allowSimul
               <i className="fa fa-clock"></i>
               <div>
                 <strong>Thời gian thanh toán còn lại</strong>
-                <div className="ivy-payment-countdown__hint">Đơn hàng sẽ tự hủy nếu không thanh toán trước khi hết giờ</div>
+                <div className="ivy-payment-countdown__hint">
+                  {isPayOs
+                    ? 'Backend sẽ đối soát payOS trước khi hủy và hoàn tồn kho/coupon.'
+                    : 'Đơn hàng sẽ tự hủy nếu không thanh toán trước khi hết giờ'}
+                </div>
               </div>
             </div>
             <div className="ivy-payment-countdown__time">
@@ -160,20 +173,20 @@ export default function PaymentStep({ orderCode, total, bankAccounts, allowSimul
         ) : (
           <div className="ivy-payment-expired">
             <i className="fa fa-times-circle"></i>
-            <h3>Đã hết thời gian thanh toán</h3>
-            <p>Đơn hàng đã tự hủy. Vui lòng đặt lại nếu vẫn muốn mua.</p>
+            <h3>Giao dịch không còn hiệu lực</h3>
+            <p>Đơn đã hủy hoặc hết thời gian thanh toán.</p>
             <button onClick={() => navigate('/cart')} className="ivy-btn-primary">Quay về giỏ hàng</button>
           </div>
         )}
 
-        {!expired && instructionLoading && !primaryBank && (
-          <div className="ivy-payment-no-bank">Đang tải thông tin chuyển khoản...</div>
+        {!expired && instructionLoading && (
+          <div className="ivy-payment-no-bank">Đang tạo hoặc khôi phục payment link...</div>
         )}
 
-        {!expired && primaryBank && (
+        {!expired && !instructionLoading && instructions && (
           <div className="ivy-payment-step__body">
             <div className="ivy-payment-info">
-              <h3><i className="fa fa-file-invoice"></i> Thông tin chuyển khoản</h3>
+              <h3><i className="fa fa-file-invoice"></i> Thông tin thanh toán</h3>
               <p className="ivy-payment-info__order">Mã giao dịch: <strong>{orderCode}</strong></p>
 
               <div className="ivy-payment-info__rows">
@@ -181,25 +194,29 @@ export default function PaymentStep({ orderCode, total, bankAccounts, allowSimul
                   <span className="ivy-label">Số tiền</span>
                   <div className="ivy-amount-pill">{formatCurrency(payableTotal)}</div>
                 </div>
+                {showBankAccount && primaryBank && (
+                  <>
+                    <div>
+                      <span className="ivy-label">Kênh nhận</span>
+                      <div className="ivy-value-bold">{primaryBank.bankName}</div>
+                    </div>
+                    <div>
+                      <span className="ivy-label">Số tài khoản</span>
+                      <div className="ivy-value-row">
+                        <span className="ivy-value-bigred">{primaryBank.accountNumber}</span>
+                        <button type="button" onClick={() => navigator.clipboard.writeText(primaryBank.accountNumber)} className="ivy-copy-btn">
+                          <i className="fa fa-copy"></i> Sao chép
+                        </button>
+                      </div>
+                    </div>
+                    <div>
+                      <span className="ivy-label">Chủ tài khoản</span>
+                      <div className="ivy-value-bold">{primaryBank.accountHolder}</div>
+                    </div>
+                  </>
+                )}
                 <div>
-                  <span className="ivy-label">Ngân hàng</span>
-                  <div className="ivy-value-bold">{primaryBank.bankName}</div>
-                </div>
-                <div>
-                  <span className="ivy-label">Số tài khoản</span>
-                  <div className="ivy-value-row">
-                    <span className="ivy-value-bigred">{primaryBank.accountNumber}</span>
-                    <button type="button" onClick={() => navigator.clipboard.writeText(primaryBank.accountNumber)} className="ivy-copy-btn">
-                      <i className="fa fa-copy"></i> Sao chép
-                    </button>
-                  </div>
-                </div>
-                <div>
-                  <span className="ivy-label">Chủ tài khoản</span>
-                  <div className="ivy-value-bold">{primaryBank.accountHolder}</div>
-                </div>
-                <div>
-                  <span className="ivy-label">Nội dung CK</span>
+                  <span className="ivy-label">Nội dung</span>
                   <div className="ivy-value-row">
                     <span className="ivy-value-pill">{transferContent}</span>
                     <button type="button" onClick={() => navigator.clipboard.writeText(transferContent)} className="ivy-copy-btn">
@@ -210,40 +227,67 @@ export default function PaymentStep({ orderCode, total, bankAccounts, allowSimul
               </div>
 
               <p className="ivy-payment-info__note">
-                <strong>Lưu ý:</strong> Vui lòng chuyển đúng số tiền và nội dung để hệ thống tự động xác nhận đơn.
+                <strong>Lưu ý:</strong>{' '}
+                {isPayOs
+                  ? 'payOS webhook mới là nguồn xác nhận thanh toán. Không đóng/mở đơn dựa vào URL quay về từ trình duyệt.'
+                  : 'Vui lòng chuyển đúng số tiền và nội dung để hệ thống xác nhận đơn.'}
               </p>
+
+              {isPayOs && instructions.checkoutUrl && (
+                <a
+                  href={instructions.checkoutUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="ivy-btn-primary"
+                >
+                  Mở trang thanh toán payOS
+                </a>
+              )}
             </div>
 
             <div className="ivy-payment-qr">
-              <h3>Quét mã QR để thanh toán</h3>
-              <div className="ivy-payment-qr__frame">
-                <img src={qrUrl} alt="VietQR" loading="lazy" decoding="async" onError={handleQrError} />
-              </div>
-              <p className="ivy-payment-qr__hint">
-                {qrFallbackActive
-                  ? 'VietQR động không tải được, đang dùng mã QR dự phòng của cửa hàng.'
-                  : 'Mã VietQR được tạo tự động theo đúng số tiền và nội dung đơn hàng.'}
-              </p>
-              <a href={qrUrl} download={`QR-${orderCode}.png`} className="ivy-btn-primary">
-                <i className="fa fa-download"></i> Tải QR về máy
-              </a>
+              <h3>{isPayOs ? 'Quét QR payOS để thanh toán' : 'Quét mã QR để thanh toán'}</h3>
+              {qrUrl ? (
+                <>
+                  <div className="ivy-payment-qr__frame">
+                    <img src={qrUrl} alt={isPayOs ? 'QR payOS' : 'QR chuyển khoản'} loading="lazy" decoding="async" />
+                  </div>
+                  <p className="ivy-payment-qr__hint">
+                    {isPayOs
+                      ? instructions.qrMode === 'payos_checkout'
+                        ? 'Payment link đã tồn tại; QR mở payOS Hosted Checkout để tiếp tục thanh toán.'
+                        : 'QR được payOS cấp theo đúng số tiền của đơn; trạng thái sẽ tự cập nhật sau khi webhook được xác minh.'
+                      : 'Quét bằng ứng dụng ngân hàng để thanh toán.'}
+                  </p>
+                  <a href={qrUrl} download={`QR-${orderCode}.png`} className="ivy-btn-primary">
+                    <i className="fa fa-download"></i> Tải QR về máy
+                  </a>
+                </>
+              ) : (
+                <p className="ivy-payment-qr__hint">Không tạo được QR. Hãy mở trang thanh toán payOS.</p>
+              )}
             </div>
           </div>
         )}
 
-        {!expired && !instructionLoading && !primaryBank && (
+        {!expired && !instructionLoading && !instructions && (
           <div className="ivy-payment-no-bank">
-            {instructionError || 'Phương thức chuyển khoản chưa được cấu hình. Vui lòng liên hệ shop.'}
+            {instructionError || 'Phương thức thanh toán chưa được cấu hình. Vui lòng liên hệ shop.'}
           </div>
         )}
+
+        {actionError && <div className="ivy-payment-no-bank">{actionError}</div>}
 
         {!expired && (
           <div className="ivy-payment-actions">
             {allowSimulatePaid && (
-              <button onClick={handleSimulatePaid} className="ivy-btn-primary">
-                Tôi đã chuyển khoản (mô phỏng - chỉ dev)
+              <button disabled={actionBusy} onClick={() => void handleSimulatePaid()} className="ivy-btn-primary">
+                Mô phỏng paid (chỉ dev)
               </button>
             )}
+            <button disabled={actionBusy} onClick={() => void handleCancel()} className="ivy-btn-secondary">
+              Hủy giao dịch
+            </button>
             <button onClick={() => navigate('/products')} className="ivy-btn-secondary">
               Tiếp tục mua hàng
             </button>
