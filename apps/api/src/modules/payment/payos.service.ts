@@ -49,7 +49,6 @@ export interface PayOsWebhookData {
 }
 
 export interface EnsurePayOsPaymentInput {
-  orderId: number;
   orderCode: string;
   amount: number;
   customerName: string;
@@ -78,6 +77,8 @@ function numberValue(value: unknown): number {
   return 0;
 }
 
+const ORDER_SUFFIX_BASE = 0x1000000; // 16^6, vừa đủ suffix 6 ký tự hex.
+
 @Injectable()
 export class PayOsService {
   private sdk: PayOsSdkClient | null = null;
@@ -90,11 +91,46 @@ export class PayOsService {
     );
   }
 
+  /**
+   * payOS yêu cầu orderCode integer, còn KaitoKid dùng mã dạng
+   * KK-YYYYMMDD-XXXXXX. Không dùng DonHang.Id vì AUTO_INCREMENT có thể bị
+   * reset/reuse ở local, trong khi payOS vẫn giữ payment request cũ.
+   *
+   * Encoding giữ nguyên toàn bộ YYYYMMDD + 24-bit suffix nên deterministic,
+   * reversible và vẫn nằm trong Number.MAX_SAFE_INTEGER.
+   */
+  providerOrderCode(orderCode: string): number {
+    const match = /^KK-(\d{8})-([0-9A-F]{6})$/i.exec(orderCode.trim());
+    if (!match || !this.validDateKey(match[1])) {
+      throw new BadRequestException("Mã đơn KaitoKid không hợp lệ cho payOS");
+    }
+
+    const day = Number(match[1]);
+    const suffix = Number.parseInt(match[2], 16);
+    const value = day * ORDER_SUFFIX_BASE + suffix;
+    if (!Number.isSafeInteger(value) || value <= 0) {
+      throw new BadRequestException("Mã orderCode payOS vượt giới hạn an toàn");
+    }
+    return value;
+  }
+
+  kaitoKidOrderCode(providerOrderCode: number): string | null {
+    if (!Number.isSafeInteger(providerOrderCode) || providerOrderCode <= 0) {
+      return null;
+    }
+    const day = Math.floor(providerOrderCode / ORDER_SUFFIX_BASE);
+    const suffix = providerOrderCode % ORDER_SUFFIX_BASE;
+    const dayText = String(day).padStart(8, "0");
+    if (!this.validDateKey(dayText)) return null;
+    return `KK-${dayText}-${suffix.toString(16).toUpperCase().padStart(6, "0")}`;
+  }
+
   async ensurePayment(input: EnsurePayOsPaymentInput): Promise<PayOsPayment> {
-    this.assertPaymentInput(input.orderId, input.amount);
+    const providerOrderCode = this.providerOrderCode(input.orderCode);
+    this.assertPaymentInput(providerOrderCode, input.amount);
 
     try {
-      const existing = await this.getPayment(input.orderId);
+      const existing = await this.getPayment(providerOrderCode);
       this.assertSameAmount(existing, input.amount);
       return existing;
     } catch (error) {
@@ -104,9 +140,10 @@ export class PayOsService {
     const expires = input.paymentExpiresAt
       ? Math.floor(new Date(input.paymentExpiresAt).getTime() / 1000)
       : undefined;
-    const description = `DH${input.orderId}`.slice(0, 9);
+    const suffix = input.orderCode.split("-").at(-1) ?? "ORDER";
+    const description = `DH${suffix}`.slice(0, 9);
     const payload: Record<string, unknown> = {
-      orderCode: input.orderId,
+      orderCode: providerOrderCode,
       amount: Math.round(input.amount),
       description,
       buyerName: input.customerName,
@@ -123,44 +160,43 @@ export class PayOsService {
       return normalized;
     } catch (error) {
       if (this.isAlreadyExists(error)) {
-        // payOS có thể trả GET code 101 rồi ngay sau đó CREATE code 231 nếu
-        // payment request vừa được tạo bởi request khác/request trước đã thành
-        // công nhưng response bị mất. Recover cùng fixed DonHang.Id, không tạo
-        // orderCode mới và chỉ chấp nhận payment có amount khớp.
+        // GET code 101 rồi CREATE code 231 vẫn có thể xảy ra do eventual
+        // consistency/request đồng thời. Recover đúng providerOrderCode được
+        // suy ra từ MaDonHang và chỉ chấp nhận payment có amount khớp.
         const recovered = await this.recoverExistingPayment(
-          input.orderId,
+          providerOrderCode,
           input.amount,
         );
         if (recovered) return recovered;
       }
 
-      // Create có thể timeout sau khi payOS đã nhận request. Request kế tiếp
-      // luôn GET theo DonHang.Id trước nên không sinh orderCode thứ hai.
       throw this.providerError("Không thể tạo yêu cầu thanh toán payOS", error);
     }
   }
 
-  async getPayment(orderId: number): Promise<PayOsPayment> {
-    this.assertOrderId(orderId);
+  async getPayment(providerOrderCode: number): Promise<PayOsPayment> {
+    this.assertOrderId(providerOrderCode);
     try {
-      const value = await this.client().paymentRequests.get(orderId);
+      const value = await this.client().paymentRequests.get(providerOrderCode);
       return this.normalizePayment(value);
     } catch (error) {
       if (this.isNotFound(error)) {
-        // payOS API có thể trả HTTP 200 nhưng business code 101 khi orderCode
-        // chưa có payment request. Chuẩn hóa về 404 nội bộ để ensure/cancel/expiry
-        // đều hiểu đây là "chưa tạo payment", không phải provider outage.
+        // payOS có thể trả HTTP 200 nhưng business code 101 khi orderCode
+        // chưa có payment request.
         throw new NotFoundException("Yêu cầu thanh toán payOS chưa tồn tại");
       }
       throw this.providerError("Không thể đọc trạng thái payOS", error);
     }
   }
 
-  async cancelPayment(orderId: number, reason: string): Promise<PayOsPayment> {
-    this.assertOrderId(orderId);
+  async cancelPayment(
+    providerOrderCode: number,
+    reason: string,
+  ): Promise<PayOsPayment> {
+    this.assertOrderId(providerOrderCode);
     try {
       const value = await this.client().paymentRequests.cancel(
-        orderId,
+        providerOrderCode,
         reason.slice(0, 255),
       );
       return this.normalizePayment(value);
@@ -198,8 +234,8 @@ export class PayOsService {
   }
 
   async qrDataUrl(payment: PayOsPayment): Promise<string | null> {
-    // Create response có qrCode VietQR trực tiếp. GET hiện chỉ trả paymentLinkId,
-    // nên khi reload dùng QR mở payOS Hosted Checkout làm fallback ổn định.
+    // Create response có qrCode trực tiếp. GET hiện có thể chỉ trả paymentLinkId,
+    // nên khi reload dùng Hosted Checkout làm fallback QR ổn định.
     const source = payment.qrCode || payment.checkoutUrl;
     if (!source) return null;
     return QRCode.toDataURL(source, {
@@ -254,14 +290,14 @@ export class PayOsService {
   }
 
   private async recoverExistingPayment(
-    orderId: number,
+    providerOrderCode: number,
     amount: number,
   ): Promise<PayOsPayment | null> {
     const delaysMs = [0, 150, 300, 600];
     for (const delayMs of delaysMs) {
       if (delayMs > 0) await this.sleep(delayMs);
       try {
-        const payment = await this.getPayment(orderId);
+        const payment = await this.getPayment(providerOrderCode);
         this.assertSameAmount(payment, amount);
         return payment;
       } catch (error) {
@@ -275,15 +311,15 @@ export class PayOsService {
     return new Promise((resolve) => setTimeout(resolve, delayMs));
   }
 
-  private assertPaymentInput(orderId: number, amount: number): void {
-    this.assertOrderId(orderId);
+  private assertPaymentInput(providerOrderCode: number, amount: number): void {
+    this.assertOrderId(providerOrderCode);
     if (!Number.isFinite(amount) || Math.round(amount) <= 0) {
       throw new BadRequestException("Số tiền thanh toán payOS phải lớn hơn 0");
     }
   }
 
-  private assertOrderId(orderId: number): void {
-    if (!Number.isSafeInteger(orderId) || orderId <= 0) {
+  private assertOrderId(orderCode: number): void {
+    if (!Number.isSafeInteger(orderCode) || orderCode <= 0) {
       throw new BadRequestException("Mã orderCode payOS không hợp lệ");
     }
   }
@@ -310,6 +346,21 @@ export class PayOsService {
       orderCode,
     }).toString();
     return `${base}/orders?${query}`;
+  }
+
+  private validDateKey(value: string): boolean {
+    if (!/^\d{8}$/.test(value)) return false;
+    const year = Number(value.slice(0, 4));
+    const month = Number(value.slice(4, 6));
+    const day = Number(value.slice(6, 8));
+    const date = new Date(Date.UTC(year, month - 1, day));
+    return (
+      year >= 2000 &&
+      year <= 2999 &&
+      date.getUTCFullYear() === year &&
+      date.getUTCMonth() === month - 1 &&
+      date.getUTCDate() === day
+    );
   }
 
   private isNotFound(error: unknown): boolean {
