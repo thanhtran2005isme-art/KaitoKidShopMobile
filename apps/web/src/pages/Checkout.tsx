@@ -236,9 +236,8 @@ export default function Checkout() {
         });
       }
 
-      // Backend là authority cho cart: chỉ refresh state sau khi order transaction
-      // hoàn tất. Không gọi clearCart() ở client vì sẽ xóa cả item không thuộc
-      // checkout/partial checkout và phá khả năng restore khi payment bị hủy.
+      // Backend là authority của giỏ. Chỉ đồng bộ lại state sau khi order
+      // transaction thành công; không xóa toàn bộ giỏ ở client.
       await refreshCart();
       setShowReview(false);
       setPendingOrder(orderInfo);
@@ -287,6 +286,7 @@ export default function Checkout() {
         onPaid={() => {
           setPaymentStep(false);
           setCompletedStep(true);
+          window.scrollTo({ top: 0, behavior: 'smooth' });
         }}
       />
     );
@@ -294,7 +294,7 @@ export default function Checkout() {
 
   return (
     <div className="ivy-checkout-page">
-      {/* Progress Steps */}
+      {/* Steps: step 2 active */}
       <div className="ivy-cart-steps">
         <div className="ivy-step done"><div className="ivy-step-num">✓</div><span>Giỏ hàng</span></div>
         <div className="ivy-step-line active"></div>
@@ -306,56 +306,63 @@ export default function Checkout() {
       </div>
 
       <div className="ivy-checkout-layout">
-        <div className="ivy-checkout-main">
-          <CheckoutForm value={addressForm} onChange={setAddressForm} />
+        {/* LEFT */}
+        <div className="ivy-checkout-left">
+          <CheckoutForm
+            isLoggedIn={!!user}
+            value={addressForm}
+            onChange={setAddressForm}
+            error={error}
+          />
+
           <ShippingSelector
             provider={shippingProvider}
             onProviderChange={setShippingProvider}
             options={shippingOptions}
             selected={selectedShipping}
-            onSelect={setSelectedShipping}
+            onSelect={(opt) => setSelectedShipping(opt)}
+            hasAddress={!!(addressForm.city && addressForm.district)}
             loading={shippingLoading}
           />
+
           <PaymentMethodSelector value={paymentMethod} onChange={setPaymentMethod} />
         </div>
 
+        {/* RIGHT */}
         <OrderSummaryBox
-          cart={cart}
           subtotal={subtotal}
           shippingFee={shippingFee}
+          couponCode={appliedCoupon}
           couponDiscount={couponDiscount}
+          comboLabel={combo?.eligible ? `Mua kèm −${combo.percent}%` : undefined}
           comboDiscount={comboDiscount}
           total={total}
           promoInput={promoInput}
           onPromoInputChange={setPromoInput}
-          appliedCoupon={appliedCoupon}
-          onApplyCoupon={() => void applyCoupon()}
-          onRemoveCoupon={() => {
-            setAppliedCoupon(null);
-            setCouponDiscount(0);
-            setPromoInput('');
-          }}
-          error={error}
-          onReview={handleOpenReview}
+          onApplyCoupon={applyCoupon}
+          submitting={submitting}
+          onSubmit={handleOpenReview}
+          submitLabel="XEM LẠI ĐƠN"
         />
       </div>
 
       <ReviewOrderModal
         open={showReview}
-        onClose={() => setShowReview(false)}
-        onConfirm={() => void handleConfirmOrder()}
-        submitting={submitting}
         cart={cart}
-        address={fullAddress}
         customerName={addressForm.name}
         customerPhone={addressForm.phone}
-        shipping={selectedShipping}
+        customerAddress={fullAddress}
         paymentMethod={paymentMethod}
+        shippingName={selectedShipping?.serviceName || ''}
         subtotal={subtotal}
         shippingFee={shippingFee}
+        couponCode={appliedCoupon}
         couponDiscount={couponDiscount}
         comboDiscount={comboDiscount}
         total={total}
+        submitting={submitting}
+        onCancel={() => setShowReview(false)}
+        onConfirm={handleConfirmOrder}
       />
     </div>
   );
