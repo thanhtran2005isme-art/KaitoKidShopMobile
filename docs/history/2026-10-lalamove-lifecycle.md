@@ -98,6 +98,20 @@ Live Sandbox của đơn `KK-20261005-B5C55A` cho thấy Lalamove gửi `ORDER_S
 
 Live gate `duplicate/out-of-order webhook không regress state` vẫn phải test lại bằng một đơn Sandbox mới trước khi tick PASS.
 
+## 2026-10-05 — Mobile detail theo dõi Lalamove foreground mỗi 10 giây
+
+Rà Mobile sau khi Web tracking đã ổn cho thấy danh sách đơn và màn tracking đã có fallback 10 giây, nhưng màn chi tiết `/orders/[id]` chỉ tải một lần hoặc chờ pull-to-refresh. Nếu khách đứng ở màn chi tiết trong lúc Lalamove đổi trạng thái, các quyền `Đã nhận hàng` / `Chưa nhận được hàng` có thể xuất hiện muộn dù backend đã nhận webhook.
+
+Đã đồng bộ behavior của màn chi tiết với các surface Mobile còn lại:
+
+- chỉ poll khi provider là `lalamove`, đã có tracking code và shipping/order chưa terminal;
+- mỗi 10 giây khi app foreground gọi owner tracking trước, sau đó reload Customer Order DTO để nhận cả shipping status và quyền hậu mãi mới;
+- có in-flight guard để không phát request chồng nhau;
+- khi app background thì không poll, quay lại foreground thì sync ngay;
+- tạm dừng polling trong lúc customer action đang chạy để tránh race UI với cancel/receipt/return;
+- background fallback không bật loading/refresh spinner và không xóa lỗi form/action hiện có;
+- tự dừng khi `delivered/completed/received_by_customer/delivery_disputed/returned/cancelled/failed` hoặc business order đã terminal.
+
 ## Gate còn mở
 
 Không merge PR #75 cho tới khi chạy thật sandbox với credentials `pk_test/sk_test`, webhook public và xác nhận flow cả Customer Web `:5173` lẫn Mobile/Expo `:8081`. Static review/contract source không thay thế sandbox E2E.
