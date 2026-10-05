@@ -8,6 +8,8 @@ export type CustomerReturnStatus =
   | 'received_restock'
   | 'received_quarantine';
 
+export type CustomerRefundStatus = 'none' | 'pending' | 'completed';
+
 export type CustomerOrder = CreatedOrder & {
   canCancel: boolean;
   trackingCode?: string | null;
@@ -21,6 +23,7 @@ export type CustomerOrder = CreatedOrder & {
   canRequestReturn?: boolean;
   returnRequested?: boolean;
   returnStatus?: CustomerReturnStatus;
+  refundStatus?: CustomerRefundStatus;
   receivedAt?: string | null;
   returnDeadline?: string | null;
   returnWindowDays?: number;
