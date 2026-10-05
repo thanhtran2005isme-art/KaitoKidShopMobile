@@ -133,6 +133,39 @@ export class PaymentService {
   }
 
   async getStatus(userId: number, orderCode: string) {
+    let current = await this.getOwnedOrder(userId, orderCode);
+    if (!current) return null;
+
+    // Webhook là authority chính, nhưng local/dev có thể chưa public được
+    // localhost cho payOS. Trong lúc khách đang ở màn chờ thanh toán, polling
+    // chủ động đối soát provider để payment đã PAID không bị kẹt ở pending.
+    if (
+      current.paymentMethod.toUpperCase() === "ATM" &&
+      this.payos.isConfigured() &&
+      current.status === "pending" &&
+      !current.paidAt
+    ) {
+      try {
+        const provider = await this.findPayOsPayment(current.orderCode);
+        if (provider?.status === "PAID") {
+          this.assertPayOsPaymentMatchesOrder(provider, current);
+          await this.confirmPaidByOrderCode(
+            current.orderCode,
+            toNumber(current.total),
+            "payos_reconcile",
+          );
+          current = await this.getOwnedOrder(userId, orderCode);
+          if (!current) return null;
+          return this.statusDto(current);
+        }
+      } catch (error) {
+        // Provider outage/timeout không được làm endpoint status mất khả dụng.
+        // Nếu đã hết hạn, expireOwnedOrderIfNeeded bên dưới vẫn thực hiện
+        // provider-first reconciliation trước khi hoàn tồn kho/coupon.
+        if (error instanceof BadRequestException) throw error;
+      }
+    }
+
     const expired = await this.expireOwnedOrderIfNeeded(userId, orderCode);
     if (!expired.order) return null;
     if (expired.cancelled) {
@@ -218,6 +251,7 @@ export class PaymentService {
     ) {
       const provider = await this.findPayOsPayment(current.orderCode);
       if (provider?.status === "PAID") {
+        this.assertPayOsPaymentMatchesOrder(provider, current);
         await this.confirmPaidByOrderCode(
           current.orderCode,
           toNumber(current.total),
@@ -233,6 +267,7 @@ export class PaymentService {
           "Khach hang huy giao dich KaitoKid",
         );
         if (cancelled.status === "PAID") {
+          this.assertPayOsPaymentMatchesOrder(cancelled, current);
           await this.confirmPaidByOrderCode(
             current.orderCode,
             toNumber(current.total),
@@ -485,6 +520,7 @@ export class PaymentService {
     ) {
       const provider = await this.findPayOsPayment(order.orderCode);
       if (provider?.status === "PAID") {
+        this.assertPayOsPaymentMatchesOrder(provider, order);
         await this.confirmPaidByOrderCode(
           order.orderCode,
           toNumber(order.total),
@@ -501,6 +537,7 @@ export class PaymentService {
           "Het han thanh toan KaitoKid",
         );
         if (cancelled.status === "PAID") {
+          this.assertPayOsPaymentMatchesOrder(cancelled, order);
           await this.confirmPaidByOrderCode(
             order.orderCode,
             toNumber(order.total),
@@ -614,6 +651,23 @@ export class PaymentService {
     } catch (error) {
       if (this.providerStatus(error) === 404) return null;
       throw error;
+    }
+  }
+
+  private assertPayOsPaymentMatchesOrder(
+    payment: PayOsPayment,
+    order: PaymentOrderRow,
+  ): void {
+    if (
+      payment.currency &&
+      payment.currency.toUpperCase() !== "VND"
+    ) {
+      throw new BadRequestException("Trạng thái payOS không dùng tiền tệ VND");
+    }
+    if (Math.round(payment.amount) !== Math.round(toNumber(order.total))) {
+      throw new BadRequestException(
+        "Số tiền trạng thái payOS không khớp tổng tiền đơn hàng",
+      );
     }
   }
 
