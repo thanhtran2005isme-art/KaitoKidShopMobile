@@ -75,6 +75,24 @@ Trước khi test giao dịch thật, kiểm tra hai trường hợp:
 - nếu không có `payosEnabled`, `GET /api/payment/config` phải có `ATM`, `payOsConfigured=true`, `paymentProvider=payos`;
 - đặt `payosEnabled=false` phải tắt `ATM` mà không cần xóa secret.
 
+### GET payment trả HTTP 200 nhưng code 101
+
+SDK `@payos/node` ném `APIError` khi response body có business code khác `00`, kể cả HTTP status là `200`.
+
+payOS có thể trả:
+
+```text
+HTTP 200
+code = 101
+Mã thanh toán không tồn tại
+```
+
+khi `DonHang.Id` chưa từng được dùng để tạo payment request. Đây là **expected create path**, không phải provider outage.
+
+Backend phải chuẩn hóa trường hợp này thành nội bộ `not found`, sau đó `ensurePayment()` tiếp tục gọi `paymentRequests.create()` với cùng fixed `DonHang.Id`. Không được trả `502` chỉ vì code `101`.
+
+Contract `payos-payment-contract.test.mjs` phải tái hiện đúng case này để tránh regression.
+
 ## 5. Customer Web acceptance
 
 1. Login customer.
