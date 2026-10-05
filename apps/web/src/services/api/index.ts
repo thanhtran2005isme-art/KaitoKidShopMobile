@@ -20,7 +20,7 @@ export { pageApi, type PageDTO } from './pageApi';
 export { menuApi, type MenuDTO } from './menuApi';
 export { collectionApi, type CollectionDTO, type PublicCollectionDTO } from './collectionApi';
 export { lookbookApi, type LookbookDTO, type PublicLookbookDTO, type LookbookHotspotDTO } from './lookbookApi';
-export { settingsApi, type SettingDTO, type UpsertSettingDTO } from './settingsApi';
+export { settingsApi, type SettingDTO, type UpsertSettingDTO, type VietQrBankDTO, type VietQrAccountLookupDTO } from './settingsApi';
 export { cartApi, type CartItemDTO as CartItemBackendDTO, type AddToCartPayload, type ComboDiscountResult, type ReorderResult } from './cartApi';
 export { customerOrderApi, customerReviewApi, type CustomerOrderDTO, type CustomerOrderItemDTO, type CreateReviewPayload, type ReviewDTO as CustomerReviewDTO } from './customerOrderApi';
 export { accountApi, type AccountDTO, type UpdateAccountPayload, type ChangePasswordPayload, type PointsHistoryDTO, type RedeemResultDTO, type PersonalVoucher } from './accountApi';

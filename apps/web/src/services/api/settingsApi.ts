@@ -17,6 +17,23 @@ export interface UpsertSettingDTO {
   moTa?: string;
 }
 
+export interface VietQrBankDTO {
+  id: number;
+  name: string;
+  code: string;
+  bin: string;
+  shortName: string;
+  logo: string;
+  transferSupported: boolean;
+  lookupSupported: boolean;
+}
+
+export interface VietQrAccountLookupDTO {
+  bank: VietQrBankDTO;
+  accountNumber: string;
+  accountName: string;
+}
+
 interface PublicPaymentConfig {
   allowSimulatePaid: boolean;
   supportedMethods?: string[];
@@ -57,6 +74,32 @@ export const settingsApi = {
   async upsert(settings: UpsertSettingDTO[]): Promise<ApiResponse<{ message: string }>> {
     try {
       const response = await adminApiClient.put<{ message: string }>('/api/admin/settings', settings);
+      return { success: true, data: response.data };
+    } catch (error) {
+      return { success: false, error: getErrorMessage(error) };
+    }
+  },
+
+  /** Danh sách ngân hàng authoritative từ VietQR, proxy qua backend Admin. */
+  async getPaymentBanks(): Promise<ApiResponse<VietQrBankDTO[]>> {
+    try {
+      const response = await adminApiClient.get<VietQrBankDTO[]>('/api/admin/payment/banks');
+      return { success: true, data: response.data };
+    } catch (error) {
+      return { success: false, error: getErrorMessage(error) };
+    }
+  },
+
+  /** Xác minh BIN + số tài khoản và lấy tên chủ tài khoản từ VietQR. */
+  async lookupBankAccount(
+    bankBin: string,
+    accountNumber: string,
+  ): Promise<ApiResponse<VietQrAccountLookupDTO>> {
+    try {
+      const response = await adminApiClient.post<VietQrAccountLookupDTO>(
+        '/api/admin/payment/lookup-account',
+        { bankBin, accountNumber },
+      );
       return { success: true, data: response.data };
     } catch (error) {
       return { success: false, error: getErrorMessage(error) };

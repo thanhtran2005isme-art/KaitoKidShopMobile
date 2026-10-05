@@ -1,6 +1,6 @@
 # AI Handoff — Current State
 
-Last updated: 2026-10-04
+Last updated: 2026-10-05
 
 ## Repository
 
@@ -42,6 +42,7 @@ Legacy ASP.NET Core `backend/` đã retire trong retirement change. SQL/schema a
 - Template: `apps/api/.env.example`
 - Local CORS cho phép loopback `localhost`/`127.0.0.1` dùng port dev động khi cùng scheme đã được allow; không mở rộng sang origin/LAN tùy ý.
 - JSON body limit hiện là 16 MB để admin có thể lưu cấu hình ngân hàng chứa QR base64 mà không bị HTTP 413.
+- Admin Payment lấy danh sách ngân hàng từ VietQR `/v2/banks`; xác minh BIN + STK qua `/v2/lookup`. `VIETQR_CLIENT_ID` và `VIETQR_API_KEY` chỉ nằm ở backend/deployment secrets, không gửi về Web/Mobile.
 
 Node là background worker owner duy nhất; critical workers vẫn điều khiển bằng feature flags.
 
@@ -62,7 +63,9 @@ Node là background worker owner duy nhất; critical workers vẫn điều khi�
 - React + Vite, thường `5173`
 - Customer + Staff/Admin cùng gọi Node `:5300`
 - Staff auth dùng chung `adminApiClient`; không fallback về legacy `localhost:5053`.
-- Chat realtime gọi Socket.IO Node `/chatHub`
+- Chat realtime gọi Socket.IO Node `/chatHub`.
+- Admin không nhập tự do tên ngân hàng/chủ tài khoản: chọn ngân hàng từ catalog VietQR, STK chỉ nhận 6–19 chữ số và account holder chỉ được điền từ kết quả lookup. Mọi lần lưu Payment khi bật chuyển khoản đều xác minh lại toàn bộ bank slot.
+- QR checkout ưu tiên VietQR động theo từng đơn; ảnh QR Admin upload/dán URL chỉ là fallback nếu ảnh động tải lỗi.
 
 ## Database
 
@@ -124,6 +127,7 @@ Sau đó smoke Web customer + Admin + Mobile bằng **Node-only**. Không khởi
 - Checkout selection có thể persist qua reload, nhưng chỉ lưu ID; dữ liệu commerce authoritative vẫn lấy lại từ backend.
 - Pricing/coupon/combo/shipping/payment authoritative ở backend.
 - Payment/order cancellation/restock idempotent dưới race.
+- Tài khoản nhận chuyển khoản mới phải được chọn từ catalog VietQR và xác minh lookup trước khi Admin lưu; account holder không phải dữ liệu gõ tay.
 - Tracking/cancel/reorder owner-only.
 - Review exact completed order + purchased variant.
 - Delete account releases reservations first.
