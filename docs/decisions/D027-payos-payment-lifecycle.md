@@ -28,20 +28,28 @@ Web/Mobile không nhận ba giá trị này.
 
 Trong giai đoạn PR #75, DB vẫn lưu `PhuongThucThanhToan='ATM'` cho online bank payment để tương thích dữ liệu/code hiện tại. Contract public bổ sung `paymentProvider='payos'`; UI customer hiển thị payOS. Việc đổi enum DB từ ATM sang PAYOS, nếu cần, là migration riêng sau này.
 
-### 2. `DonHang.Id` là `orderCode` gửi sang payOS
+### 2. payOS `orderCode` được suy ra từ `MaDonHang`, không dùng `DonHang.Id`
 
-payOS yêu cầu `orderCode` kiểu integer. `MaDonHang` của KaitoKid là display code dạng chuỗi nên không dùng trực tiếp.
-
-Mapping ổn định:
+payOS yêu cầu `orderCode` kiểu integer. KaitoKid giữ display code dạng:
 
 ```text
-payOS orderCode = DonHang.Id
-KaitoKid display order code = DonHang.MaDonHang
+KK-YYYYMMDD-XXXXXX
 ```
+
+trong đó `XXXXXX` là 6 ký tự hex. Không được dùng `DonHang.Id` làm payOS orderCode vì AUTO_INCREMENT của DB local/test có thể reset hoặc reuse, trong khi payOS vẫn giữ payment request cũ. Điều đó đã tạo collision `code 231 — Đơn thanh toán đã tồn tại` trong live acceptance của PR #75.
+
+Mapping hiện hành deterministic + reversible:
+
+```text
+suffixBase = 16^6
+payOS orderCode = YYYYMMDD * suffixBase + hex(XXXXXX)
+```
+
+Ví dụ `KK-20261005-DB6E9B` được ánh xạ thành một positive safe integer duy nhất cho chính display code đó. Webhook làm phép đảo để lấy lại `MaDonHang` rồi mới query `DonHang`.
 
 Không thêm bảng/cột mapping mới.
 
-Khi cần tạo payment, backend luôn GET payment request theo `DonHang.Id` trước. Chỉ khi provider trả not-found mới create. SDK create được cấu hình `maxRetries=0` để tránh retry mù sau network timeout; request sau sẽ recover bằng GET cùng fixed order code.
+Backend luôn GET payment request theo provider orderCode này trước. Chỉ khi provider trả not-found mới create. SDK create dùng `maxRetries=0` để tránh retry mù sau network timeout. Nếu GET vừa trả business `101` nhưng CREATE trả business `231`, backend bounded-retry GET cùng provider orderCode để recover request vừa được tạo, đồng thời bắt buộc amount phải khớp.
 
 ### 3. Backend cấp QR/payment link
 
@@ -76,13 +84,13 @@ Endpoint không dùng KaitoKid JWT vì caller là payOS. Trước khi tin dữ l
 
 Sau verify, backend còn kiểm tra:
 
-- `orderCode` map được về `DonHang.Id`;
+- `orderCode` đảo được về `DonHang.MaDonHang` theo mapping hiện hành;
 - order dùng online payment hiện tại (`ATM` compatibility code);
 - `currency == VND`;
 - `amount == DonHang.TongTien`;
 - webhook transaction code thành công (`00`).
 
-Signed sample webhook dùng khi payOS xác minh URL có thể mang `orderCode` không tồn tại tại KaitoKid; backend ACK 2xx nhưng không tạo/cập nhật order giả.
+Webhook có orderCode không map được về mã KaitoKid hiện hành được ACK/ignore; backend tuyệt đối không fallback đoán theo `DonHang.Id`, vì ID local có thể đã được reuse sau reset DB.
 
 ### 5. Paid transition idempotent
 
@@ -129,8 +137,8 @@ Customer cancel hoặc payment sweeper:
 GET payOS status
   PAID      -> confirm paid, không hoàn stock/coupon
   PENDING   -> cancel payOS trước
-                 PAID race      -> confirm paid
-                 CANCELLED      -> mới cancel commerce
+                 PAID race       -> confirm paid
+                 CANCELLED       -> mới cancel commerce
                  trạng thái khác -> fail closed
   CANCELLED -> có thể cancel commerce
   404/no payment link -> local cancel an toàn
@@ -138,7 +146,17 @@ GET payOS status
 
 Chỉ commerce cancel terminal mới restore stock + coupon.
 
-### 8. Shipping boundary
+Ngoài restore stock/coupon, pending order bị hủy/hết hạn phải **trả chính các order item về `GioHang` và reserve lại** trong cùng transaction. Lock order là `user -> product -> variant`, đồng nhất với `CartService`, để tránh deadlock/race với thao tác giỏ hàng. Nếu cart đã có cùng product/size/color, quantity được merge; `GiuDenLuc` được cấp lại theo reservation window hiện hành.
+
+### 8. Cart authority khi tạo pending order
+
+Backend là authority của cart. Customer Web không được gọi `clearCart()` sau khi `POST /api/orders` thành công, vì hành vi đó có thể xóa các item không thuộc checkout/partial checkout.
+
+Selected order items có thể được backend consume khỏi `GioHang` khi order transaction thành công; đó là chuyển ownership từ cart sang pending order, không phải mất dữ liệu. Nếu payment bị customer-cancel hoặc expiry thì backend restore chúng về cart như mục 7.
+
+Các item không thuộc checkout phải giữ nguyên. Client chỉ `refreshCart()` sau create order, không tự clear toàn bộ giỏ.
+
+### 9. Shipping boundary
 
 COD giữ behavior hiện tại: tạo shipping order sau khi order được tạo.
 
@@ -154,7 +172,7 @@ create KaitoKid order
 
 Không Place Order Lalamove trước khi payOS xác nhận tiền.
 
-### 9. Runtime cutover không phụ thuộc VietQR/Admin bank settings
+### 10. Runtime cutover không phụ thuộc VietQR/Admin bank settings
 
 Từ cutover này, online payment mới chỉ được bật khi backend có đủ `PAYOS_CLIENT_ID`, `PAYOS_API_KEY`, `PAYOS_CHECKSUM_KEY` và `payosEnabled` không bị đặt thành `false`.
 
@@ -177,8 +195,8 @@ Không thêm bảng/cột/schema trong D027.
 
 Các cột hiện có tiếp tục được dùng:
 
-- `DonHang.Id` — payOS integer orderCode;
-- `DonHang.MaDonHang` — display code;
+- `DonHang.Id` — internal relational primary key; **không** gửi sang payOS;
+- `DonHang.MaDonHang` — display code và source để derive reversible payOS orderCode;
 - `DonHang.PhuongThucThanhToan` — hiện giữ `ATM` compatibility code;
 - `DonHang.TongTien` — amount authoritative;
 - `DonHang.HetHanThanhToan` — local payment expiry;
@@ -192,11 +210,15 @@ Không merge payment cutover chỉ vì static/build PASS. Live acceptance cần 
 1. cấu hình credentials payOS local/deploy mà không commit secret;
 2. public HTTPS webhook `/api/payment/payos/webhook` được payOS confirm thành công;
 3. tạo đơn Web và Mobile, QR/payment link đúng amount;
-4. thanh toán sandbox/live test và webhook chuyển order `pending -> confirmed`;
-5. Mobile/Web tự sang success sau backend paid;
-6. duplicate webhook không double side-effect;
-7. amount/signature invalid bị reject;
-8. cancel pending provider-first hoạt động;
-9. paid-vs-expiry/cancel race không hoàn tồn/coupon sai;
-10. paid online tạo shipment đúng một lần;
-11. khi thiếu payOS credentials, cấu hình VietQR/bank legacy không làm ATM xuất hiện cho đơn mới.
+4. reset/reseed local DB không được làm payOS collision do reuse `DonHang.Id`;
+5. case GET `101` -> CREATE `231` phải recover idempotent thay vì trả 502;
+6. thanh toán sandbox/live test và webhook chuyển order `pending -> confirmed`;
+7. Mobile/Web tự sang success sau backend paid;
+8. duplicate webhook không double side-effect;
+9. amount/signature invalid bị reject;
+10. cancel pending provider-first hoạt động và item được trả lại giỏ;
+11. expiry cũng restore cart reservation đúng một lần;
+12. paid-vs-expiry/cancel race không hoàn tồn/coupon/cart sai;
+13. paid online tạo shipment đúng một lần;
+14. khi thiếu payOS credentials, cấu hình VietQR/bank legacy không làm ATM xuất hiện cho đơn mới;
+15. Customer Web không tự `clearCart()` toàn bộ sau create order.
