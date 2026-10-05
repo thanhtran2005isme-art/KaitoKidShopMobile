@@ -24,6 +24,10 @@ PAYOS_CANCEL_URL=https://<public-web>/orders?payment=cancel
 
 Callback URL chỉ phục vụ UX; không phải authority paid.
 
+`payosEnabled` là optional store setting. Nếu key này chưa tồn tại, backend tự bật online payment khi ba credentials payOS đã đủ. Nếu `payosEnabled=false`, ATM/online bị tắt dù credentials còn tồn tại.
+
+Các key legacy `bankEnabled`, `enableBankTransfer`, `bankAccounts` **không còn được phép bật online payment mới**.
+
 ## 2. Public webhook
 
 Backend phải có public HTTPS URL tới:
@@ -55,7 +59,23 @@ Customer Web: http://localhost:5173
 Expo/Mobile: :8081
 ```
 
-## 4. Customer Web acceptance
+## 4. Runtime cutover acceptance
+
+Trước khi test giao dịch thật, kiểm tra hai trường hợp:
+
+### Không có payOS credentials
+
+- tạm bỏ ba biến `PAYOS_CLIENT_ID`, `PAYOS_API_KEY`, `PAYOS_CHECKSUM_KEY`;
+- dù database còn `bankEnabled=true`, `enableBankTransfer=true` hoặc `bankAccounts`, `GET /api/payment/config` không được quảng bá `ATM` cho đơn mới;
+- COD vẫn theo `codEnabled`/`enableCOD` hiện hành.
+
+### Có payOS credentials
+
+- cấu hình đủ ba credentials;
+- nếu không có `payosEnabled`, `GET /api/payment/config` phải có `ATM`, `payOsConfigured=true`, `paymentProvider=payos`;
+- đặt `payosEnabled=false` phải tắt `ATM` mà không cần xóa secret.
+
+## 5. Customer Web acceptance
 
 1. Login customer.
 2. Thêm hàng và checkout.
@@ -67,7 +87,7 @@ Expo/Mobile: :8081
 8. payOS webhook phải cập nhật order `pending -> confirmed`.
 9. Web poll KaitoKid backend và chuyển success mà không cần nút “Tôi đã thanh toán”.
 
-## 5. Mobile acceptance
+## 6. Mobile acceptance
 
 1. Login Mobile.
 2. Cart -> Checkout -> chọn online payment -> Create Order.
@@ -78,7 +98,7 @@ Expo/Mobile: :8081
 7. Sau webhook verified + DB paid, Mobile tự điều hướng tới `order-success/[orderCode]`.
 8. Mobile không xin quyền đọc SMS/notification/balance ngân hàng.
 
-## 6. Security/idempotency acceptance
+## 7. Security/idempotency acceptance
 
 Phải chứng minh:
 
@@ -90,7 +110,7 @@ Phải chứng minh:
 - shipment không được tạo hai lần do duplicate webhook;
 - order cancelled không bị revive bởi manual forged request.
 
-## 7. Cancel/expiry race
+## 8. Cancel/expiry race
 
 ### Pending chưa trả tiền
 
@@ -107,7 +127,7 @@ Phải chứng minh:
 - Nếu `PENDING` -> cancel provider trước.
 - Nếu provider chưa terminal -> fail closed, không hoàn tồn/coupon.
 
-## 8. Shipping/Lalamove acceptance
+## 9. Shipping/Lalamove acceptance
 
 Online order chưa paid:
 
@@ -125,7 +145,7 @@ payment_confirmed
 
 Chứng minh shipment chỉ được tạo một lần.
 
-## 9. Automated gates
+## 10. Automated gates
 
 ```bat
 npm --prefix apps\api run test:checkout-order
@@ -135,6 +155,8 @@ npm --prefix apps\mobile run lint
 npm --prefix apps\mobile run typecheck
 ```
 
+`test:checkout-order` phải gồm `payment-runtime-cutover-contract.test.mjs` để khóa việc legacy bank/VietQR không thể kích hoạt ATM mới.
+
 Giữ thêm các race gate hiện có khi test DB sẵn sàng:
 
 ```bat
@@ -142,11 +164,12 @@ scripts\node-concurrency-race-gate.bat
 scripts\node-realtime-runtime-gate.bat
 ```
 
-## 10. Merge gate
+## 11. Merge gate
 
 PR #75 tiếp tục Draft/Open cho đến khi:
 
 - automated gates PASS;
+- runtime cutover test PASS: không credentials thì legacy bank settings không bật ATM;
 - payOS credentials thật/test channel đã được cấu hình ngoài Git;
 - public webhook được confirm;
 - Web + Mobile payment E2E PASS;
