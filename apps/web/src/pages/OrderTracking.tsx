@@ -5,7 +5,7 @@
 // - Nút Mua lại + Xuất hoá đơn
 // - Xác nhận nhận hàng / báo chưa nhận / hoàn hàng 7 ngày
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
@@ -56,6 +56,18 @@ const providerMap: Record<string, string> = {
   mock: 'KaitoKid (Mock)',
   lalamove: 'Lalamove',
 };
+
+const LALAMOVE_POLL_MS = 10_000;
+const LALAMOVE_TERMINAL_SHIPPING_STATUSES = new Set([
+  'delivered',
+  'completed',
+  'received_by_customer',
+  'delivery_disputed',
+  'returned',
+  'carrier_cancelled',
+  'cancelled',
+  'failed',
+]);
 
 type AfterSalesTone = 'warning' | 'info' | 'success' | 'danger';
 
@@ -158,6 +170,19 @@ function firstUnreviewedItem(order: CustomerOrderDTO) {
   return order.items.find((item) => !item.hasReviewed) ?? null;
 }
 
+function shouldPollLalamove(order: CustomerOrderDTO) {
+  if ((order.shippingProvider || '').toLowerCase() !== 'lalamove') return false;
+  if (!order.trackingCode) return false;
+  if (['cancelled', 'completed', 'returned'].includes((order.status || '').toLowerCase())) return false;
+  return !LALAMOVE_TERMINAL_SHIPPING_STATUSES.has((order.shippingStatus || '').toLowerCase());
+}
+
+function sortOrders(items: CustomerOrderDTO[]) {
+  return [...items].sort(
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+  );
+}
+
 export default function OrderTracking() {
   const { user } = useAuth();
   const { refreshCart } = useCart();
@@ -174,26 +199,38 @@ export default function OrderTracking() {
   const [afterSalesOrderId, setAfterSalesOrderId] = useState<number | null>(null);
   const [returningOrder, setReturningOrder] = useState<CustomerOrderDTO | null>(null);
   const [returnReason, setReturnReason] = useState('');
+  const livePollInFlight = useRef(false);
+
+  const applyOrders = (items: CustomerOrderDTO[]) => {
+    const sorted = sortOrders(items);
+    setOrders(sorted);
+    setSelected((current) => {
+      if (!current) return null;
+      return sorted.find((item) => item.id === current.id) ?? current;
+    });
+  };
 
   const loadOrders = async () => {
     setLoading(true);
     const result = await customerOrderApi.getMyOrders();
     if (result.success && result.data) {
-      const sorted = [...result.data].sort(
-        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-      );
-      setOrders(sorted);
+      applyOrders(result.data);
     } else {
       setOrders([]);
     }
     setLoading(false);
   };
 
+  const refreshOrdersSilently = async () => {
+    const result = await customerOrderApi.getMyOrders();
+    if (result.success && result.data) applyOrders(result.data);
+  };
+
   useEffect(() => {
     if (!user) return;
     void loadOrders();
     const tick = () => {
-      if (document.visibilityState === 'visible') void loadOrders();
+      if (document.visibilityState === 'visible') void refreshOrdersSilently();
     };
     const interval = window.setInterval(tick, 60_000);
     document.addEventListener('visibilitychange', tick);
@@ -202,6 +239,50 @@ export default function OrderTracking() {
       document.removeEventListener('visibilitychange', tick);
     };
   }, [user]);
+
+  const liveLalamoveOrders = useMemo(
+    () => orders.filter(shouldPollLalamove),
+    [orders],
+  );
+
+  useEffect(() => {
+    if (!user || liveLalamoveOrders.length === 0) return;
+
+    let disposed = false;
+    const syncLiveLalamove = async () => {
+      if (disposed || livePollInFlight.current || document.visibilityState !== 'visible') return;
+      livePollInFlight.current = true;
+      try {
+        const results = await Promise.all(
+          liveLalamoveOrders.map(async (order) => ({
+            orderCode: order.orderCode,
+            result: await shippingApi.track(order.orderCode),
+          })),
+        );
+        if (disposed) return;
+
+        setTracking((current) => {
+          if (!current) return current;
+          const next = results.find(({ orderCode }) => orderCode === current.orderCode)?.result;
+          return next?.success && next.data ? next.data : current;
+        });
+        await refreshOrdersSilently();
+      } finally {
+        livePollInFlight.current = false;
+      }
+    };
+
+    const interval = window.setInterval(() => void syncLiveLalamove(), LALAMOVE_POLL_MS);
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') void syncLiveLalamove();
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      disposed = true;
+      window.clearInterval(interval);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+  }, [user, liveLalamoveOrders]);
 
   const counts = useMemo(() => {
     const c: Record<OrderStatusFilterValue, number> = {
@@ -231,7 +312,7 @@ export default function OrderTracking() {
     const result = await shippingApi.track(orderCode);
     if (result.success && result.data) {
       setTracking(result.data);
-      await loadOrders();
+      await refreshOrdersSilently();
     } else {
       toast.error(result.error || 'Không lấy được tracking');
     }
