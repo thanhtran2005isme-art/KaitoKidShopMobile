@@ -1,70 +1,45 @@
-# Admin Settings — Payment / payOS
+# Admin Settings — Payment
 
-## Mục tiêu hiện hành
+## Trạng thái hiện hành
 
-Online payment của Customer Web/Mobile dùng **payOS làm provider** theo D027. Admin Settings không phải nơi nhập hoặc hiển thị secret payOS và không phải nơi tự tạo QR chuyển khoản.
+Online payment của KaitoKid trên PR #75 đã cutover sang **payOS** theo D027.
 
-Payment tab nên tập trung vào hai capability mà shop có thể bật/tắt:
+Admin bank/VietQR verification được tạo ở giai đoạn trước của cùng PR và hiện chỉ là **legacy migration surface**. Nó không còn là payment provider, không còn quyền bật ATM cho đơn mới và không được mở rộng thêm như UX thanh toán hiện hành.
 
-- COD;
-- Online payment qua payOS.
+## payOS runtime
 
-Backend/deployment là source of truth cho trạng thái credentials/provider.
+- Secrets `PAYOS_CLIENT_ID`, `PAYOS_API_KEY`, `PAYOS_CHECKSUM_KEY` chỉ cấu hình ở backend/deployment; không nhập hoặc hiển thị trong Admin Web.
+- Nếu đủ credentials và không có `payosEnabled=false`, backend tự quảng bá online payment qua compatibility method `ATM` + `paymentProvider=payos`.
+- `bankEnabled`, `enableBankTransfer`, `bankAccounts` legacy không được kích hoạt online payment mới.
+- Customer QR/payment link do backend/payOS cấp theo đúng order; Admin không upload QR làm authority.
 
-## payOS status
+## Legacy bank/VietQR section
 
-Payment tab khi hoàn tất cutover nên hiển thị status card đơn giản:
+Nếu code/UI cũ vẫn còn hiển thị trong migration window:
 
-```text
-payOS
-Provider status: Sẵn sàng / Thiếu cấu hình
-Webhook: cần nghiệm thu public HTTPS ngoài UI
-```
+- coi dữ liệu bank/account là thông tin legacy, không phải source of truth của payment mới;
+- không dùng trạng thái verify VietQR để quyết định Web/Mobile có được thanh toán online hay không;
+- không thêm dependency customer checkout mới vào `VIETQR_CLIENT_ID` / `VIETQR_API_KEY`;
+- không khôi phục dynamic `img.vietqr.io` hoặc QR upload làm payment path chính;
+- cleanup UI này phải giữ nguyên dữ liệu DB cũ trừ khi có migration riêng được duyệt.
 
-Không hiển thị:
+## UI hướng tới sau cleanup
 
-- `PAYOS_CLIENT_ID`;
-- `PAYOS_API_KEY`;
-- `PAYOS_CHECKSUM_KEY`;
-- raw secret/token provider.
+Payment tab nên chỉ thể hiện:
 
-Secret chỉ đặt trong `apps/api/.env` local hoặc deployment secrets.
+1. COD enabled + COD fee;
+2. payOS runtime status: configured / disabled / unavailable;
+3. hướng dẫn rằng credentials được quản lý bằng backend secrets;
+4. link/runbook kiểm thử payOS nếu cần;
+5. không hiển thị secret thật.
 
-## QR/customer payment
+## Trạng thái UI cần có
 
-Admin không upload QR để làm payment authority.
+- payOS configured/active;
+- payOS missing credentials;
+- payOS disabled bởi `payosEnabled=false`;
+- save COD loading/error/success;
+- legacy data, nếu còn hiển thị, phải có nhãn rõ “legacy” và không được gây hiểu nhầm là provider hiện hành.
 
-Customer checkout lấy payment instructions owner-scoped từ Node backend. Backend tạo/recover payment request payOS và trả QR/payment link đúng order/amount. Web/Mobile chỉ render dữ liệu đó.
-
-Browser callback không tự đánh dấu paid; signed payOS webhook + backend persisted state mới là authority.
-
-## Legacy VietQR/bank-account UI
-
-PR #75 từng có bank selector + VietQR lookup + account-holder verification + QR upload fallback. Phần này là **legacy work-in-progress trước D027**, không còn là target UX của online payment mới.
-
-Trong migration window, source code/config cũ có thể còn tồn tại để tránh phá dữ liệu lịch sử, nhưng:
-
-- Customer payment không được phụ thuộc vào catalog/lookup VietQR Admin;
-- không mở rộng thêm bank slot/QR-upload flow;
-- không mô tả VietQR lookup là payment provider hiện hành;
-- cleanup tiếp theo phải thu gọn Payment tab về COD + payOS capability/status thay vì duy trì hai nguồn cấu hình cạnh tranh.
-
-## Trạng thái UI mục tiêu
-
-- COD enabled/disabled;
-- payOS enabled/disabled theo store setting nếu cần;
-- provider configured/unconfigured do backend trả;
-- loading/error/retry khi đọc config;
-- cảnh báo rõ nếu bật online payment nhưng backend thiếu payOS credentials;
-- save không bao giờ gửi/ghi secret payOS.
-
-## Customer success feedback
-
-Admin UI không tham gia xác nhận giao dịch. Flow đúng là:
-
-```text
-Bank -> payOS -> signed webhook -> Node -> DonHang paid/confirmed
-                                  -> Web/Mobile status refresh -> success
-```
-
-Do đó không thêm nút Admin/Customer kiểu “Tôi đã chuyển khoản” để thay thế webhook trong production.
+Durable decision: `docs/decisions/D027-payos-payment-lifecycle.md`.
+Runbook: `docs/runbooks/PAYOS_PAYMENT_E2E.md`.
