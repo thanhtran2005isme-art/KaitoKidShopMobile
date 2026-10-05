@@ -71,7 +71,6 @@ test('payOS business code 101 được hiểu là chưa có payment và chuyển
           const error = new Error('HTTP 200, Mã thanh toán không tồn tại (code: 101)');
           error.status = 200;
           error.code = '101';
-          error.desc = 'Mã thanh toán không tồn tại';
           throw error;
         },
         async create(input) {
@@ -87,15 +86,9 @@ test('payOS business code 101 được hiểu là chưa có payment và chuyển
             currency: 'VND',
           };
         },
-        async cancel() {
-          throw new Error('not used');
-        },
+        async cancel() { throw new Error('not used'); },
       },
-      webhooks: {
-        verify(value) {
-          return value;
-        },
-      },
+      webhooks: { verify(value) { return value; } },
     };
 
     const payment = await service.ensurePayment({
@@ -148,15 +141,9 @@ test('hai ensurePayment đồng thời cho cùng đơn chỉ create payOS đúng
             currency: 'VND',
           };
         },
-        async cancel() {
-          throw new Error('not used');
-        },
+        async cancel() { throw new Error('not used'); },
       },
-      webhooks: {
-        verify(value) {
-          return value;
-        },
-      },
+      webhooks: { verify(value) { return value; } },
     };
 
     const input = {
@@ -178,6 +165,65 @@ test('hai ensurePayment đồng thời cho cùng đơn chỉ create payOS đúng
     assert.equal(second.orderCode, providerOrderCode);
     assert.equal(first.paymentLinkId, 'single-flight-link');
     assert.equal(second.paymentLinkId, 'single-flight-link');
+  } finally {
+    restoreEnv();
+  }
+});
+
+test('QR CREATE được cache để GET kế tiếp không làm mất QR ngân hàng', async () => {
+  const restoreEnv = withPayOsEnv();
+  try {
+    const service = new PayOsService();
+    const display = 'KK-20261005-A53AAD';
+    const providerOrderCode = service.providerOrderCode(display);
+    let getCalls = 0;
+    service.sdk = {
+      paymentRequests: {
+        async get() {
+          getCalls += 1;
+          if (getCalls === 1) {
+            const error = new Error('HTTP 200, Mã thanh toán không tồn tại (code: 101)');
+            error.status = 200;
+            error.code = '101';
+            throw error;
+          }
+          return {
+            id: 'cached-link',
+            orderCode: providerOrderCode,
+            amount: 389600,
+            status: 'PENDING',
+          };
+        },
+        async create(input) {
+          return {
+            orderCode: input.orderCode,
+            amount: input.amount,
+            description: input.description,
+            status: 'PENDING',
+            paymentLinkId: 'cached-link',
+            checkoutUrl: 'https://pay.payos.vn/web/cached-link',
+            qrCode: '0002010102123857VALIDBANKQR6304ABCD',
+            currency: 'VND',
+          };
+        },
+        async cancel() { throw new Error('not used'); },
+      },
+      webhooks: { verify(value) { return value; } },
+    };
+
+    const input = {
+      orderCode: display,
+      amount: 389600,
+      customerName: 'QR Cache Customer',
+      customerEmail: 'qr@example.com',
+      paymentExpiresAt: new Date(Date.now() + 15 * 60 * 1000),
+    };
+
+    const created = await service.ensurePayment(input);
+    const reloaded = await service.ensurePayment(input);
+    assert.ok(created.qrCode);
+    assert.equal(reloaded.qrCode, created.qrCode);
+    assert.equal(reloaded.checkoutUrl, 'https://pay.payos.vn/web/cached-link');
   } finally {
     restoreEnv();
   }
@@ -215,18 +261,11 @@ test('payOS create code 231 recover payment đã tồn tại thay vì trả 502'
           const error = new Error('HTTP 200, Đơn thanh toán đã tồn tại (code: 231)');
           error.status = 200;
           error.code = '231';
-          error.desc = 'Đơn thanh toán đã tồn tại';
           throw error;
         },
-        async cancel() {
-          throw new Error('not used');
-        },
+        async cancel() { throw new Error('not used'); },
       },
-      webhooks: {
-        verify(value) {
-          return value;
-        },
-      },
+      webhooks: { verify(value) { return value; } },
     };
 
     const payment = await service.ensurePayment({
@@ -248,11 +287,28 @@ test('payOS create code 231 recover payment đã tồn tại thay vì trả 502'
   }
 });
 
-test('QR payOS được backend render thành data URL cho Web và Mobile', () => {
-  assert.match(providerSource, /QRCode\.toDataURL/);
-  assert.match(providerSource, /payment\.qrCode \|\| payment\.checkoutUrl/);
+test('QR payOS chỉ render raw qrCode, không biến checkoutUrl thành QR ngân hàng', async () => {
+  assert.match(providerSource, /if \(!payment\.qrCode\) return null/);
+  assert.match(providerSource, /QRCode\.toDataURL\(payment\.qrCode/);
+  assert.doesNotMatch(providerSource, /payment\.qrCode \|\| payment\.checkoutUrl/);
   assert.match(paymentSource, /qrMode: payment\.qrCode \? "payos_vietqr" : "payos_checkout"/);
   assert.match(paymentSource, /checkoutUrl: payment\.checkoutUrl/);
+
+  const service = new PayOsService();
+  const noFakeQr = await service.qrDataUrl({
+    orderCode: 1,
+    amount: 10000,
+    status: 'PENDING',
+    paymentLinkId: 'hosted-only',
+    checkoutUrl: 'https://pay.payos.vn/web/hosted-only',
+    qrCode: null,
+    description: null,
+    currency: 'VND',
+    bin: null,
+    accountNumber: null,
+    accountName: null,
+  });
+  assert.equal(noFakeQr, null);
 });
 
 test('webhook payOS là public route nhưng bắt buộc verify signature', () => {
