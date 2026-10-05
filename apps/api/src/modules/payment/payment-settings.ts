@@ -88,8 +88,8 @@ export async function loadPaymentSettings(
   );
   const map = new Map(rows.map((row) => [row.code, row.value]));
 
-  // Tài khoản ngân hàng cũ vẫn được đọc để không phá các đơn/config legacy,
-  // nhưng payment customer hiện hành ưu tiên payOS khi backend có credentials.
+  // Dữ liệu tài khoản ngân hàng cũ vẫn được đọc để phục vụ đơn/config legacy
+  // trong migration window. Nó không còn quyền kích hoạt online payment mới.
   const accounts: PaymentBankAccount[] = [];
   const json = map.get("bankAccounts");
   if (json?.trim()) {
@@ -111,7 +111,7 @@ export async function loadPaymentSettings(
         }
       }
     } catch {
-      // Fallback các key payment cũ.
+      // Fallback các key payment cũ bên dưới.
     }
   }
 
@@ -132,17 +132,16 @@ export async function loadPaymentSettings(
   }
 
   const configuredPayOs = payOsConfigured();
-  const onlineEnabled = readBoolAliases(
-    map,
-    ["payosEnabled", "bankEnabled", "enableBankTransfer"],
-    configuredPayOs || accounts.length > 0,
-  );
+
+  // Cutover D027: bankEnabled/enableBankTransfer/VietQR legacy không còn được
+  // phép bật ATM cho đơn mới. payOS tự bật khi đủ backend credentials, trừ khi
+  // operator chủ động đặt payosEnabled=false trong payment settings.
+  const onlineEnabled = readBool(map, "payosEnabled", configuredPayOs);
 
   return {
     enableCod: readBoolAliases(map, ["codEnabled", "enableCOD"], true),
-    // Giữ tên enableBank để OrdersService legacy không phải đổi contract ngay.
-    // Khi payOS được cấu hình, ATM hiện tại chính là online bank-transfer qua payOS.
-    enableBank: onlineEnabled && (configuredPayOs || accounts.length > 0),
+    // Giữ tên enableBank để OrdersService legacy không phải đổi DB contract ATM.
+    enableBank: onlineEnabled && configuredPayOs,
     enablePayOs: onlineEnabled && configuredPayOs,
     bankAccounts: accounts,
   };
