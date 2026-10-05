@@ -61,8 +61,6 @@ Expo/Mobile: :8081
 
 ## 4. Runtime cutover acceptance
 
-Trước khi test giao dịch thật, kiểm tra hai trường hợp:
-
 ### Không có payOS credentials
 
 - tạm bỏ ba biến `PAYOS_CLIENT_ID`, `PAYOS_API_KEY`, `PAYOS_CHECKSUM_KEY`;
@@ -75,23 +73,49 @@ Trước khi test giao dịch thật, kiểm tra hai trường hợp:
 - nếu không có `payosEnabled`, `GET /api/payment/config` phải có `ATM`, `payOsConfigured=true`, `paymentProvider=payos`;
 - đặt `payosEnabled=false` phải tắt `ATM` mà không cần xóa secret.
 
-### GET payment trả HTTP 200 nhưng code 101
+### Mapping orderCode
 
-SDK `@payos/node` ném `APIError` khi response body có business code khác `00`, kể cả HTTP status là `200`.
+Không dùng `DonHang.Id` làm payOS orderCode.
 
-payOS có thể trả:
+Với mã KaitoKid dạng:
 
 ```text
-HTTP 200
-code = 101
-Mã thanh toán không tồn tại
+KK-YYYYMMDD-XXXXXX
 ```
 
-khi `DonHang.Id` chưa từng được dùng để tạo payment request. Đây là **expected create path**, không phải provider outage.
+backend derive integer:
 
-Backend phải chuẩn hóa trường hợp này thành nội bộ `not found`, sau đó `ensurePayment()` tiếp tục gọi `paymentRequests.create()` với cùng fixed `DonHang.Id`. Không được trả `502` chỉ vì code `101`.
+```text
+payOS orderCode = YYYYMMDD * 16^6 + hex(XXXXXX)
+```
 
-Contract `payos-payment-contract.test.mjs` phải tái hiện đúng case này để tránh regression.
+Mapping phải round-trip được:
+
+```text
+MaDonHang -> payOS orderCode -> đúng MaDonHang ban đầu
+```
+
+Reset/reseed local DB hoặc reuse AUTO_INCREMENT không được làm collision payment cũ trên payOS.
+
+### GET code 101 / CREATE code 231
+
+SDK `@payos/node` có thể ném `APIError` khi response body có business code khác `00`, kể cả HTTP status `200`.
+
+Case hợp lệ cần recover:
+
+```text
+GET payment
+-> HTTP 200 + code 101 "Mã thanh toán không tồn tại"
+-> CREATE payment
+-> nếu HTTP 200 + code 231 "Đơn thanh toán đã tồn tại"
+-> bounded GET lại cùng provider orderCode
+-> amount phải khớp
+-> trả payment hiện có
+```
+
+Không được trả `502` chỉ vì code `101`/`231` nếu payment hiện hữu có thể recover an toàn.
+
+Contract `payos-payment-contract.test.mjs` phải khóa cả hai case này.
 
 ## 5. Customer Web acceptance
 
@@ -99,11 +123,22 @@ Contract `payos-payment-contract.test.mjs` phải tái hiện đúng case này �
 2. Thêm hàng và checkout.
 3. Chọn online bank payment hiện hành (DB compatibility code vẫn là `ATM`).
 4. Tạo order.
-5. Màn payment phải hiển thị payOS, amount đúng `DonHang.TongTien`, QR/payment link có thể mở.
-6. Không được gọi/read `/api/admin/settings` từ Customer payment.
-7. Thanh toán bằng QR/payment link.
-8. payOS webhook phải cập nhật order `pending -> confirmed`.
-9. Web poll KaitoKid backend và chuyển success mà không cần nút “Tôi đã thanh toán”.
+5. Web **không được gọi `clearCart()` toàn bộ** sau create order; backend là cart authority.
+6. Item không thuộc checkout phải còn nguyên trong giỏ.
+7. Màn payment phải hiển thị payOS, amount đúng `DonHang.TongTien`, QR/payment link có thể mở.
+8. Không được gọi/read `/api/admin/settings` từ Customer payment để xác nhận paid.
+9. Thanh toán bằng QR/payment link.
+10. payOS webhook phải cập nhật order `pending -> confirmed`.
+11. Web poll KaitoKid backend và chuyển success mà không cần nút “Tôi đã thanh toán”.
+
+### Hủy/hết hạn trước khi thanh toán
+
+- Customer bấm **Hủy giao dịch** -> backend đối soát/cancel payOS trước;
+- sau khi provider xác nhận `CANCELLED`, backend cancel order;
+- stock + coupon được restore;
+- chính order items được trả lại `GioHang`, merge theo product/size/color nếu cần;
+- cart reservation được cấp lại `GiuDenLuc` theo reservation window hiện hành;
+- quay về `/cart` phải thấy lại sản phẩm, không phải add tay lại.
 
 ## 6. Mobile acceptance
 
@@ -115,13 +150,15 @@ Contract `payos-payment-contract.test.mjs` phải tái hiện đúng case này �
 6. Mobile poll `/api/payment/status/:orderCode` khoảng 3 giây/lần trong lúc pending.
 7. Sau webhook verified + DB paid, Mobile tự điều hướng tới `order-success/[orderCode]`.
 8. Mobile không xin quyền đọc SMS/notification/balance ngân hàng.
+9. Cancel/expiry phải có cùng cart-restore semantics như Web.
 
 ## 7. Security/idempotency acceptance
 
 Phải chứng minh:
 
 - signature invalid -> reject;
-- signed webhook unknown order -> ACK/ignore, không mutate DB;
+- signed webhook unknown/unmappable order -> ACK/ignore, không mutate DB;
+- webhook không được fallback đoán theo `DonHang.Id`;
 - amount mismatch -> reject;
 - currency khác VND -> reject;
 - duplicate paid webhook -> `NgayThanhToan` không bị side-effect lặp;
@@ -132,18 +169,25 @@ Phải chứng minh:
 
 ### Pending chưa trả tiền
 
-- Customer cancel -> backend GET payOS -> cancel provider -> chỉ sau `CANCELLED` mới restore stock/coupon.
+- Customer cancel -> backend GET payOS -> cancel provider -> chỉ sau `CANCELLED` mới restore stock/coupon/cart.
 
 ### Tiền vào đúng lúc cancel
 
-- Provider trả `PAID` hoặc cancel response cho thấy `PAID` -> KaitoKid confirm paid; không restore stock/coupon.
+- Provider trả `PAID` hoặc cancel response cho thấy `PAID` -> KaitoKid confirm paid; không restore stock/coupon/cart.
 
 ### Payment hết hạn
 
 - Sweeper phải đối soát payOS trước.
 - Nếu `PAID` -> confirm.
 - Nếu `PENDING` -> cancel provider trước.
-- Nếu provider chưa terminal -> fail closed, không hoàn tồn/coupon.
+- Nếu `CANCELLED`/no payment -> local cancel + restore stock/coupon/cart.
+- Nếu provider chưa terminal -> fail closed, không hoàn tồn/coupon/cart.
+
+### Cart restore idempotency
+
+- local cancel/expiry chỉ chạy khi order còn `pending` + unpaid;
+- transaction giữ user lock trước inventory lock để cùng lock order với CartService;
+- gọi lại cancel/status sau terminal không được cộng cart/reservation lần hai.
 
 ## 9. Shipping/Lalamove acceptance
 
@@ -173,7 +217,18 @@ npm --prefix apps\mobile run lint
 npm --prefix apps\mobile run typecheck
 ```
 
-`test:checkout-order` phải gồm `payment-runtime-cutover-contract.test.mjs` để khóa việc legacy bank/VietQR không thể kích hoạt ATM mới.
+`test:checkout-order` phải gồm:
+
+- `payos-payment-contract.test.mjs`;
+- `payment-runtime-cutover-contract.test.mjs`.
+
+Các contract phải khóa:
+
+- mapping `MaDonHang <-> payOS orderCode` reversible;
+- code `101` create path;
+- code `231` recovery path;
+- cart restore sau cancel/expiry;
+- legacy bank/VietQR không thể kích hoạt ATM mới.
 
 Giữ thêm các race gate hiện có khi test DB sẵn sàng:
 
@@ -191,5 +246,7 @@ PR #75 tiếp tục Draft/Open cho đến khi:
 - payOS credentials thật/test channel đã được cấu hình ngoài Git;
 - public webhook được confirm;
 - Web + Mobile payment E2E PASS;
+- reset DB không tái hiện collision `231` từ `DonHang.Id`;
 - cancel/expiry race PASS;
+- cancel/expiry trả item lại cart đúng một lần;
 - payOS paid -> Lalamove shipment PASS.
