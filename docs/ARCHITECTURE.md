@@ -93,6 +93,122 @@ USB launcher reverse `8081` và `5300` khi có đúng một thiết bị ADB aut
 
 Node phục vụ upload/public assets và mount shared `apps/web/public`. Fallback `/products/*` và `/lookbook/*` vẫn giữ để dữ liệu legacy không tạo 404.
 
+## Online payment architecture — payOS (PR #75)
+
+D027 khóa payOS là payment provider online hiện hành của PR #75. Trong migration window, DB vẫn dùng `PhuongThucThanhToan='ATM'` làm compatibility code; UI/API public phân biệt provider bằng `paymentProvider='payos'`. Không thêm schema chỉ để đổi nhãn payment.
+
+### Trust boundary
+
+```text
+Customer Web / Mobile
+        │
+        │ create order / get instructions / get status
+        ▼
+Node API :5300
+        │
+        │ official @payos/node SDK
+        ▼
+      payOS
+        │
+        │ customer scans QR / pays through bank
+        ▼
+      Bank
+        │
+        └──────────────► payOS
+                           │
+                           │ signed webhook
+                           ▼
+POST /api/payment/payos/webhook
+                           │
+                           ├─ verify checksum signature
+                           ├─ map orderCode = DonHang.Id
+                           ├─ verify VND + exact TongTien
+                           └─ idempotent paid transition
+                                      │
+                                      ▼
+                          DonHang.NgayThanhToan
+                          DonHang.TrangThai=confirmed
+                                      │
+                                      ▼
+                          create shipping order once
+```
+
+Web/Mobile không đọc SMS, notification ngân hàng hoặc biến động số dư. Client chỉ poll trạng thái KaitoKid backend trong lúc pending để làm UI freshness; signed payOS webhook/reconcile mới là authority cho paid.
+
+### payOS identifiers and secrets
+
+payOS cần integer `orderCode`, nên mapping cố định là:
+
+```text
+payOS orderCode        = DonHang.Id
+customer display code  = DonHang.MaDonHang
+```
+
+Secrets chỉ tồn tại ở backend/deployment:
+
+```text
+PAYOS_CLIENT_ID
+PAYOS_API_KEY
+PAYOS_CHECKSUM_KEY
+```
+
+Không expose secret sang Vite/Expo/Admin settings.
+
+### Payment request recovery
+
+Khi client xin payment instructions, Node luôn thử đọc payment request payOS theo `DonHang.Id` trước. Chỉ create khi provider báo chưa tồn tại. Create không retry mù; request tiếp theo recover cùng fixed order code. Cơ chế này tránh tạo payment identity thứ hai sau timeout mạng mơ hồ.
+
+Backend trả QR/payment link cho client. Nếu create response có raw `qrCode`, Node render QR đó. Khi reload và provider lookup không trả raw QR, backend có thể render QR dẫn tới payOS Hosted Checkout để customer vẫn có đường tiếp tục thanh toán.
+
+### Paid transition
+
+Paid confirmation dùng row lock và chung một transition path:
+
+1. `SELECT DonHang ... FOR UPDATE`;
+2. verify expected amount/payment method;
+3. nếu `NgayThanhToan` đã tồn tại thì duplicate event là idempotent;
+4. không revive order đã cancelled;
+5. set `NgayThanhToan` và `TrangThai='confirmed'`;
+6. append `payment_confirmed` history;
+7. online payment mới tạo shipment nếu chưa có tracking;
+8. gửi payment-confirmation email.
+
+Vì vậy browser `returnUrl`/`cancelUrl` không được tự set paid.
+
+### Cancel and expiry boundary
+
+Online payment dùng **provider-first → commerce-second**:
+
+```text
+GET payOS
+  PAID      -> confirm paid; không restore stock/coupon
+  PENDING   -> cancel payOS trước
+                CANCELLED -> mới cancel commerce + restore
+                PAID race -> confirm paid
+                khác      -> fail closed
+  CANCELLED -> cancel commerce nếu còn pending local
+  no link   -> local cancel/expiry an toàn
+```
+
+Payment sweeper phải tuân cùng rule; không được chỉ nhìn `HetHanThanhToan` rồi hoàn tồn kho ngay.
+
+### Shipping boundary
+
+COD tiếp tục tạo shipment sau khi tạo order theo contract hiện hành.
+
+Online/payOS:
+
+```text
+KaitoKid order pending
+-> payOS payment
+-> signed paid webhook
+-> order confirmed
+-> createShippingOrder
+-> Lalamove/GHN/GHTK theo provider đã chọn
+```
+
+Với Lalamove trong PR #75, không Place Order thật trước khi payOS xác nhận paid.
+
 ## Source-of-truth business boundaries
 
 - Pricing, coupon, combo, shipping fee, payment method và order totals: backend authoritative.
@@ -105,6 +221,8 @@ Node phục vụ upload/public assets và mount shared `apps/web/public`. Fallba
 - Google/social: backend validates provider credential before issuing KaitoKid JWT.
 - Admin/RBAC: JWT + staff permission guards.
 - Payment/order/inventory terminal transitions phải giữ idempotency/concurrency invariants đã được runtime race gate kiểm tra.
+- payOS webhook phải verify signature + order mapping + currency + exact amount trước khi mutate commerce state.
+- Web/Mobile payment success luôn lấy từ backend persisted state, không từ browser callback query string hoặc device bank signal.
 
 ## Development launch flow
 
@@ -127,7 +245,8 @@ Expo Mobile :8081
 
 ## Source-of-truth rules
 
-- Current code/configuration: Git `main`
+- Current merged code/configuration: Git `main`
+- Current PR #75 implementation while Draft/Open: `feat/admin-lalamove-carrier`
 - Current operational state: `docs/AI_HANDOFF.md`
 - Stable architecture: this file
 - Durable decisions: `docs/DECISIONS.md` + `docs/decisions/`
