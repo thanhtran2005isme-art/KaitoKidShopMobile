@@ -14,6 +14,25 @@ const controllerSource = source('../src/modules/payment/payment.controller.ts');
 const moduleSource = source('../src/modules/payment/payment.module.ts');
 const envSource = source('../.env.example');
 
+function withPayOsEnv() {
+  const previous = {
+    clientId: process.env.PAYOS_CLIENT_ID,
+    apiKey: process.env.PAYOS_API_KEY,
+    checksumKey: process.env.PAYOS_CHECKSUM_KEY,
+  };
+  process.env.PAYOS_CLIENT_ID = 'test-client';
+  process.env.PAYOS_API_KEY = 'test-api';
+  process.env.PAYOS_CHECKSUM_KEY = 'test-checksum';
+  return () => {
+    if (previous.clientId === undefined) delete process.env.PAYOS_CLIENT_ID;
+    else process.env.PAYOS_CLIENT_ID = previous.clientId;
+    if (previous.apiKey === undefined) delete process.env.PAYOS_API_KEY;
+    else process.env.PAYOS_API_KEY = previous.apiKey;
+    if (previous.checksumKey === undefined) delete process.env.PAYOS_CHECKSUM_KEY;
+    else process.env.PAYOS_CHECKSUM_KEY = previous.checksumKey;
+  };
+}
+
 test('payOS credentials chỉ nằm ở backend env và provider dùng official SDK', () => {
   assert.match(providerSource, /from "@payos\/node"/);
   assert.match(providerSource, /PAYOS_CLIENT_ID/);
@@ -32,15 +51,7 @@ test('DonHang.Id là payOS orderCode và create chỉ chạy sau GET recovery', 
 });
 
 test('payOS business code 101 được hiểu là chưa có payment và chuyển sang create', async () => {
-  const previous = {
-    clientId: process.env.PAYOS_CLIENT_ID,
-    apiKey: process.env.PAYOS_API_KEY,
-    checksumKey: process.env.PAYOS_CHECKSUM_KEY,
-  };
-  process.env.PAYOS_CLIENT_ID = 'test-client';
-  process.env.PAYOS_API_KEY = 'test-api';
-  process.env.PAYOS_CHECKSUM_KEY = 'test-checksum';
-
+  const restoreEnv = withPayOsEnv();
   try {
     const service = new PayOsService();
     let createCalls = 0;
@@ -91,12 +102,71 @@ test('payOS business code 101 được hiểu là chưa có payment và chuyển
     assert.equal(payment.amount, 150000);
     assert.equal(payment.status, 'PENDING');
   } finally {
-    if (previous.clientId === undefined) delete process.env.PAYOS_CLIENT_ID;
-    else process.env.PAYOS_CLIENT_ID = previous.clientId;
-    if (previous.apiKey === undefined) delete process.env.PAYOS_API_KEY;
-    else process.env.PAYOS_API_KEY = previous.apiKey;
-    if (previous.checksumKey === undefined) delete process.env.PAYOS_CHECKSUM_KEY;
-    else process.env.PAYOS_CHECKSUM_KEY = previous.checksumKey;
+    restoreEnv();
+  }
+});
+
+test('payOS create code 231 recover payment đã tồn tại thay vì trả 502', async () => {
+  const restoreEnv = withPayOsEnv();
+  try {
+    const service = new PayOsService();
+    let getCalls = 0;
+    let createCalls = 0;
+    service.sdk = {
+      paymentRequests: {
+        async get() {
+          getCalls += 1;
+          if (getCalls === 1) {
+            const error = new Error('HTTP 200, Mã thanh toán không tồn tại (code: 101)');
+            error.status = 200;
+            error.code = '101';
+            throw error;
+          }
+          return {
+            orderCode: 456,
+            amount: 275000,
+            status: 'PENDING',
+            paymentLinkId: 'existing-link',
+            checkoutUrl: 'https://pay.payos.vn/web/existing-link',
+            currency: 'VND',
+          };
+        },
+        async create() {
+          createCalls += 1;
+          const error = new Error('HTTP 200, Đơn thanh toán đã tồn tại (code: 231)');
+          error.status = 200;
+          error.code = '231';
+          error.desc = 'Đơn thanh toán đã tồn tại';
+          throw error;
+        },
+        async cancel() {
+          throw new Error('not used');
+        },
+      },
+      webhooks: {
+        verify(value) {
+          return value;
+        },
+      },
+    };
+
+    const payment = await service.ensurePayment({
+      orderId: 456,
+      orderCode: 'KK-TEST-456',
+      amount: 275000,
+      customerName: 'Test Customer',
+      customerEmail: 'test@example.com',
+      paymentExpiresAt: new Date(Date.now() + 15 * 60 * 1000),
+    });
+
+    assert.equal(createCalls, 1);
+    assert.ok(getCalls >= 2);
+    assert.equal(payment.orderCode, 456);
+    assert.equal(payment.amount, 275000);
+    assert.equal(payment.paymentLinkId, 'existing-link');
+    assert.equal(payment.status, 'PENDING');
+  } finally {
+    restoreEnv();
   }
 });
 
