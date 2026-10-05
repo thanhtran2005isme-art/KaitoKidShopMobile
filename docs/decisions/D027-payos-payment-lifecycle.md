@@ -51,6 +51,8 @@ Không thêm bảng/cột mapping mới.
 
 Backend luôn GET payment request theo provider orderCode này trước. Chỉ khi provider trả not-found mới create. SDK create dùng `maxRetries=0` để tránh retry mù sau network timeout. Nếu GET vừa trả business `101` nhưng CREATE trả business `231`, backend bounded-retry GET cùng provider orderCode để recover request vừa được tạo, đồng thời bắt buộc amount phải khớp.
 
+Các request `instructions` đồng thời của cùng một order còn được single-flight trong một Node process để React StrictMode/multi-request không tạo hai chuỗi GET->CREATE cạnh tranh.
+
 ### 3. Backend cấp QR/payment link
 
 `GET /api/payment/instructions/:orderCode` vẫn owner-scoped bằng KaitoKid JWT.
@@ -68,7 +70,9 @@ qrUrl
 transferContent
 ```
 
-`qrUrl` là data URL PNG do Node render từ payload QR payOS. Khi payment request vừa create, nguồn QR là `qrCode` payOS. Khi reload và provider GET không trả raw `qrCode`, backend render QR dẫn tới payOS Hosted Checkout để customer vẫn có đường thanh toán ổn định.
+`qrUrl` chỉ được render từ raw `qrCode` do payOS trả ở CREATE payment request. `checkoutUrl` là URL web Hosted Checkout, không phải payload VietQR/EMVCo và tuyệt đối không được encode thành QR rồi trình bày như QR ngân hàng.
+
+Vì GET payment request hiện có thể không trả lại raw `qrCode`, backend giữ short-lived in-memory QR cache cho payment vừa CREATE để các request kế tiếp trong cùng vòng thanh toán vẫn dùng đúng QR ngân hàng. Nếu backend restart hoặc không còn raw QR, UI chỉ hiển thị nút mở `checkoutUrl`; không hiển thị QR giả.
 
 Customer Web/Mobile không tự ghép `img.vietqr.io` làm payment authority nữa.
 
@@ -105,13 +109,13 @@ Webhook/reconcile dùng chung payment confirmation path:
 7. chỉ sau paid mới tạo shipping order cho online payment nếu chưa có tracking;
 8. gửi payment confirmation email.
 
-Do đó duplicate webhook không được double-create shipment hoặc double-run payment transition.
+Do đó duplicate webhook hoặc webhook + polling reconcile cùng lúc không được double-create shipment hoặc double-run payment transition.
 
-### 6. Mobile/Web chỉ đồng bộ UI, không đọc biến động số dư
+### 6. Mobile/Web không đọc biến động số dư; webhook primary + provider reconcile fallback
 
 Mobile/Web không đọc SMS, notification ngân hàng hoặc balance.
 
-Luồng authoritative:
+Luồng primary:
 
 ```text
 Ngân hàng
@@ -123,9 +127,24 @@ Ngân hàng
   -> success UI
 ```
 
-Payment screen Mobile/Web poll `/api/payment/status/:orderCode` mỗi khoảng 3 giây trong lúc pending. Polling chỉ là UI freshness fallback; nó không thay webhook verification.
+Payment screen Mobile/Web poll `/api/payment/status/:orderCode` khoảng 3 giây/lần trong lúc pending.
 
-Mobile có thể mở `checkoutUrl` bằng `expo-web-browser`; QR vẫn hiển thị để quét bằng app ngân hàng/thiết bị phù hợp.
+Để local/dev không bị kẹt khi payOS không thể gọi `localhost`, endpoint status còn có fallback reconciliation server-side:
+
+```text
+GET /api/payment/status/:orderCode
+  -> order owner + pending + unpaid + payOS configured
+  -> GET payOS payment request
+  -> nếu PAID: validate currency VND + amount == DonHang.TongTien
+  -> confirmPaid idempotent với source payos_reconcile
+  -> trả paidAt/status confirmed cho client
+```
+
+Provider timeout/outage trong polling không biến status endpoint thành 502; backend giữ trạng thái local và tiếp tục poll. Nếu đã tới expiry thì flow provider-first ở mục 7 vẫn quyết định trước khi hoàn tồn kho/coupon/cart.
+
+Fallback này không thay thế yêu cầu public signed webhook ở production; webhook vẫn là đường xác nhận chủ động và merge gate bắt buộc. Reconcile chỉ là safety net/recovery path.
+
+Mobile có thể mở `checkoutUrl` bằng `expo-web-browser`; QR chỉ hiển thị khi có raw QR payOS hợp lệ.
 
 ### 7. Cancel/expiry là provider-first, commerce-second
 
@@ -135,9 +154,9 @@ Customer cancel hoặc payment sweeper:
 
 ```text
 GET payOS status
-  PAID      -> confirm paid, không hoàn stock/coupon
+  PAID      -> validate VND + amount, confirm paid, không hoàn stock/coupon
   PENDING   -> cancel payOS trước
-                 PAID race       -> confirm paid
+                 PAID race       -> validate + confirm paid
                  CANCELLED       -> mới cancel commerce
                  trạng thái khác -> fail closed
   CANCELLED -> có thể cancel commerce
@@ -165,7 +184,7 @@ Online/payOS: shipping order chỉ được tạo sau payment confirmation. Vớ
 ```text
 create KaitoKid order
 -> payOS QR/payment link
--> payOS webhook paid
+-> payOS webhook hoặc verified reconcile paid
 -> KaitoKid confirmed
 -> Lalamove Place Order
 ```
@@ -210,15 +229,17 @@ Không merge payment cutover chỉ vì static/build PASS. Live acceptance cần 
 1. cấu hình credentials payOS local/deploy mà không commit secret;
 2. public HTTPS webhook `/api/payment/payos/webhook` được payOS confirm thành công;
 3. tạo đơn Web và Mobile, QR/payment link đúng amount;
-4. reset/reseed local DB không được làm payOS collision do reuse `DonHang.Id`;
-5. case GET `101` -> CREATE `231` phải recover idempotent thay vì trả 502;
-6. thanh toán sandbox/live test và webhook chuyển order `pending -> confirmed`;
-7. Mobile/Web tự sang success sau backend paid;
-8. duplicate webhook không double side-effect;
-9. amount/signature invalid bị reject;
-10. cancel pending provider-first hoạt động và item được trả lại giỏ;
-11. expiry cũng restore cart reservation đúng một lần;
-12. paid-vs-expiry/cancel race không hoàn tồn/coupon/cart sai;
-13. paid online tạo shipment đúng một lần;
-14. khi thiếu payOS credentials, cấu hình VietQR/bank legacy không làm ATM xuất hiện cho đơn mới;
-15. Customer Web không tự `clearCart()` toàn bộ sau create order.
+4. QR hiển thị trên KaitoKid phải là raw QR payOS/VietQR hợp lệ; checkoutUrl không được giả làm QR ngân hàng;
+5. reset/reseed local DB không được làm payOS collision do reuse `DonHang.Id`;
+6. case GET `101` -> CREATE `231` phải recover idempotent thay vì trả 502;
+7. thanh toán sandbox/live test và webhook chuyển order `pending -> confirmed`;
+8. khi webhook local chưa tới, status polling phải recover payment PAID an toàn bằng provider reconcile;
+9. Mobile/Web tự sang success sau backend paid;
+10. duplicate webhook/reconcile không double side-effect;
+11. amount/signature invalid bị reject;
+12. cancel pending provider-first hoạt động và item được trả lại giỏ;
+13. expiry cũng restore cart reservation đúng một lần;
+14. paid-vs-expiry/cancel race không hoàn tồn/coupon/cart sai;
+15. paid online tạo shipment đúng một lần;
+16. khi thiếu payOS credentials, cấu hình VietQR/bank legacy không làm ATM xuất hiện cho đơn mới;
+17. Customer Web không tự `clearCart()` toàn bộ sau create order.
