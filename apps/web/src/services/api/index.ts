@@ -38,7 +38,13 @@ export { adminShippingApi, type ShippingConfig as AdminShippingConfig, type Ship
 
 export { ghnLocationApi, type GhnProvince as GhnProvinceItem2, type GhnDistrict as GhnDistrictItem2, type GhnWard as GhnWardItem } from './ghnLocationApi';
 
-export { paymentApi, type PaymentStatus, type PaymentConfig } from './paymentApi';
+export {
+  paymentApi,
+  type PaymentStatus,
+  type PaymentConfig,
+  type PaymentInstructions,
+  type PaymentInstructionBankAccount,
+} from './paymentApi';
 
 export { searchApi, type SearchRequest, type SearchResult, type SearchFacets, type SuggestionResponse, type ImageSearchItem, type ImageSearchResult } from './searchApi';
 
