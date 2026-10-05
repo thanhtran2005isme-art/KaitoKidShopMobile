@@ -1,36 +1,70 @@
-# Admin Settings — Payment / Bank Account
+# Admin Settings — Payment / payOS
 
-## Mục tiêu
+## Mục tiêu hiện hành
 
-Cấu hình tài khoản nhận chuyển khoản phải giảm tối đa lỗi nhập tay và không cho Admin tự khai báo tên ngân hàng/chủ tài khoản không được xác minh.
+Online payment của Customer Web/Mobile dùng **payOS làm provider** theo D027. Admin Settings không phải nơi nhập hoặc hiển thị secret payOS và không phải nơi tự tạo QR chuyển khoản.
 
-## Bank selector
+Payment tab nên tập trung vào hai capability mà shop có thể bật/tắt:
 
-- Tên ngân hàng không phải text input.
-- Dùng catalog ngân hàng từ backend/VietQR, option hiển thị logo + short name + tên đầy đủ khi có.
-- Giá trị nghiệp vụ lưu theo BIN/code chuẩn; không dựa vào casing hoặc chuỗi tên hiển thị.
-- Chỉ cho chọn ngân hàng có `transferSupported` và `lookupSupported`.
+- COD;
+- Online payment qua payOS.
 
-## Account verification
+Backend/deployment là source of truth cho trạng thái credentials/provider.
 
-- Số tài khoản: chỉ chữ số, 6–19 ký tự.
-- Khi đổi ngân hàng hoặc số tài khoản, phải clear `accountHolder` + `verifiedAt` ngay.
-- CTA `Xác minh tài khoản` gọi backend lookup.
-- Thành công: hiển thị trạng thái verified, tự điền chủ tài khoản từ provider và khóa field đó.
-- Thất bại: lỗi đặt ngay trong bank card; không fallback sang nhập tay tên chủ tài khoản.
-- Khi bấm lưu Payment, toàn bộ bank slot được xác minh lại trước khi persist.
+## payOS status
 
-## Legacy config
+Payment tab khi hoàn tất cutover nên hiển thị status card đơn giản:
 
-Bank slot cũ chỉ có `bankName/accountNumber/accountHolder` được phép hiển thị để người quản trị nhận biết dữ liệu cũ, nhưng phải được xem là **chưa xác minh**. Admin phải chọn lại ngân hàng chuẩn và lookup thành công trước lần lưu kế tiếp.
+```text
+payOS
+Provider status: Sẵn sàng / Thiếu cấu hình
+Webhook: cần nghiệm thu public HTTPS ngoài UI
+```
 
-## QR
+Không hiển thị:
 
-QR upload/URL là phần riêng. Ảnh QR không được dùng để suy ra tên ngân hàng hoặc chủ tài khoản. Checkout có thể ưu tiên VietQR động theo từng đơn và dùng QR tĩnh như fallback theo payment contract hiện hành.
+- `PAYOS_CLIENT_ID`;
+- `PAYOS_API_KEY`;
+- `PAYOS_CHECKSUM_KEY`;
+- raw secret/token provider.
 
-## Trạng thái UI
+Secret chỉ đặt trong `apps/api/.env` local hoặc deployment secrets.
 
-- catalog loading/error/retry;
-- lookup idle/loading/verified/error;
-- button save disabled/loading trong lúc verify;
-- thông báo lỗi cụ thể, không dùng toast chung chung làm nguồn trạng thái duy nhất.
+## QR/customer payment
+
+Admin không upload QR để làm payment authority.
+
+Customer checkout lấy payment instructions owner-scoped từ Node backend. Backend tạo/recover payment request payOS và trả QR/payment link đúng order/amount. Web/Mobile chỉ render dữ liệu đó.
+
+Browser callback không tự đánh dấu paid; signed payOS webhook + backend persisted state mới là authority.
+
+## Legacy VietQR/bank-account UI
+
+PR #75 từng có bank selector + VietQR lookup + account-holder verification + QR upload fallback. Phần này là **legacy work-in-progress trước D027**, không còn là target UX của online payment mới.
+
+Trong migration window, source code/config cũ có thể còn tồn tại để tránh phá dữ liệu lịch sử, nhưng:
+
+- Customer payment không được phụ thuộc vào catalog/lookup VietQR Admin;
+- không mở rộng thêm bank slot/QR-upload flow;
+- không mô tả VietQR lookup là payment provider hiện hành;
+- cleanup tiếp theo phải thu gọn Payment tab về COD + payOS capability/status thay vì duy trì hai nguồn cấu hình cạnh tranh.
+
+## Trạng thái UI mục tiêu
+
+- COD enabled/disabled;
+- payOS enabled/disabled theo store setting nếu cần;
+- provider configured/unconfigured do backend trả;
+- loading/error/retry khi đọc config;
+- cảnh báo rõ nếu bật online payment nhưng backend thiếu payOS credentials;
+- save không bao giờ gửi/ghi secret payOS.
+
+## Customer success feedback
+
+Admin UI không tham gia xác nhận giao dịch. Flow đúng là:
+
+```text
+Bank -> payOS -> signed webhook -> Node -> DonHang paid/confirmed
+                                  -> Web/Mobile status refresh -> success
+```
+
+Do đó không thêm nút Admin/Customer kiểu “Tôi đã chuyển khoản” để thay thế webhook trong production.
