@@ -9,8 +9,8 @@ function source(path) {
 const settingsSource = source('../src/modules/payment/payment-settings.ts');
 const paymentSource = source('../src/modules/payment/payment.service.ts');
 const envSource = source('../.env.example');
-const handoffSource = source('../../docs/AI_HANDOFF.md');
-const decisionSource = source('../../docs/decisions/D027-payos-payment-lifecycle.md');
+const handoffSource = source('../../../docs/AI_HANDOFF.md');
+const decisionSource = source('../../../docs/decisions/D027-payos-payment-lifecycle.md');
 
 test('runtime online payment không được kích hoạt bởi bankEnabled/VietQR legacy', () => {
   assert.match(settingsSource, /readBool\(map,\s*"payosEnabled",\s*configuredPayOs\)/);
