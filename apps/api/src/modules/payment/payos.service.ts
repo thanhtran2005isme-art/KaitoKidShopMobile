@@ -217,19 +217,11 @@ export class PayOsService {
   }
 
   /**
-   * Fresh provider read dùng cho cancel/expiry và các trust boundary cần trạng
-   * thái mới nhất. Concurrent GET cùng order được coalesce để tránh burst.
+   * GET trạng thái payOS luôn qua cache 10 giây/order. Cancel/expiry vẫn an toàn:
+   * nếu cache là PENDING thì bước cancel tiếp theo vẫn gọi provider thật; nếu
+   * cache đã CANCELLED/PAID thì đó là terminal state hợp lệ.
    */
   async getPayment(providerOrderCode: number): Promise<PayOsPayment> {
-    return this.fetchPayment(providerOrderCode, false);
-  }
-
-  /**
-   * Polling Web/Mobile có thể gọi KaitoKid mỗi vài giây nhưng backend không được
-   * gọi payOS cùng tần suất. Cache tối thiểu 10 giây/order; nếu payOS trả 429,
-   * dùng trạng thái cache tạm thời và exponential cooldown thay vì tạo burst.
-   */
-  async getPaymentForStatus(providerOrderCode: number): Promise<PayOsPayment> {
     this.assertOrderId(providerOrderCode);
     const cached = this.cachedEntry(providerOrderCode);
     if (
@@ -243,6 +235,10 @@ export class PayOsService {
       throw this.rateLimitError();
     }
     return this.fetchPayment(providerOrderCode, true);
+  }
+
+  async getPaymentForStatus(providerOrderCode: number): Promise<PayOsPayment> {
+    return this.getPayment(providerOrderCode);
   }
 
   private async fetchPayment(
