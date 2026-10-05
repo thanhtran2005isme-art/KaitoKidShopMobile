@@ -82,6 +82,7 @@ const ORDER_SUFFIX_BASE = 0x1000000; // 16^6, vừa đủ suffix 6 ký tự hex.
 @Injectable()
 export class PayOsService {
   private sdk: PayOsSdkClient | null = null;
+  private readonly ensureFlights = new Map<string, Promise<PayOsPayment>>();
 
   isConfigured(): boolean {
     return Boolean(
@@ -125,7 +126,35 @@ export class PayOsService {
     return `KK-${dayText}-${suffix.toString(16).toUpperCase().padStart(6, "0")}`;
   }
 
+  /**
+   * Coalesce các request instructions đồng thời của cùng một order.
+   * React StrictMode có thể mount/effect hai lần ở development; nếu hai request
+   * cùng chạy GET(101) -> CREATE thì request thứ hai sẽ nhận payOS code 231.
+   * Single-flight đảm bảo trong một Node process chỉ có một GET/CREATE chain.
+   */
   async ensurePayment(input: EnsurePayOsPaymentInput): Promise<PayOsPayment> {
+    const normalizedOrderCode = input.orderCode.trim().toUpperCase();
+    const existingFlight = this.ensureFlights.get(normalizedOrderCode);
+    if (existingFlight) return existingFlight;
+
+    const flight = this.ensurePaymentOnce({
+      ...input,
+      orderCode: normalizedOrderCode,
+    });
+    this.ensureFlights.set(normalizedOrderCode, flight);
+
+    try {
+      return await flight;
+    } finally {
+      if (this.ensureFlights.get(normalizedOrderCode) === flight) {
+        this.ensureFlights.delete(normalizedOrderCode);
+      }
+    }
+  }
+
+  private async ensurePaymentOnce(
+    input: EnsurePayOsPaymentInput,
+  ): Promise<PayOsPayment> {
     const providerOrderCode = this.providerOrderCode(input.orderCode);
     this.assertPaymentInput(providerOrderCode, input.amount);
 
@@ -160,9 +189,9 @@ export class PayOsService {
       return normalized;
     } catch (error) {
       if (this.isAlreadyExists(error)) {
-        // GET code 101 rồi CREATE code 231 vẫn có thể xảy ra do eventual
-        // consistency/request đồng thời. Recover đúng providerOrderCode được
-        // suy ra từ MaDonHang và chỉ chấp nhận payment có amount khớp.
+        // CREATE 231 có thể xảy ra sau request đồng thời, response CREATE trước
+        // bị mất hoặc provider chưa đồng bộ GET ngay. Poll hữu hạn cùng đúng
+        // providerOrderCode; chỉ nhận payment khi amount khớp.
         const recovered = await this.recoverExistingPayment(
           providerOrderCode,
           input.amount,
@@ -293,7 +322,9 @@ export class PayOsService {
     providerOrderCode: number,
     amount: number,
   ): Promise<PayOsPayment | null> {
-    const delaysMs = [0, 150, 300, 600];
+    // payOS có thể báo CREATE=231 trước khi GET cùng orderCode nhìn thấy payment.
+    // Tổng backoff ~7.75s, vẫn dưới SDK timeout nhưng đủ cho eventual consistency.
+    const delaysMs = [0, 250, 500, 1000, 2000, 4000];
     for (const delayMs of delaysMs) {
       if (delayMs > 0) await this.sleep(delayMs);
       try {
