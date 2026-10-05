@@ -2,6 +2,7 @@ import {
   BadGatewayException,
   BadRequestException,
   Injectable,
+  NotFoundException,
   ServiceUnavailableException,
 } from "@nestjs/common";
 import { PayOS } from "@payos/node";
@@ -133,7 +134,12 @@ export class PayOsService {
       const value = await this.client().paymentRequests.get(orderId);
       return this.normalizePayment(value);
     } catch (error) {
-      if (this.isNotFound(error)) throw error;
+      if (this.isNotFound(error)) {
+        // payOS API có thể trả HTTP 200 nhưng business code 101 khi orderCode
+        // chưa có payment request. Chuẩn hóa về 404 nội bộ để ensure/cancel/expiry
+        // đều hiểu đây là "chưa tạo payment", không phải provider outage.
+        throw new NotFoundException("Yêu cầu thanh toán payOS chưa tồn tại");
+      }
       throw this.providerError("Không thể đọc trạng thái payOS", error);
     }
   }
@@ -273,8 +279,9 @@ export class PayOsService {
   }
 
   private isNotFound(error: unknown): boolean {
+    if (error instanceof NotFoundException) return true;
     const raw = record(error);
-    return numberValue(raw.status) === 404;
+    return numberValue(raw.status) === 404 || numberValue(raw.code) === 101;
   }
 
   private providerError(message: string, error: unknown): BadGatewayException {
