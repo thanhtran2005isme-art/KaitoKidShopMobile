@@ -1,6 +1,16 @@
 import apiClient, { getErrorMessage } from '../apiClient';
 import type { ApiResponse } from '../../types/api';
 
+export type CustomerReturnStatus =
+  | 'none'
+  | 'requested'
+  | 'approved'
+  | 'rejected'
+  | 'received_restock'
+  | 'received_quarantine';
+
+export type CustomerRefundStatus = 'none' | 'pending' | 'completed';
+
 export interface CustomerOrderItemDTO {
   productId: number;
   productName: string;
@@ -44,6 +54,8 @@ export interface CustomerOrderDTO {
   canReview?: boolean;
   canRequestReturn?: boolean;
   returnRequested?: boolean;
+  returnStatus?: CustomerReturnStatus;
+  refundStatus?: CustomerRefundStatus;
   receivedAt?: string | null;
   returnDeadline?: string | null;
   returnWindowDays?: number;
