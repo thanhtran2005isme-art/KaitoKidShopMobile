@@ -57,6 +57,90 @@ const providerMap: Record<string, string> = {
   lalamove: 'Lalamove',
 };
 
+type AfterSalesTone = 'warning' | 'info' | 'success' | 'danger';
+
+function afterSalesState(order: CustomerOrderDTO): {
+  title: string;
+  detail: string;
+  tone: AfterSalesTone;
+} | null {
+  if (order.refundStatus === 'completed') {
+    return {
+      title: 'Đã ghi nhận hoàn tiền',
+      detail: 'KaitoKid đã xác nhận hoàn tiền thủ công cho yêu cầu hậu mãi này.',
+      tone: 'success',
+    };
+  }
+
+  if (order.refundStatus === 'pending') {
+    const disposition = order.returnStatus === 'received_quarantine'
+      ? 'Hàng hoàn đã được tiếp nhận và đưa vào khu cách ly kiểm tra.'
+      : order.returnStatus === 'received_restock'
+        ? 'Hàng hoàn đã được tiếp nhận và nhập lại tồn bán được.'
+        : 'Hàng hoàn đã được tiếp nhận.';
+    return {
+      title: 'Đang chờ hoàn tiền',
+      detail: `${disposition} Hoàn tiền đang chờ xử lý xác nhận.`,
+      tone: 'warning',
+    };
+  }
+
+  switch (order.returnStatus) {
+    case 'requested':
+      return {
+        title: 'Yêu cầu hoàn hàng đang chờ duyệt',
+        detail: 'KaitoKid đang kiểm tra yêu cầu. Chưa có thay đổi tồn kho hoặc hoàn tiền.',
+        tone: 'warning',
+      };
+    case 'approved':
+      return {
+        title: 'Yêu cầu hoàn hàng đã được duyệt',
+        detail: 'Vui lòng hoàn trả hàng theo hướng dẫn. Tồn kho chỉ cập nhật sau khi KaitoKid thực nhận hàng.',
+        tone: 'info',
+      };
+    case 'rejected':
+      return {
+        title: 'Yêu cầu hoàn hàng bị từ chối',
+        detail: 'Yêu cầu đã được KaitoKid xử lý và không tiếp tục sang bước nhận hàng hoàn.',
+        tone: 'danger',
+      };
+    case 'received_restock':
+      return {
+        title: 'Đã nhận hàng hoàn',
+        detail: 'Hàng hoàn đã được kiểm tra và nhập lại tồn bán được.',
+        tone: 'success',
+      };
+    case 'received_quarantine':
+      return {
+        title: 'Đã nhận hàng hoàn · đang cách ly',
+        detail: 'Hàng hoàn đã được tiếp nhận nhưng không cộng vào tồn bán được.',
+        tone: 'warning',
+      };
+    default:
+      return null;
+  }
+}
+
+function AfterSalesNotice({ order }: { order: CustomerOrderDTO }) {
+  const state = afterSalesState(order);
+  if (!state) return null;
+
+  const palette: Record<AfterSalesTone, { background: string; border: string; color: string }> = {
+    warning: { background: '#fffbeb', border: '#fde68a', color: '#92400e' },
+    info: { background: '#eff6ff', border: '#bfdbfe', color: '#1d4ed8' },
+    success: { background: '#f0fdf4', border: '#bbf7d0', color: '#15803d' },
+    danger: { background: '#fef2f2', border: '#fecaca', color: '#b91c1c' },
+  };
+  const tone = palette[state.tone];
+
+  return (
+    <div style={{ margin: '0 16px 12px', padding: '10px 12px', background: tone.background, border: `1px solid ${tone.border}`, borderRadius: 8, color: tone.color, fontSize: 13 }}>
+      <div style={{ fontWeight: 700 }}>{state.title}</div>
+      <div style={{ marginTop: 3, lineHeight: 1.45 }}>{state.detail}</div>
+    </div>
+  );
+}
+
 function shippingStatusLabel(status?: string | null) {
   const key = (status || '').toLowerCase();
   return shippingStatusMap[key] || status?.trim() || 'Đang cập nhật';
@@ -314,6 +398,8 @@ export default function OrderTracking() {
                   </div>
                 )}
 
+                <AfterSalesNotice order={order} />
+
                 <div className="order-card-footer">
                   <span className="order-total">{formatCurrency(order.total)}</span>
                   <div className="order-actions">
@@ -341,7 +427,6 @@ export default function OrderTracking() {
                         <i className="fa fa-undo"></i> Hoàn hàng
                       </button>
                     )}
-                    {order.returnRequested && <span style={{ marginLeft: 8, color: '#92400e', fontSize: 13, fontWeight: 600 }}><i className="fa fa-clock"></i> Đã yêu cầu hoàn hàng</span>}
                     {order.status === 'completed' && (
                       <button className="btn-reorder" onClick={() => void handleReorder(order.id)} disabled={reorderingId === order.id}>
                         <i className="fa fa-redo"></i> {reorderingId === order.id ? 'Đang thêm...' : 'Mua lại'}
@@ -385,6 +470,10 @@ export default function OrderTracking() {
                     : 'Đơn vị vận chuyển đã báo giao thành công. KaitoKid chỉ tính đơn hoàn thành sau khi bạn xác nhận đã nhận.'}
                 </div>
               )}
+
+              <div style={{ marginTop: 14 }}>
+                <AfterSalesNotice order={selected} />
+              </div>
 
               <h4 style={{ margin: '20px 0 12px' }}>Sản phẩm ({selected.items.length})</h4>
               {selected.items.map((item, i) => (
