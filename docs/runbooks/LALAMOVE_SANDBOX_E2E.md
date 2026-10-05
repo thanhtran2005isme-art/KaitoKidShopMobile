@@ -9,6 +9,7 @@
 - `apps/api/.env` có sandbox credentials thật nhưng **không commit**;
 - Lalamove provider được bật trong Admin Shipping;
 - Pickup Address/Name/Phone là dữ liệu hợp lệ;
+- số điện thoại gửi Lalamove dùng chuẩn E.164, ví dụ `+84901234567`;
 - có một địa chỉ drop-off nằm trong vùng Lalamove Sandbox hỗ trợ;
 - webhook URL của Partner Portal trỏ tới HTTPS public endpoint của backend local/deploy:
   `POST /api/shipping/lalamove/webhook`.
@@ -50,12 +51,26 @@ Bổ sung vào `apps/api/.env` cho smoke test:
 
 ```env
 LALAMOVE_PICKUP_NAME=KaitoKid Sandbox
-LALAMOVE_PICKUP_PHONE=+84...
+LALAMOVE_PICKUP_PHONE=+84901234567
 LALAMOVE_SANDBOX_DROPOFF_ADDRESS=...
 LALAMOVE_SANDBOX_DROPOFF_NAME=KaitoKid Test Customer
-LALAMOVE_SANDBOX_DROPOFF_PHONE=+84...
+LALAMOVE_SANDBOX_DROPOFF_PHONE=+84909876543
 LALAMOVE_SANDBOX_CANCEL_AFTER=true
 ```
+
+Phone phải theo E.164 (`+` + mã quốc gia + số thuê bao, không khoảng trắng). Smoke script fail-fast trước khi gọi carrier nếu phone sai format.
+
+Lalamove có thể reverse-geocode từ địa chỉ. Nếu quotation trả `ERR_REVERSE_GEOCODE_FAILURE`, bổ sung **đủ cả cặp** tọa độ tương ứng:
+
+```env
+# Optional — chỉ cần khi address không reverse-geocode ổn định
+LALAMOVE_PICKUP_LAT=21.0...
+LALAMOVE_PICKUP_LNG=105.8...
+LALAMOVE_SANDBOX_DROPOFF_LAT=21.0...
+LALAMOVE_SANDBOX_DROPOFF_LNG=105.8...
+```
+
+Không khai báo riêng lẻ LAT hoặc LNG. Script sẽ từ chối một cặp thiếu và cũng kiểm tra latitude nằm trong `-90..90`, longitude trong `-180..180`.
 
 Chạy:
 
@@ -69,6 +84,8 @@ PASS khi output lần lượt xác nhận:
 2. Place Order trả `orderId` thật từ Sandbox;
 3. Get Order trả status và `shareLink` nếu provider đã cấp;
 4. Cancel trả HTTP `204` khi trạng thái cho phép.
+
+Theo contract Lalamove v3 hiện tại, `POST /v3/quotations` trả trực tiếp `stops[].stopId`; các `stopId` đó được dùng cho sender/recipient khi `POST /v3/orders`. Cancel dùng `DELETE /v3/orders/{orderId}`; `204` là success, `409 ERR_CANCELLATION_FORBIDDEN` là nhánh carrier không cho hủy.
 
 Script cố ý từ chối base URL production và key không có prefix `pk_test_` / `sk_test_`.
 
