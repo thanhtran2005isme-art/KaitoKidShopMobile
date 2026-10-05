@@ -107,6 +107,110 @@ Nếu `/checkout` vẫn báo “Chưa có sản phẩm để thanh toán” sau 
 
 Không sửa lỗi này bằng cách persist toàn bộ Product/Cart snapshot, giá, tồn kho, coupon, shipping fee hoặc payment state làm nguồn dữ liệu chính. Các giá trị commerce phải được lấy/validate lại từ backend.
 
+## payOS báo chưa được cấu hình
+
+PR #75 dùng payOS làm provider thanh toán online theo D027. Backend cần đủ ba secret:
+
+```env
+PAYOS_CLIENT_ID=...
+PAYOS_API_KEY=...
+PAYOS_CHECKSUM_KEY=...
+```
+
+Các giá trị phải lấy từ đúng Payment Channel trong payOS và chỉ đặt trong `apps/api/.env`/deployment secret. Sau khi đổi env phải restart Node API.
+
+Không đưa ba secret này vào:
+
+- `VITE_*`;
+- `EXPO_PUBLIC_*`;
+- Admin settings;
+- source/Git.
+
+`GET /api/payment/config` chỉ được expose boolean/provider status, không trả secret.
+
+## payOS tạo order nhưng Web/Mobile không hiện QR
+
+Kiểm tra theo thứ tự:
+
+1. đơn dùng online payment compatibility code `ATM`;
+2. `GET /api/payment/instructions/{MaDonHang}` với JWT đúng chủ đơn trả `provider=payos`;
+3. response có `qrUrl` và/hoặc `checkoutUrl`;
+4. `qrUrl` dạng `data:image/png;base64,...` phải được client render trực tiếp, không prepend API origin;
+5. nếu request đã tồn tại và provider GET không trả raw `qrCode`, `qrMode=payos_checkout` là hợp lệ: QR lúc này mở payOS Hosted Checkout;
+6. nếu amount provider khác `DonHang.TongTien`, backend phải reject thay vì hiển thị payment không khớp.
+
+Customer Web/Mobile không tự ghép URL VietQR từ bank/account khi payOS active.
+
+## Khách đã quét QR/trừ tiền nhưng app chưa báo thành công
+
+Mobile/Web **không đọc biến động số dư ngân hàng**. Luồng đúng là:
+
+```text
+Ngân hàng -> payOS -> signed webhook -> Node -> DB -> client poll Node -> success
+```
+
+Kiểm tra:
+
+1. backend có public HTTPS URL để payOS gọi được từ Internet;
+2. webhook đã đăng ký/confirm đúng URL:
+   `POST /api/payment/payos/webhook`;
+3. reverse proxy không chặn POST/body;
+4. `PAYOS_CHECKSUM_KEY` đúng Payment Channel;
+5. webhook amount đúng `DonHang.TongTien` và currency là VND;
+6. `DonHang.Id` đúng integer `orderCode` payOS gửi về;
+7. sau webhook hợp lệ, `DonHang.NgayThanhToan` phải có giá trị và `TrangThai='confirmed'`;
+8. Mobile/Web đang kết nối đúng Node API `:5300` và poll `/api/payment/status/{MaDonHang}`.
+
+Nếu webhook chưa tới backend thì client poll mãi vẫn pending — đây là đúng fail-safe behavior, không được cho client tự đánh dấu paid.
+
+Runbook đầy đủ:
+
+```text
+docs/runbooks/PAYOS_PAYMENT_E2E.md
+```
+
+## payOS webhook trả 400
+
+Các nguyên nhân cần phân biệt:
+
+- signature/checksum sai -> reject;
+- `currency != VND` -> reject;
+- amount khác tổng đơn -> reject;
+- payment method của đơn không phải online compatibility code -> reject;
+- malformed payload -> reject.
+
+Signed sample webhook mà payOS dùng để confirm URL có thể mang `orderCode` không tồn tại trong KaitoKid. Sau khi signature hợp lệ, trường hợp này phải ACK 2xx/ignore và **không** tạo order giả.
+
+Không “sửa” lỗi signature bằng cách tắt verify webhook.
+
+## Payment hết hạn/hủy nhưng tồn kho không được hoàn ngay
+
+Với payOS đây có thể là behavior đúng. Cancel/expiry dùng provider-first:
+
+```text
+PAID      -> confirm paid, không hoàn tồn/coupon
+PENDING   -> cancel payOS trước
+CANCELLED -> mới cancel commerce và restore
+unknown   -> fail closed
+```
+
+Nếu payOS/network đang lỗi và backend chưa xác nhận terminal state, KaitoKid cố ý không restore stock/coupon để tránh bán trùng sau một giao dịch thực tế đã vào tiền.
+
+Khi debug cần kiểm tra provider status trước khi sửa trực tiếp DB.
+
+## Payment thành công nhưng chưa tạo Lalamove shipment
+
+Với online payment, shipment chỉ được tạo **sau** verified paid. Kiểm tra:
+
+1. `NgayThanhToan` đã set;
+2. history có `payment_confirmed`;
+3. `NhaVanChuyen`/`MaDichVuVanChuyen` của order đúng provider/service đã quote;
+4. order chưa có tracking cũ;
+5. Lalamove credentials/config đúng;
+6. nếu create carrier thất bại, xử lý theo Lalamove hardened lifecycle của PR #75; không giả trạng thái shipped.
+
+Duplicate payOS webhook không được tạo shipment lần hai.
+
 ## Product/Lookbook media lỗi
 
 Node mount shared `apps/web/public` và giữ branded fallback cho `/products/*` và `/lookbook/*`. Nếu media mới vẫn 404:
