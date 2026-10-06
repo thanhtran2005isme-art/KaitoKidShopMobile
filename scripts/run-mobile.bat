@@ -5,7 +5,6 @@ title KaitoKid - Expo Mobile
 
 for %%I in ("%~dp0..") do set "ROOT=%%~fI"
 set "MOBILE=%ROOT%\apps\mobile"
-set "PATH=%PATH%;%LOCALAPPDATA%\Android\Sdk\platform-tools"
 set "PORT_PREP=%ROOT%\scripts\prepare-expo-port.ps1"
 
 if not exist "%MOBILE%\package.json" (
@@ -41,31 +40,61 @@ set "EXPO_PUBLIC_NODE_API_URL="
 set "EXPO_PACKAGER_PROXY_URL="
 set "EXPO_HOST_FLAG=--lan"
 set "ADB_REVERSE_COUNT=0"
+set "ADB_DEVICE_COUNT=0"
+set "ADB_UNAUTHORIZED_COUNT=0"
+set "ADB_BIN="
 
 echo [EXPO] Kiem tra cong Metro 8081...
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%PORT_PREP%" -Port 8081
 if errorlevel 1 goto :port_error
 
-where adb >nul 2>&1
-if not errorlevel 1 (
-  adb start-server >nul 2>&1
-  for /f "skip=1 tokens=1,2" %%A in ('adb devices') do if "%%B"=="device" (
-    adb -s "%%A" reverse --remove tcp:8081 >nul 2>&1
-    adb -s "%%A" reverse --remove tcp:5300 >nul 2>&1
-    adb -s "%%A" reverse tcp:8081 tcp:8081 >nul 2>&1
-    if not errorlevel 1 (
-      adb -s "%%A" reverse tcp:5300 tcp:5300 >nul 2>&1
-      if not errorlevel 1 (
-        set /a ADB_REVERSE_COUNT+=1
-        echo [ADB] %%A: reverse 8081/5300 OK.
-      ) else (
-        adb -s "%%A" reverse --remove tcp:8081 >nul 2>&1
-        echo [CANH BAO] %%A: reverse 5300 that bai, bo USB mode cho thiet bi nay.
+rem Tim ADB theo thu tu: PATH -> ANDROID_SDK_ROOT -> ANDROID_HOME -> Android Studio mac dinh -> C:\platform-tools.
+for /f "delims=" %%A in ('where adb 2^>nul') do if not defined ADB_BIN set "ADB_BIN=%%~fA"
+if not defined ADB_BIN if defined ANDROID_SDK_ROOT if exist "!ANDROID_SDK_ROOT!\platform-tools\adb.exe" set "ADB_BIN=!ANDROID_SDK_ROOT!\platform-tools\adb.exe"
+if not defined ADB_BIN if defined ANDROID_HOME if exist "!ANDROID_HOME!\platform-tools\adb.exe" set "ADB_BIN=!ANDROID_HOME!\platform-tools\adb.exe"
+if not defined ADB_BIN if exist "%LOCALAPPDATA%\Android\Sdk\platform-tools\adb.exe" set "ADB_BIN=%LOCALAPPDATA%\Android\Sdk\platform-tools\adb.exe"
+if not defined ADB_BIN if exist "C:\platform-tools\adb.exe" set "ADB_BIN=C:\platform-tools\adb.exe"
+
+if defined ADB_BIN (
+  echo [ADB] Su dung: !ADB_BIN!
+  "!ADB_BIN!" start-server >nul 2>&1
+  for /f "skip=1 tokens=1,2" %%A in ('"!ADB_BIN!" devices 2^>nul') do (
+    if not "%%A"=="" (
+      if "%%B"=="device" (
+        set /a ADB_DEVICE_COUNT+=1
+        "!ADB_BIN!" -s "%%A" reverse --remove tcp:8081 >nul 2>&1
+        "!ADB_BIN!" -s "%%A" reverse --remove tcp:5300 >nul 2>&1
+        "!ADB_BIN!" -s "%%A" reverse tcp:8081 tcp:8081 >nul 2>&1
+        if not errorlevel 1 (
+          "!ADB_BIN!" -s "%%A" reverse tcp:5300 tcp:5300 >nul 2>&1
+          if not errorlevel 1 (
+            set /a ADB_REVERSE_COUNT+=1
+            echo [ADB] %%A: reverse 8081/5300 OK.
+          ) else (
+            "!ADB_BIN!" -s "%%A" reverse --remove tcp:8081 >nul 2>&1
+            echo [CANH BAO] %%A: reverse 5300 that bai, bo USB mode cho thiet bi nay.
+          )
+        ) else (
+          echo [CANH BAO] %%A: reverse 8081 that bai.
+        )
+      ) else if "%%B"=="unauthorized" (
+        set /a ADB_UNAUTHORIZED_COUNT+=1
+        echo [CANH BAO] %%A: ADB unauthorized - mo khoa dien thoai va chap nhan RSA USB debugging.
+      ) else if not "%%B"=="" (
+        echo [CANH BAO] %%A: ADB state = %%B.
       )
-    ) else (
-      echo [CANH BAO] %%A: reverse 8081 that bai.
     )
   )
+  if !ADB_DEVICE_COUNT! EQU 0 (
+    if !ADB_UNAUTHORIZED_COUNT! GTR 0 (
+      echo [ADB] Chua co thiet bi authorized. Expo se dung LAN cho den khi chap nhan RSA.
+    ) else (
+      echo [ADB] Khong co thiet bi Android o trang thai device. Expo se dung LAN.
+    )
+  )
+) else (
+  echo [CANH BAO] Khong tim thay adb.exe trong PATH, ANDROID_SDK_ROOT, ANDROID_HOME, Android SDK mac dinh hoac C:\platform-tools.
+  echo [CANH BAO] Expo se dung LAN; neu LAN bi client isolation/firewall thi Expo Go co the xoay mai khi tai bundle.
 )
 
 if !ADB_REVERSE_COUNT! GTR 0 (
