@@ -1,8 +1,9 @@
 /**
- * 52 bảng hiện có trong backend/Database/KaitoKid_MariaDB.sql trên main
- * sau khi đã bao gồm migration xác nhận email đăng ký.
+ * Contract bảng MariaDB hiện hành của KaitoKid.
  *
- * Đây là contract bảo toàn dữ liệu khi chuyển C# -> Node.
+ * 52 bảng nền từ database/KaitoKid_MariaDB.sql + 3 bảng Ví KaitoKid được
+ * bổ sung bởi migration 20261006_wallet_refund_withdrawal.sql.
+ * Đây là contract bảo toàn dữ liệu khi Node API khởi động/audit database.
  */
 export const LEGACY_TABLES = [
   "NguoiDung", "DanhMuc", "SanPham", "ThuocTinhSanPham", "BoSuuTap",
@@ -16,6 +17,7 @@ export const LEGACY_TABLES = [
   "HomepageBlock", "LookbookHotspot", "LichSuDiem", "DangKyNewsletter", "BangSize",
   "CauHoiSanPham", "PhienXemSanPham", "GioiThieu", "LichSuTrangThaiVanChuyen",
   "VaiTro", "QuyenHan", "VaiTro_QuyenHan", "NhanVien", "LichSuDangNhapNV",
+  "ViDienTu", "GiaoDichVi", "YeuCauRutTien",
 ] as const;
 
 export const LEGACY_TABLE_COUNT = LEGACY_TABLES.length;

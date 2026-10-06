@@ -17,8 +17,8 @@ try {
     throw "Node API is not running at $BaseUrl. Run scripts\run-node-cutover.bat first. $($_.Exception.Message)"
 }
 
-if ($health.status -ne 'ok' -or $health.database.expectedTables -ne 52 -or $health.database.actualTables -ne 52) {
-    throw 'Health/DB audit is not 52/52; destructive race gate is blocked.'
+if ($health.status -ne 'ok' -or $health.database.expectedTables -ne 55 -or $health.database.actualTables -ne 55) {
+    throw 'Health/DB audit is not 55/55; destructive race gate is blocked.'
 }
 
 if (-not (Test-Path $EnvFile)) {
