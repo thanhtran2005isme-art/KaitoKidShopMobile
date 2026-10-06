@@ -62,14 +62,75 @@ export class AdminCustomersController {
     const rows = await this.prisma.$queryRawUnsafe<JsonRecord[]>(
       `SELECT n.Id, n.HoTen, n.Email, n.SoDienThoai, n.VaiTro, n.TrangThai, n.NgayTao,
               (SELECT COUNT(*) FROM DonHang d WHERE d.NguoiDungId=n.Id) AS OrderCount,
-              COALESCE((SELECT SUM(d.TongTien) FROM DonHang d WHERE d.NguoiDungId=n.Id AND d.TrangThai='completed'),0) AS TotalSpent
+              (SELECT COUNT(*) FROM DonHang d WHERE d.NguoiDungId=n.Id AND d.TrangThai='completed') AS CompletedOrders,
+              (SELECT COUNT(*) FROM DonHang d WHERE d.NguoiDungId=n.Id AND d.TrangThai='cancelled') AS CancelledOrders,
+              COALESCE((SELECT SUM(d.TongTien) FROM DonHang d WHERE d.NguoiDungId=n.Id AND d.TrangThai='completed'),0) AS TotalSpent,
+              COALESCE((SELECT AVG(d.TongTien) FROM DonHang d WHERE d.NguoiDungId=n.Id AND d.TrangThai='completed'),0) AS AverageOrderValue,
+              (SELECT MIN(d.NgayTao) FROM DonHang d WHERE d.NguoiDungId=n.Id) AS FirstOrderAt,
+              (SELECT MAX(d.NgayTao) FROM DonHang d WHERE d.NguoiDungId=n.Id) AS LastOrderAt,
+              (SELECT d.TrangThai FROM DonHang d WHERE d.NguoiDungId=n.Id ORDER BY d.NgayTao DESC, d.Id DESC LIMIT 1) AS LastOrderStatus,
+              (SELECT MAX(d.NgayTao) FROM DonHang d WHERE d.NguoiDungId=n.Id AND d.TrangThai='completed') AS LastCompletedOrderAt
        FROM NguoiDung n WHERE ${where}
        ORDER BY n.NgayTao DESC LIMIT ? OFFSET ?`,
       ...params,
       pageSize,
       offset,
     );
-    return { items: jsonRows(rows), total: Number(totals[0]?.total ?? 0), page, pageSize };
+    const total = Number(totals[0]?.total ?? 0);
+    return { items: jsonRows(rows), total, page, pageSize, totalPages: Math.ceil(total / pageSize) };
+  }
+
+  @Get(":id/analytics")
+  async analytics(@CurrentUser() user: AuthenticatedUser, @Param("id") rawId: string) {
+    assertStaffPermission(user, "customers.view");
+    const id = intPath(rawId);
+    const customerRows = await this.prisma.$queryRawUnsafe<Array<{ Id: unknown }>>(
+      "SELECT Id FROM NguoiDung WHERE Id=? AND VaiTro='user' LIMIT 1",
+      id,
+    );
+    if (!customerRows[0]) throw new NotFoundException();
+
+    const [orderRows, productRows, categoryRows] = await Promise.all([
+      this.prisma.$queryRawUnsafe<JsonRecord[]>(
+        `SELECT d.Id, d.MaDonHang AS OrderCode, d.TongTien AS Total, d.TrangThai AS Status,
+                d.NgayTao AS CreatedAt, COUNT(ct.Id) AS ItemCount
+         FROM DonHang d
+         LEFT JOIN ChiTietDonHang ct ON ct.DonHangId=d.Id
+         WHERE d.NguoiDungId=?
+         GROUP BY d.Id, d.MaDonHang, d.TongTien, d.TrangThai, d.NgayTao
+         ORDER BY d.NgayTao DESC, d.Id DESC`,
+        id,
+      ),
+      this.prisma.$queryRawUnsafe<JsonRecord[]>(
+        `SELECT ct.TenSanPham AS Product, SUM(ct.SoLuong) AS Quantity
+         FROM DonHang d
+         JOIN ChiTietDonHang ct ON ct.DonHangId=d.Id
+         WHERE d.NguoiDungId=? AND d.TrangThai='completed'
+         GROUP BY ct.SanPhamId, ct.TenSanPham
+         ORDER BY Quantity DESC, Product ASC
+         LIMIT 4`,
+        id,
+      ),
+      this.prisma.$queryRawUnsafe<JsonRecord[]>(
+        `SELECT COALESCE(NULLIF(TRIM(p.DanhMuc), ''), 'Khác') AS Category, SUM(ct.SoLuong) AS Quantity
+         FROM DonHang d
+         JOIN ChiTietDonHang ct ON ct.DonHangId=d.Id
+         LEFT JOIN SanPham p ON p.Id=ct.SanPhamId
+         WHERE d.NguoiDungId=? AND d.TrangThai='completed'
+         GROUP BY Category
+         ORDER BY Quantity DESC, Category ASC
+         LIMIT 3`,
+        id,
+      ),
+    ]);
+
+    const products = jsonRows(productRows);
+    const categories = jsonRows(categoryRows);
+    return {
+      topCategories: categories.map((row) => String(row.category ?? "")).filter(Boolean),
+      purchasedProducts: products.map((row) => String(row.product ?? "")).filter(Boolean),
+      orders: jsonRows(orderRows),
+    };
   }
 
   @Get(":id")
@@ -79,7 +140,14 @@ export class AdminCustomersController {
     const rows = await this.prisma.$queryRawUnsafe<JsonRecord[]>(
       `SELECT n.Id, n.HoTen, n.Email, n.SoDienThoai, n.VaiTro, n.TrangThai, n.NgayTao,
               (SELECT COUNT(*) FROM DonHang d WHERE d.NguoiDungId=n.Id) AS orderCount,
-              COALESCE((SELECT SUM(d.TongTien) FROM DonHang d WHERE d.NguoiDungId=n.Id AND d.TrangThai='completed'),0) AS totalSpent
+              (SELECT COUNT(*) FROM DonHang d WHERE d.NguoiDungId=n.Id AND d.TrangThai='completed') AS completedOrders,
+              (SELECT COUNT(*) FROM DonHang d WHERE d.NguoiDungId=n.Id AND d.TrangThai='cancelled') AS cancelledOrders,
+              COALESCE((SELECT SUM(d.TongTien) FROM DonHang d WHERE d.NguoiDungId=n.Id AND d.TrangThai='completed'),0) AS totalSpent,
+              COALESCE((SELECT AVG(d.TongTien) FROM DonHang d WHERE d.NguoiDungId=n.Id AND d.TrangThai='completed'),0) AS averageOrderValue,
+              (SELECT MIN(d.NgayTao) FROM DonHang d WHERE d.NguoiDungId=n.Id) AS firstOrderAt,
+              (SELECT MAX(d.NgayTao) FROM DonHang d WHERE d.NguoiDungId=n.Id) AS lastOrderAt,
+              (SELECT d.TrangThai FROM DonHang d WHERE d.NguoiDungId=n.Id ORDER BY d.NgayTao DESC, d.Id DESC LIMIT 1) AS lastOrderStatus,
+              (SELECT MAX(d.NgayTao) FROM DonHang d WHERE d.NguoiDungId=n.Id AND d.TrangThai='completed') AS lastCompletedOrderAt
        FROM NguoiDung n WHERE n.Id=? AND n.VaiTro='user' LIMIT 1`,
       id,
     );

@@ -133,3 +133,21 @@ test("raw MariaDB rows are converted to ASP.NET-compatible camelCase JSON", () =
     tongTien: 120000,
   });
 });
+
+test("customer purchase analytics use NguoiDungId and completed orders for value and interests", () => {
+  assert.ok(catalogSource.includes('@Get(":id/analytics")'));
+  assert.ok(catalogSource.includes("d.NguoiDungId=n.Id AND d.TrangThai='completed'"));
+  assert.ok(catalogSource.includes("SUM(d.TongTien) FROM DonHang d WHERE d.NguoiDungId=n.Id AND d.TrangThai='completed'"));
+  assert.ok(catalogSource.includes("AVG(d.TongTien) FROM DonHang d WHERE d.NguoiDungId=n.Id AND d.TrangThai='completed'"));
+
+  const analyticsStart = catalogSource.indexOf('@Get(":id/analytics")');
+  const customerDetailStart = catalogSource.indexOf('@Get(":id")', analyticsStart);
+  const analyticsSource = catalogSource.slice(analyticsStart, customerDetailStart);
+  const completedFilters = analyticsSource.match(/WHERE d\.NguoiDungId=\? AND d\.TrangThai='completed'/g) || [];
+
+  assert.equal(completedFilters.length, 2, "top products and categories must both use completed orders");
+  assert.ok(analyticsSource.includes("WHERE d.NguoiDungId=?"));
+  assert.ok(analyticsSource.includes("JOIN ChiTietDonHang"));
+  assert.ok(analyticsSource.includes("LEFT JOIN SanPham"));
+  assert.doesNotMatch(analyticsSource, /Email|SoDienThoai/);
+});
