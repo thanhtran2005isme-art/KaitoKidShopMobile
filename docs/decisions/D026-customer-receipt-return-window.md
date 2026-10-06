@@ -1,6 +1,7 @@
 # D026 — Carrier giao thành công không đồng nghĩa khách đã nhận hàng
 
-**Ngày:** 2026-10-05
+**Ngày:** 2026-10-05  
+**Cập nhật:** 2026-10-06
 
 ## Quyết định
 
@@ -8,17 +9,18 @@ KaitoKid tách rõ các mốc nghiệp vụ hậu mãi:
 
 1. đơn vị vận chuyển báo giao thành công (`TrangThaiVanChuyen = delivered`);
 2. khách hàng xác nhận thực sự đã nhận hàng (`received_by_customer` + `NgayHoanThanh`);
-3. khách gửi yêu cầu hoàn (`return_requested`);
+3. khách gửi yêu cầu hoàn trong **15 ngày** kể từ mốc xác nhận nhận hàng;
 4. Admin duyệt/từ chối yêu cầu;
 5. hàng hoàn thực tế quay về, được kiểm tra và phân luồng `restock` hoặc `quarantine`;
-6. hoàn tiền được đối soát riêng.
+6. khi bước nhận/kiểm hàng hoàn hoàn tất, tiền được credit vào **Ví KaitoKid** trong cùng transaction;
+7. khách dùng số dư cho đơn mới hoặc tạo yêu cầu rút tiền theo D028.
 
 Carrier không được tự hoàn tất business order. `NgayHoanThanh` một mình cũng không đủ authority; bằng chứng khách nhận hàng phải có history marker `received_by_customer`.
 
 ## Quy tắc khách hàng
 
 - Khi carrier đã báo giao nhưng khách chưa xác nhận, backend trả `canConfirmReceived=true` và `canReportNotReceived=true`.
-- `Đã nhận hàng` ghi `NgayHoanThanh`, chuyển `TrangThai=completed`, `TrangThaiVanChuyen=received_by_customer` và bắt đầu cửa sổ hoàn hàng 7 ngày.
+- `Đã nhận hàng` ghi `NgayHoanThanh`, chuyển `TrangThai=completed`, `TrangThaiVanChuyen=received_by_customer` và bắt đầu cửa sổ hoàn hàng **15 ngày**.
 - `Chưa nhận được hàng` chuyển vận chuyển sang `delivery_disputed`, giữ business order ở `shipping`, ghi lịch sử để đối soát. Hành động này **không** tự hủy đơn, hoàn tiền, hoàn coupon hay nhập lại tồn kho.
 - Polling/webhook carrier không được ghi đè `delivery_disputed`, `received_by_customer` hoặc business state `returned`.
 
@@ -26,37 +28,26 @@ Carrier không được tự hoàn tất business order. `NgayHoanThanh` một m
 
 Review chỉ được tạo khi đơn đúng owner, đúng order/product/variant, `DonHang.TrangThai=completed`, `NgayHoanThanh IS NOT NULL` và tồn tại marker `received_by_customer`.
 
-## Cửa sổ hoàn hàng 7 ngày
+## Cửa sổ hoàn hàng 15 ngày
 
 - Mốc thời gian duy nhất: thời điểm khách xác nhận nhận hàng.
-- Hạn gửi yêu cầu = `NgayHoanThanh + 7 ngày`.
+- Hạn gửi yêu cầu = `NgayHoanThanh + 15 ngày`.
 - Customer chỉ được mở một case hoàn cho mỗi đơn. Sau khi case đã được duyệt, từ chối hoặc nhận hàng hoàn, client không tự tạo case mới.
 - `return_requested` và các quyết định hậu mãi nằm trong `LichSuTrangThaiVanChuyen`; không thêm enum giả vào `DonHang.TrangThai`.
 - Customer DTO trả `returnStatus` theo marker mới nhất thay vì chỉ kiểm tra “đã từng có request hay chưa”.
+- Backend là authority của deadline; việc ẩn nút ở Web/Mobile không thay thế kiểm tra server-side.
 
 ## Projection hậu mãi cho Customer Web/Mobile
 
-Customer DTO phải trả riêng hai trục trạng thái, đều lấy từ **marker mới nhất có authority** trong `LichSuTrangThaiVanChuyen`:
+Customer DTO trả riêng hai trục trạng thái, lấy từ **marker mới nhất có authority** trong `LichSuTrangThaiVanChuyen`:
 
-- `returnStatus`:
-  - `none`
-  - `requested`
-  - `approved`
-  - `rejected`
-  - `received_restock`
-  - `received_quarantine`
+- `returnStatus`: `none`, `requested`, `approved`, `rejected`, `received_restock`, `received_quarantine`;
 - `refundStatus`:
-  - `none`
-  - `pending` từ marker `refund_pending`
-  - `completed` từ marker `refund_completed_manual`.
+  - `none`;
+  - `pending` chỉ còn dùng cho dữ liệu legacy có marker `refund_pending`;
+  - `completed` khi có `refund_wallet_credited` hoặc marker legacy `refund_completed_manual`.
 
-UI Customer Web/Mobile không được suy hoàn tiền từ `DonHang.TrangThai=returned`. Khi cùng lúc có return state và refund state, trạng thái refund có độ ưu tiên hiển thị cao hơn vì phản ánh bước hậu mãi mới hơn:
-
-1. `refundStatus=completed` → “Đã ghi nhận hoàn tiền”;
-2. `refundStatus=pending` → “Đang chờ hoàn tiền”;
-3. nếu chưa có refund marker mới hiển thị `returnStatus` hiện tại.
-
-`refundStatus=completed` chỉ có nghĩa Admin đã xác nhận hoàn tiền thủ công theo audit hiện tại; **không được mô tả như bằng chứng payment gateway đã tự refund**.
+UI không được suy hoàn tiền chỉ từ `DonHang.TrangThai=returned`. Case mới chỉ hiển thị đã hoàn tiền sau khi ledger wallet đã credit thành công và history có `refund_wallet_credited`.
 
 ## Workflow Admin hậu mãi
 
@@ -64,7 +55,7 @@ UI Customer Web/Mobile không được suy hoàn tiền từ `DonHang.TrangThai=
 
 - Admin chỉ được quyết định khi marker mới nhất là `return_requested`.
 - Duyệt ghi `return_approved`; từ chối ghi `return_rejected` cùng ghi chú.
-- Bước này **không đụng tồn kho, không đổi `DonHang.TrangThai`, không refund**.
+- Bước này **không đụng tồn kho, không đổi `DonHang.TrangThai`, không credit ví**.
 
 ### 2. Nhận hàng hoàn thực tế
 
@@ -84,18 +75,19 @@ Cả hai nhánh chỉ sau khi nhận hàng thực tế mới chuyển:
 
 - `DonHang.TrangThai = returned`;
 - `TrangThaiVanChuyen = returned`;
-- tạo marker `refund_pending`.
+- credit `DonHang.TongTien` vào Ví KaitoKid bằng ledger `refund_credit`;
+- ghi marker `refund_wallet_credited` nếu credit mới được tạo.
 
-Transaction phải khóa đơn và các dòng tồn liên quan để chống double click/race làm cộng tồn hai lần.
+Transaction phải khóa đơn, tồn kho và ví liên quan. Nếu bất kỳ bước nào lỗi thì toàn bộ thay đổi phải rollback; không được tồn tại trạng thái “đã returned nhưng chưa credit ví” do lỗi giữa chừng.
 
 ## Hoàn tiền
 
-Hiện flow hậu mãi này **không giả lập API refund gateway**.
+Case mới **không yêu cầu Admin chuyển khoản ngay trong workflow trả hàng**.
 
-- `refund_pending` chỉ có nghĩa nghiệp vụ cần hoàn tiền/đối soát.
-- Admin chỉ bấm “Xác nhận đã hoàn tiền thủ công” sau khi tiền đã được xử lý thực tế bên ngoài hệ thống.
-- Hành động đó ghi `refund_completed_manual` kèm mã tham chiếu/ghi chú.
-- Marker audit không được mô tả như bằng chứng gateway tự refund.
+- Tiền hoàn được cộng vào Ví KaitoKid đúng một lần theo `orderId`.
+- Khách có thể dùng số dư mua tiếp hoặc yêu cầu rút về ngân hàng theo D028.
+- Endpoint `refund-completed`/marker `refund_completed_manual` chỉ còn để xử lý case legacy đã tồn tại ở `refund_pending` trước khi Ví KaitoKid được triển khai.
+- Không mô tả marker legacy là bằng chứng gateway tự refund.
 
 ## Coupon
 
@@ -108,15 +100,20 @@ Endpoint cập nhật trạng thái legacy `/api/admin/orders/:id/status` không
 - `completed`: chỉ customer `confirm-received` mới có authority;
 - `returned`: chỉ workflow hậu mãi sau khi nhận hàng hoàn mới có authority.
 
-Admin vẫn được vận hành `pending → confirmed → shipping` và hủy theo rule hiện hành.
+Nhận hàng hoàn hiện đồng thời phát sinh credit tiền nên endpoint này phải có cả:
+
+- `orders.update_status`;
+- `inventory.manage`;
+- `wallet.manage`.
 
 ## Tương thích dữ liệu cũ
 
 Nếu dữ liệu cũ có `TrangThai=completed`, carrier status `delivered/completed` nhưng thiếu marker `received_by_customer`, Customer API phải trình bày đơn như đang chờ khách xác nhận. Receipt-aware Lalamove wrapper phải xóa completion timestamp không có authority thay vì hợp thức hóa nó.
 
+Case cũ đã có `refund_pending` vẫn được đọc/hiển thị và có thể hoàn tất thủ công bằng endpoint legacy. Case mới không tạo `refund_pending` nữa.
+
 ## Hệ quả kỹ thuật
 
-- Không thêm bảng/cột DB mới trong thay đổi này.
-- Dùng `DonHang`, `LichSuTrangThaiVanChuyen`, `SanPham`, `TonKhoBienThe`, `TonKho_LichSu` hiện có.
-- UI Customer/Admin không tự suy quyền từ label; action được backend/state machine quyết định.
+- Hậu mãi dùng thêm subsystem Ví KaitoKid được định nghĩa tại D028.
 - `returned` là business state đã tồn tại trong schema và chỉ dùng khi hàng hoàn thực tế đã được nhận/kiểm tra.
+- UI Customer/Admin không tự suy quyền từ label; action được backend/state machine quyết định.

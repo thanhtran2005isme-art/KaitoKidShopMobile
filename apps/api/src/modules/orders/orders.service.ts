@@ -9,6 +9,7 @@ import { distinctPositiveIds } from "../cart/cart.helpers.js";
 import { CouponService } from "../coupons/coupon.service.js";
 import { loadPaymentSettings } from "../payment/payment-settings.js";
 import { ShippingService } from "../shipping/shipping.service.js";
+import { WalletService } from "../wallet/wallet.service.js";
 import {
   canCancelOrder,
   canonicalShippingAddress,
@@ -32,6 +33,7 @@ interface CreateOrderInput {
   shippingDistrict?: unknown;
   shippingWard?: unknown;
   shippingStreet?: unknown;
+  useWallet?: unknown;
 }
 
 interface CartCheckoutRow {
@@ -104,13 +106,15 @@ export class OrdersService {
     private readonly shipping: ShippingService,
     private readonly inventory: OrderInventoryService,
     private readonly email: AuthEmailService,
+    private readonly wallet: WalletService,
   ) {}
 
   async createOrder(userId: number, input: CreateOrderInput) {
     const selectedIds = this.parseSelectedIds(input.cartItemIds);
+    const useWallet = this.boolean(input.useWallet);
 
     // Quote shipping phải chạy ngoài interactive transaction để không giữ
-    // row-lock trong lúc chờ GHN/GHTK. Sau đó transaction revalidate snapshot.
+    // row-lock trong lúc chờ provider. Transaction phía dưới revalidate snapshot.
     const snapshot = await this.loadCheckoutCart(
       this.prisma,
       userId,
@@ -282,9 +286,7 @@ export class OrdersService {
         );
         if (productVariants.length > 0) {
           const variant = productVariants.find(
-            (value) =>
-              value.size === item.size &&
-              value.color === item.color,
+            (value) => value.size === item.size && value.color === item.color,
           );
           if (!variant || toNumber(variant.stock) < quantity) {
             throw new BadRequestException(
@@ -325,14 +327,10 @@ export class OrdersService {
       const comboDiscount = combo.eligible ? combo.discount : 0;
       const totalDiscount = couponDiscount + comboDiscount;
 
-      // Provider/service đã quote ngoài transaction; cart/address đã revalidate.
       shippingProvider = quotedShipping.provider;
       shippingServiceCode = quotedShipping.serviceCode;
       const shippingFee = quotedShipping.fee;
-      const total = Math.max(
-        0,
-        subtotal - totalDiscount + shippingFee,
-      );
+      const total = Math.max(0, subtotal - totalDiscount + shippingFee);
       const now = new Date();
       const orderCode = this.orderCode(now);
       const paymentExpiresAt =
@@ -377,6 +375,28 @@ export class OrdersService {
         "SELECT LAST_INSERT_ID() AS id",
       );
       const orderId = toNumber(ids[0]?.id);
+
+      const walletUsed = await this.wallet.debitOrderInTransaction(
+        tx,
+        userId,
+        orderId,
+        orderCode,
+        total,
+        useWallet,
+      );
+      const amountDue = Math.max(0, total - walletUsed);
+      const paidInFullByWallet = amountDue === 0 && total > 0;
+      if (paidInFullByWallet) {
+        await tx.$executeRawUnsafe(
+          `UPDATE DonHang
+           SET TrangThai = 'confirmed', NgayThanhToan = ?, HetHanThanhToan = NULL,
+               NgayCapNhat = ?
+           WHERE Id = ?`,
+          now,
+          now,
+          orderId,
+        );
+      }
 
       for (const item of lockedCart) {
         const productId = toNumber(item.productId);
@@ -457,6 +477,9 @@ export class OrdersService {
         paymentMethod,
         shippingProvider,
         shippingServiceCode,
+        walletUsed,
+        amountDue,
+        paidInFullByWallet,
       };
     });
 
@@ -467,7 +490,16 @@ export class OrdersService {
       "Hệ thống KaitoKid",
     );
 
-    if (result.paymentMethod === "COD") {
+    if (result.paidInFullByWallet) {
+      await this.shipping.appendHistory(
+        result.orderId,
+        "payment_confirmed",
+        "Đơn hàng đã được thanh toán toàn bộ bằng số dư Ví KaitoKid",
+        "Hệ thống KaitoKid",
+      );
+    }
+
+    if (result.paymentMethod === "COD" || result.paidInFullByWallet) {
       await this.shipping.createShippingOrder(
         result.orderId,
         result.shippingProvider,
@@ -523,11 +555,12 @@ export class OrdersService {
     const cancelled = await this.prisma.$transaction(async (tx) => {
       const rows = await tx.$queryRawUnsafe<Array<{
         id: unknown;
+        orderCode: string;
         status: string;
         shippingStatus: string | null;
         couponCode: string | null;
       }>>(
-        `SELECT Id AS id, TrangThai AS status,
+        `SELECT Id AS id, MaDonHang AS orderCode, TrangThai AS status,
                 TrangThaiVanChuyen AS shippingStatus,
                 MaGiamGia AS couponCode
          FROM DonHang
@@ -544,6 +577,12 @@ export class OrdersService {
 
       await this.inventory.restoreStockInTransaction(tx, orderId);
       await this.coupons.restoreUsageWithClient(tx, order.couponCode);
+      await this.wallet.restoreOrderDebitInTransaction(
+        tx,
+        userId,
+        orderId,
+        order.orderCode,
+      );
       await tx.$executeRawUnsafe(
         `UPDATE DonHang
          SET TrangThai = 'cancelled',
@@ -594,6 +633,21 @@ export class OrdersService {
       userId,
       ...orderIds,
     );
+    const walletRows = await this.prisma.$queryRawUnsafe<Array<{
+      orderId: string;
+      amount: unknown;
+    }>>(
+      `SELECT ThamChieuId AS orderId, SoTien AS amount
+       FROM GiaoDichVi
+       WHERE NguoiDungId = ? AND Loai = 'order_payment'
+         AND ThamChieuLoai = 'order'
+         AND ThamChieuId IN (${this.marks(orderIds.length)})`,
+      userId,
+      ...orderIds.map(String),
+    );
+    const walletByOrder = new Map(
+      walletRows.map((row) => [toNumber(row.orderId), toNumber(row.amount)]),
+    );
     const reviewed = new Set(
       reviews.map((review) =>
         reviewedKey(
@@ -607,6 +661,8 @@ export class OrdersService {
 
     return orders.map((order) => {
       const orderId = toNumber(order.id);
+      const total = toNumber(order.total);
+      const walletUsed = walletByOrder.get(orderId) ?? 0;
       return {
         id: orderId,
         orderCode: order.orderCode,
@@ -617,7 +673,9 @@ export class OrdersService {
         subtotal: toNumber(order.subtotal),
         shippingFee: toNumber(order.shippingFee),
         discount: toNumber(order.discount),
-        total: toNumber(order.total),
+        total,
+        walletUsed,
+        amountDue: Math.max(0, total - walletUsed),
         couponCode: order.couponCode,
         paymentMethod: order.paymentMethod,
         status: order.status,
@@ -730,10 +788,7 @@ export class OrdersService {
     );
   }
 
-  private sameCartIdentity(
-    left: CartCheckoutRow[],
-    right: CartCheckoutRow[],
-  ): boolean {
+  private sameCartIdentity(left: CartCheckoutRow[], right: CartCheckoutRow[]): boolean {
     const signature = (items: CartCheckoutRow[]) =>
       items
         .map((item) => [
@@ -761,6 +816,12 @@ export class OrdersService {
       );
     }
     return distinctPositiveIds(numeric);
+  }
+
+  private boolean(value: unknown): boolean {
+    if (value === true || value === 1) return true;
+    if (typeof value !== "string") return false;
+    return /^(1|true|yes|on)$/i.test(value.trim());
   }
 
   private text(value: unknown, fallback = ""): string {

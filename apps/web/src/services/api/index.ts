@@ -32,6 +32,7 @@ export { locationApi, type Province, type District, type Ward } from './location
 export { supplierApi, type SupplierDTO, type CreateSupplierPayload } from './supplierApi';
 export { stockReceiptApi, type StockReceiptDTO, type StockReceiptItemDTO, type StockReceiptListItem, type CreateStockReceiptPayload, type CreateStockReceiptItemPayload } from './stockReceiptApi';
 export { variantStockApi, type VariantStockDTO, type ProductVariantSummary } from './variantStockApi';
+export { walletApi, adminWalletApi, type WalletSummaryDTO, type WalletTransactionDTO, type WithdrawalDTO, type CreateWithdrawalPayload } from './walletApi';
 
 export { shippingApi, type ShippingProvider, type ShippingQuoteRequest, type ShippingQuoteOption, type ShippingQuoteResponse, type ShippingTracking, type ShippingHistoryItem } from './shippingApi';
 export { adminShippingApi, type ShippingConfig as AdminShippingConfig, type ShippingTestResult, type ShippingHistoryItem as AdminShippingHistoryItem, type ShippingHistoryResponse as AdminShippingHistoryResponse, type ShippingOverview as AdminShippingOverview, type GhnProvinceItem, type GhnDistrictItem, type KaitoKidBranch } from './adminShippingApi';

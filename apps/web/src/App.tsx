@@ -32,6 +32,7 @@ import Wishlist from './pages/Wishlist';
 import WishlistShare from './pages/WishlistShare';
 import Account from './pages/Account';
 import Address from './pages/Address';
+import Wallet from './pages/Wallet';
 import Search from './pages/Search';
 import Collections from './pages/Collections';
 import Lookbook from './pages/Lookbook';
@@ -75,6 +76,7 @@ import AdminShipping from './admin/AdminShipping';
 import AdminChat from './admin/AdminChat';
 import AdminStaff from './admin/AdminStaff';
 import AdminRoles from './admin/AdminRoles';
+import AdminWallet from './admin/AdminWallet';
 
 import './App.css';
 import './styles/admin-staff.css';
@@ -120,6 +122,7 @@ function App() {
                 <Route path="/wishlist" element={<Wishlist />} />
                 <Route path="/account" element={<Account />} />
                 <Route path="/address" element={<Address />} />
+                <Route path="/wallet" element={<Wallet />} />
               </Route>
             </Route>
 
@@ -159,6 +162,9 @@ function App() {
                 <Route path="lookbook" element={<AdminLookbook />} />
                 <Route path="profile" element={<AdminProfile />} />
                 <Route path="shipping" element={<AdminShipping />} />
+                <Route element={<AdminProtectedRoute permission="wallet.view" />}>
+                  <Route path="wallet" element={<AdminWallet />} />
+                </Route>
                 {/* Nhân sự & phân quyền — gate theo quyền cụ thể */}
                 <Route element={<AdminProtectedRoute permission="staff.view" />}>
                   <Route path="staff" element={<AdminStaff />} />

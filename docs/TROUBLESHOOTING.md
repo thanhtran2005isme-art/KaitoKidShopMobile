@@ -27,17 +27,25 @@ Kiểm tra table count:
 "C:\xampp\mysql\bin\mysql.exe" -u root -e "SELECT COUNT(*) AS table_count FROM information_schema.tables WHERE table_schema='kaitokid' AND table_type='BASE TABLE';"
 ```
 
-Contract hiện tại kỳ vọng 52 bảng sau registration-email-verification migration.
+Contract hiện tại kỳ vọng **55 bảng** sau wallet migration.
 
 ## Fresh database / migration path
 
-Fresh schema:
+Fresh schema nền:
 
 ```text
 database/KaitoKid_MariaDB.sql
 ```
 
-Existing DB migrations:
+Sau khi import fresh schema nền, hoặc khi nâng DB hiện hữu, chạy:
+
+```bat
+"C:\xampp\mysql\bin\mysql.exe" -u root kaitokid < database\migrations\20261006_wallet_refund_withdrawal.sql
+```
+
+Migration này thêm `ViDienTu`, `GiaoDichVi`, `YeuCauRutTien`, RBAC `wallet.view/manage` và đồng bộ return-policy copy sang 15 ngày.
+
+Các migration khác nằm trong:
 
 ```text
 database/migrations/
@@ -51,13 +59,15 @@ Ví dụ registration verification:
 
 Không chạy `prisma migrate reset`, `prisma migrate dev` hoặc `prisma db push` trên database đang có dữ liệu.
 
-## `/health` không báo 52/52
+## `/health` không báo 55/55
 
 Chạy:
 
 ```bat
 npm --prefix apps\api run db:audit
 ```
+
+Nếu DB mới import chỉ có 52 bảng, chạy `20261006_wallet_refund_withdrawal.sql` rồi restart Node API. Không hạ table manifest/gate về 52 chỉ để làm health xanh.
 
 Nếu tên bảng bị lệch casing trên Windows, audit phải tôn trọng `@@lower_case_table_names`; không tự rename bảng chỉ để làm audit xanh.
 
@@ -145,7 +155,91 @@ Nếu `/checkout` vẫn báo “Chưa có sản phẩm để thanh toán” sau 
 4. nếu cart API lỗi tạm thời, không xóa selection để tránh mất dữ liệu do network transient;
 5. nếu item đã bị xóa/checkout ở nơi khác, ID stale sẽ bị loại khi đối chiếu với cart server.
 
-Không sửa lỗi này bằng cách persist toàn bộ Product/Cart snapshot, giá, tồn kho, coupon, shipping fee hoặc payment state làm nguồn dữ liệu chính. Các giá trị commerce phải được lấy/validate lại từ backend.
+Không persist toàn bộ Product/Cart snapshot, giá, tồn kho, coupon, shipping fee hoặc payment state làm source of truth.
+
+## Ví KaitoKid không xuất hiện / API báo thiếu bảng
+
+Kiểm tra `/health` trước. Nếu chưa 55/55, chạy wallet migration:
+
+```bat
+"C:\xampp\mysql\bin\mysql.exe" -u root kaitokid < database\migrations\20261006_wallet_refund_withdrawal.sql
+```
+
+Sau đó restart Node API và kiểm tra:
+
+- `GET /api/wallet`
+- `GET /api/wallet/transactions`
+- Customer Web `/wallet`
+- Mobile `account/wallet`
+
+Không tạo balance giả ở localStorage/client để “sửa” màn hình trống.
+
+## Checkout dùng ví nhưng payOS vẫn yêu cầu nguyên `TongTien`
+
+Backend phải là authority của hai số:
+
+```text
+walletUsed = net order_payment - order_payment_reversal
+amountDue  = TongTien - walletUsed
+```
+
+Kiểm tra:
+
+1. order DTO có `walletUsed` và `amountDue` đúng;
+2. payment instructions trả `total=amountDue`;
+3. payOS payment amount cũng bằng `amountDue`;
+4. Web/Mobile chỉ gửi `useWallet`, không gửi số tiền ví tự tính làm authority;
+5. nếu order đã cancel/expire, projection phải tính reversal để `walletUsed` trở về 0.
+
+Không sửa bằng cách đổi `DonHang.TongTien`; trường đó luôn là full order total.
+
+## Hủy/hết hạn đơn nhưng số dư ví không trở lại
+
+Kiểm tra ledger `GiaoDichVi` theo order reference:
+
+- phải có `order_payment` nếu ví từng bị debit;
+- cancel/expiry hợp lệ phải có đúng một `order_payment_reversal`;
+- unique idempotency cấm reversal trùng cùng order/type.
+
+Với ATM/payOS, cancel/expiry phải provider-first. Nếu provider đã paid hoặc chưa xác nhận cancel, backend **không** được local-restore inventory/coupon/wallet.
+
+## Refund return chưa vào Ví KaitoKid
+
+Flow mới chỉ credit tiền khi:
+
+1. customer đã xác nhận nhận hàng;
+2. return request trong 15 ngày;
+3. Admin approve;
+4. hàng vật lý đã quay về;
+5. Admin chọn `restock` hoặc `quarantine` và xác nhận kiểm hàng.
+
+Trong transaction bước 5 phải có marker `refund_wallet_credited` và ledger `refund_credit`. Dữ liệu `refund_pending/refund_completed_manual` chỉ dành cho case legacy.
+
+## Withdrawal bị treo / số dư nằm ở “tạm giữ”
+
+State machine:
+
+```text
+pending -> approved -> completed
+pending/approved -> rejected
+```
+
+- tạo request: available giảm, held tăng;
+- approve: chưa đổi balance;
+- reject: held trả về available;
+- complete: held giảm sau khi Admin đã chuyển khoản thực tế và nhập bank reference.
+
+Admin cần `wallet.view` để xem và `wallet.manage` để duyệt/từ chối/hoàn tất. Không chỉnh trực tiếp `ViDienTu` bằng UI/admin form.
+
+## Không hủy được tài khoản vì Ví KaitoKid
+
+Đây là guard chủ ý. Account deletion bị chặn nếu:
+
+- `SoDuKhaDung > 0`;
+- `SoDuTamGiu > 0`;
+- hoặc còn withdrawal `pending/approved`.
+
+Khách phải xử lý/rút hết tiền và hoàn tất các yêu cầu đang chạy trước khi anonymize account.
 
 ## payOS không xuất hiện ở Checkout
 
@@ -160,18 +254,18 @@ PAYOS_CHECKSUM_KEY
 Kiểm tra `GET /api/payment/config`:
 
 - `payOsConfigured=true` và `paymentProvider=payos` khi provider active;
-- `supportedMethods` phải có `ATM` khi payOS active;
+- `supportedMethods` có `ATM` khi payOS active;
 - nếu `payosEnabled=false` trong payment settings thì ATM bị tắt dù credentials đúng.
 
-Các key `bankEnabled`, `enableBankTransfer`, `bankAccounts` hoặc VietQR legacy **không còn được phép bật ATM cho đơn mới**. Không sửa bằng cách bật lại manual VietQR fallback.
+Các key `bankEnabled`, `enableBankTransfer`, `bankAccounts` hoặc VietQR legacy **không còn được phép bật ATM cho đơn mới**.
 
 ## payOS QR có nhưng đơn không tự thành công
 
 1. xác nhận public HTTPS webhook trỏ đúng `POST /api/payment/payos/webhook`;
 2. kiểm tra payment channel payOS đã confirm webhook URL;
 3. không dùng return/cancel URL trình duyệt để đánh dấu paid;
-4. webhook phải pass checksum, `currency=VND`, amount đúng `DonHang.TongTien` và order mapping theo D027;
-5. Web/Mobile poll `/api/payment/status/:orderCode` khoảng 3 giây khi pending; nếu DB chưa có `NgayThanhToan`, kiểm tra webhook/provider trước chứ không sửa UI thành tự xác nhận.
+4. webhook phải pass checksum, `currency=VND`, amount đúng **`amountDue` sau ví** và provider order code map reversible về `MaDonHang`;
+5. Web/Mobile poll `/api/payment/status/:orderCode`; nếu DB chưa có `NgayThanhToan`, kiểm tra webhook/provider trước chứ không sửa UI thành tự xác nhận.
 
 Runbook đầy đủ: `docs/runbooks/PAYOS_PAYMENT_E2E.md`.
 
@@ -238,7 +332,7 @@ scripts\node-concurrency-race-gate.bat
 scripts\node-realtime-runtime-gate.bat
 ```
 
-Concurrency/realtime scripts có thể tạo backup trong `.runtime-backups/`. Khi gate FAIL, không merge thay đổi liên quan đến inventory/payment/order/realtime cho tới khi hiểu và sửa nguyên nhân.
+Concurrency/realtime scripts hiện yêu cầu `/health` **55/55**. Chúng có thể tạo backup trong `.runtime-backups/`. Khi gate FAIL, không merge thay đổi inventory/payment/order/wallet/realtime cho tới khi hiểu và sửa nguyên nhân.
 
 ## `dist/modules` không tồn tại
 

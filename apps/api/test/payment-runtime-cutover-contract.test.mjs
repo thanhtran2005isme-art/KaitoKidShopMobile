@@ -28,5 +28,5 @@ test('customer payment authority vẫn là payOS webhook, legacy bank chỉ dàn
 
 test('durable docs và env template xác định payOS là provider hiện hành', () => {
   assert.match(envSource, /payOS là payment provider online hiện hành/);
-  assert.match(handoffSource, /Online payment trên PR #75 dùng payOS SDK chính thức/);
+  assert.match(handoffSource, /official payOS SDK/i);
 });

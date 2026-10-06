@@ -56,6 +56,8 @@ export class AdminOrderAfterSalesController {
   ): Promise<unknown> {
     assertStaffPermission(user, "orders.update_status");
     assertStaffPermission(user, "inventory.manage");
+    // Nhận hàng hoàn giờ đồng thời credit tiền vào Ví KaitoKid.
+    assertStaffPermission(user, "wallet.manage");
     return this.afterSales.receiveReturn(
       user,
       intPath(rawId),
@@ -64,13 +66,14 @@ export class AdminOrderAfterSalesController {
     );
   }
 
+  /** Legacy only: case refund_pending cũ trước khi Ví KaitoKid được triển khai. */
   @Post(":id/refund-completed")
   refundCompleted(
     @CurrentUser() user: AuthenticatedUser,
     @Param("id") rawId: string,
     @Body() body: JsonRecord,
   ): Promise<unknown> {
-    assertStaffPermission(user, "orders.update_status");
+    assertStaffPermission(user, "wallet.manage");
     return this.afterSales.markRefundCompleted(
       user,
       intPath(rawId),

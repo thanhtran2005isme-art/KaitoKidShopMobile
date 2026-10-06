@@ -3,7 +3,8 @@ import { toNumber } from "../../common/db-value.js";
 import type { SqlClient } from "../../common/sql-client.js";
 import { PrismaService } from "../../database/prisma.service.js";
 
-const RETURN_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+const RETURN_WINDOW_DAYS = 15;
+const RETURN_WINDOW_MS = RETURN_WINDOW_DAYS * 24 * 60 * 60 * 1000;
 const RETURN_MARKERS = [
   "return_requested",
   "return_approved",
@@ -11,7 +12,11 @@ const RETURN_MARKERS = [
   "return_received_restock",
   "return_received_quarantine",
 ] as const;
-const REFUND_MARKERS = ["refund_pending", "refund_completed_manual"] as const;
+const REFUND_MARKERS = [
+  "refund_pending",
+  "refund_completed_manual",
+  "refund_wallet_credited",
+] as const;
 
 type CustomerReturnStatus =
   | "none"
@@ -57,7 +62,9 @@ function returnStatus(marker?: string): CustomerReturnStatus {
 
 function refundStatus(marker?: string): CustomerRefundStatus {
   if (marker === "refund_pending") return "pending";
-  if (marker === "refund_completed_manual") return "completed";
+  if (marker === "refund_completed_manual" || marker === "refund_wallet_credited") {
+    return "completed";
+  }
   return "none";
 }
 
@@ -99,7 +106,7 @@ export class OrderAfterSalesService {
            'received_by_customer',
            'return_requested','return_approved','return_rejected',
            'return_received_restock','return_received_quarantine',
-           'refund_pending','refund_completed_manual'
+           'refund_pending','refund_completed_manual','refund_wallet_credited'
          )
        ORDER BY ThoiGian ASC, Id ASC`,
       ...ids,
@@ -272,7 +279,9 @@ export class OrderAfterSalesService {
       }
       const deadline = new Date(completedAt.getTime() + RETURN_WINDOW_MS);
       if (Date.now() > deadline.getTime()) {
-        throw new BadRequestException("Đã quá thời hạn hoàn hàng 7 ngày kể từ lúc nhận hàng.");
+        throw new BadRequestException(
+          `Đã quá thời hạn hoàn hàng ${RETURN_WINDOW_DAYS} ngày kể từ lúc nhận hàng.`,
+        );
       }
 
       const latest = await this.latestReturnMarker(tx, orderId);
@@ -355,7 +364,7 @@ export class OrderAfterSalesService {
       refundStatus: currentRefundStatus,
       receivedAt: receiptConfirmed ? completedAt : null,
       returnDeadline,
-      returnWindowDays: 7,
+      returnWindowDays: RETURN_WINDOW_DAYS,
     };
   }
 

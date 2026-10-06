@@ -24,7 +24,7 @@ test('status polling đối soát payOS trước khi chờ đơn hết hạn', (
   );
 });
 
-test('provider PAID phải khớp VND và tổng tiền trước khi confirm local', () => {
+test('provider PAID phải khớp VND và số tiền còn phải thanh toán sau ví trước khi confirm local', () => {
   const verifyBlock = paymentSource.match(
     /private assertPayOsPaymentMatchesOrder[\s\S]*?private providerStatus/,
   )?.[0] ?? '';
@@ -32,7 +32,8 @@ test('provider PAID phải khớp VND và tổng tiền trước khi confirm loc
   assert.match(verifyBlock, /payment\.currency/);
   assert.match(verifyBlock, /!== "VND"/);
   assert.match(verifyBlock, /Math\.round\(payment\.amount\)/);
-  assert.match(verifyBlock, /toNumber\(order\.total\)/);
+  assert.match(verifyBlock, /Math\.round\(expectedAmount\)/);
+  assert.match(verifyBlock, /số tiền còn phải thanh toán sau Ví KaitoKid/);
 });
 
 test('provider timeout trong polling không biến status endpoint thành 502', () => {

@@ -22,12 +22,14 @@ import { useAuth } from '@/context/AuthContext';
 import { useCheckout } from '@/context/CheckoutContext';
 import { useShopping } from '@/context/ShoppingContext';
 import { checkoutApi } from '@/services/checkout.api';
+import { walletApi } from '@/services/wallet.api';
 import type {
   CheckoutAddress,
   PaymentConfig,
   ShippingProvider,
   ShippingQuoteOption,
 } from '@/types/checkout';
+import type { WalletSummary } from '@/types/wallet';
 
 function money(value: number) {
   return Math.round(value).toLocaleString('vi-VN') + 'đ';
@@ -87,6 +89,8 @@ export default function CheckoutScreen() {
   const [initialRetryKey, setInitialRetryKey] = useState(0);
   const [shippingRetryKey, setShippingRetryKey] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [walletSummary, setWalletSummary] = useState<WalletSummary | null>(null);
+  const [useWallet, setUseWallet] = useState(false);
 
   const couponDiscount = coupon?.isValid ? coupon.discountAmount : 0;
   const comboDiscount = combo?.eligible ? combo.discount : 0;
@@ -95,10 +99,36 @@ export default function CheckoutScreen() {
     0,
     subtotal - couponDiscount - comboDiscount + shippingFee,
   );
+  const estimatedWalletUse = useWallet
+    ? Math.min(walletSummary?.availableBalance ?? 0, total)
+    : 0;
+  const estimatedAmountDue = Math.max(0, total - estimatedWalletUse);
   const backendPaymentAvailable = Boolean(
     paymentConfig?.supportedMethods.includes(paymentMethod),
   );
   const paymentSelectionAvailable = cardSelected || backendPaymentAvailable;
+
+  useEffect(() => {
+    if (!token) {
+      setWalletSummary(null);
+      setUseWallet(false);
+      return;
+    }
+    let active = true;
+    void walletApi.getSummary(token)
+      .then((summary) => {
+        if (!active) return;
+        setWalletSummary(summary);
+        if (summary.availableBalance <= 0) setUseWallet(false);
+      })
+      .catch(() => {
+        if (active) {
+          setWalletSummary(null);
+          setUseWallet(false);
+        }
+      });
+    return () => { active = false; };
+  }, [token]);
 
   useEffect(() => {
     if (!token) {
@@ -306,6 +336,10 @@ export default function CheckoutScreen() {
         : 'Chuyển khoản ngân hàng'
       : 'Thanh toán khi nhận hàng (COD)';
 
+  const reviewPaymentLabel = useWallet && estimatedWalletUse > 0
+    ? paymentLabel + ' · Ví KaitoKid ' + money(estimatedWalletUse)
+    : paymentLabel;
+
   const shippingLabel = selectedShipping
     ? [
         providerNames.get(selectedShipping.provider) ||
@@ -383,6 +417,17 @@ export default function CheckoutScreen() {
     setReviewVisible(true);
   };
 
+  const refreshWallet = async () => {
+    if (!token) return;
+    try {
+      const next = await walletApi.getSummary(token);
+      setWalletSummary(next);
+      if (next.availableBalance <= 0) setUseWallet(false);
+    } catch {
+      // Order/payment state remains backend-authoritative even if refresh fails.
+    }
+  };
+
   const createOrder = async () => {
     if (
       !token ||
@@ -415,13 +460,18 @@ export default function CheckoutScreen() {
         shippingDistrict: selectedAddress.district,
         shippingWard: selectedAddress.ward || undefined,
         shippingStreet: selectedAddress.street || undefined,
+        useWallet,
       });
 
       setPendingOrder(order);
       setReviewVisible(false);
-      await refreshCart();
+      await Promise.all([refreshCart(), refreshWallet()]);
 
-      if (paymentMethod === 'ATM') {
+      const amountDue = order.amountDue ?? Math.max(
+        0,
+        order.total - (order.walletUsed ?? 0),
+      );
+      if (paymentMethod === 'ATM' && amountDue > 0 && !order.paidAt) {
         router.replace({
           pathname: '/checkout/payment',
           params: { orderCode: order.orderCode },
@@ -440,7 +490,7 @@ export default function CheckoutScreen() {
           'Không thể tạo đơn hàng. Vui lòng kiểm tra lại giỏ hàng.',
         ),
       );
-      await refreshCart();
+      await Promise.all([refreshCart(), refreshWallet()]);
     } finally {
       submitLock.current = false;
       setSubmitting(false);
@@ -576,14 +626,10 @@ export default function CheckoutScreen() {
 
           <View style={styles.section}>
             <View style={styles.sectionHeading}>
-              <View style={styles.stepBadge}>
-                <Text style={styles.stepBadgeText}>01</Text>
-              </View>
+              <View style={styles.stepBadge}><Text style={styles.stepBadgeText}>01</Text></View>
               <View style={styles.sectionCopy}>
                 <Text style={styles.sectionTitle}>Địa chỉ nhận hàng</Text>
-                <Text style={styles.sectionHint}>
-                  Chọn địa chỉ đã lưu hoặc thêm địa chỉ mới.
-                </Text>
+                <Text style={styles.sectionHint}>Chọn địa chỉ đã lưu hoặc thêm địa chỉ mới.</Text>
               </View>
             </View>
 
@@ -591,33 +637,20 @@ export default function CheckoutScreen() {
               <View style={styles.selectedCard}>
                 <View style={styles.selectedHeader}>
                   <View style={styles.flex}>
-                    <Text style={styles.addressName}>
-                      {selectedAddress.fullName}
-                    </Text>
-                    <Text style={styles.addressPhone}>
-                      {selectedAddress.phone}
-                    </Text>
+                    <Text style={styles.addressName}>{selectedAddress.fullName}</Text>
+                    <Text style={styles.addressPhone}>{selectedAddress.phone}</Text>
                   </View>
                   {selectedAddress.isDefault ? (
-                    <View style={styles.defaultBadge}>
-                      <Text style={styles.defaultBadgeText}>Mặc định</Text>
-                    </View>
+                    <View style={styles.defaultBadge}><Text style={styles.defaultBadgeText}>Mặc định</Text></View>
                   ) : null}
                 </View>
-                <Text style={styles.addressText}>
-                  {fullAddress(selectedAddress)}
-                </Text>
+                <Text style={styles.addressText}>{fullAddress(selectedAddress)}</Text>
                 <Pressable
                   accessibilityLabel="Đổi hoặc quản lý địa chỉ nhận hàng"
                   accessibilityRole="button"
                   onPress={() => router.push('/checkout/address')}
-                  style={({ pressed }) => [
-                    styles.outlineAction,
-                    pressed && styles.pressed,
-                  ]}>
-                  <Text style={styles.outlineActionText}>
-                    Đổi / quản lý địa chỉ
-                  </Text>
+                  style={({ pressed }) => [styles.outlineAction, pressed && styles.pressed]}>
+                  <Text style={styles.outlineActionText}>Đổi / quản lý địa chỉ</Text>
                 </Pressable>
               </View>
             ) : (
@@ -625,16 +658,9 @@ export default function CheckoutScreen() {
                 accessibilityLabel="Thêm địa chỉ nhận hàng"
                 accessibilityRole="button"
                 onPress={() => router.push('/checkout/address')}
-                style={({ pressed }) => [
-                  styles.emptyAction,
-                  pressed && styles.pressed,
-                ]}>
-                <Text style={styles.emptyActionTitle}>
-                  Chưa có địa chỉ nhận hàng
-                </Text>
-                <Text style={styles.emptyActionText}>
-                  Thêm địa chỉ để tính phí giao hàng chính xác.
-                </Text>
+                style={({ pressed }) => [styles.emptyAction, pressed && styles.pressed]}>
+                <Text style={styles.emptyActionTitle}>Chưa có địa chỉ nhận hàng</Text>
+                <Text style={styles.emptyActionText}>Thêm địa chỉ để tính phí giao hàng chính xác.</Text>
                 <Text style={styles.emptyActionLink}>Thêm địa chỉ →</Text>
               </Pressable>
             )}
@@ -642,23 +668,15 @@ export default function CheckoutScreen() {
 
           <View style={styles.section}>
             <View style={styles.sectionHeading}>
-              <View style={styles.stepBadge}>
-                <Text style={styles.stepBadgeText}>02</Text>
-              </View>
+              <View style={styles.stepBadge}><Text style={styles.stepBadgeText}>02</Text></View>
               <View style={styles.sectionCopy}>
                 <Text style={styles.sectionTitle}>Phương thức giao hàng</Text>
-                <Text style={styles.sectionHint}>
-                  Phí và ETA được tính lại theo địa chỉ.
-                </Text>
+                <Text style={styles.sectionHint}>Phí và ETA được tính lại theo địa chỉ.</Text>
               </View>
             </View>
 
             {!selectedAddress ? (
-              <View style={styles.infoCard}>
-                <Text style={styles.infoText}>
-                  Hãy chọn địa chỉ trước để xem các gói giao hàng.
-                </Text>
-              </View>
+              <View style={styles.infoCard}><Text style={styles.infoText}>Hãy chọn địa chỉ trước để xem các gói giao hàng.</Text></View>
             ) : shippingLoading ? (
               <View accessibilityRole="progressbar" style={styles.loadingCard}>
                 <ActivityIndicator color={BRAND_COLORS.primary} />
@@ -666,67 +684,33 @@ export default function CheckoutScreen() {
               </View>
             ) : shippingOptions.length === 0 ? (
               <View style={styles.infoCard}>
-                <Text style={styles.infoText}>
-                  Chưa có gói giao hàng khả dụng cho địa chỉ này.
-                </Text>
+                <Text style={styles.infoText}>Chưa có gói giao hàng khả dụng cho địa chỉ này.</Text>
                 <Pressable
                   accessibilityLabel="Tính lại phí giao hàng"
                   accessibilityRole="button"
                   onPress={() => setShippingRetryKey((value) => value + 1)}
-                  style={({ pressed }) => [
-                    styles.retryButton,
-                    pressed && styles.pressed,
-                  ]}>
+                  style={({ pressed }) => [styles.retryButton, pressed && styles.pressed]}>
                   <Text style={styles.retryButtonText}>Tính lại phí</Text>
                 </Pressable>
               </View>
             ) : (
               <View style={styles.optionList}>
                 {shippingOptions.map((option) => {
-                  const selected =
-                    selectedShipping?.provider === option.provider &&
-                    selectedShipping?.serviceCode === option.serviceCode;
-
+                  const selected = selectedShipping?.provider === option.provider && selectedShipping?.serviceCode === option.serviceCode;
                   return (
                     <Pressable
                       key={option.provider + '-' + option.serviceCode}
-                      accessibilityLabel={
-                        'Chọn ' +
-                        option.serviceName +
-                        ', phí ' +
-                        money(option.fee)
-                      }
+                      accessibilityLabel={'Chọn ' + option.serviceName + ', phí ' + money(option.fee)}
                       accessibilityRole="radio"
                       accessibilityState={{ checked: selected }}
                       onPress={() => setSelectedShipping(option)}
-                      style={({ pressed }) => [
-                        styles.optionCard,
-                        selected && styles.optionCardSelected,
-                        pressed && styles.pressed,
-                      ]}>
-                      <View
-                        style={[
-                          styles.radio,
-                          selected && styles.radioSelected,
-                        ]}>
-                        {selected ? <View style={styles.radioDot} /> : null}
-                      </View>
+                      style={({ pressed }) => [styles.optionCard, selected && styles.optionCardSelected, pressed && styles.pressed]}>
+                      <View style={[styles.radio, selected && styles.radioSelected]}>{selected ? <View style={styles.radioDot} /> : null}</View>
                       <View style={styles.optionCopy}>
-                        <Text style={styles.optionTitle}>
-                          {providerNames.get(option.provider) ||
-                            option.provider.toUpperCase()}
-                          {' · '}
-                          {option.serviceName}
-                        </Text>
-                        <Text style={styles.optionMeta}>
-                          {option.leadTimeHours > 0
-                            ? 'Dự kiến ' + option.leadTimeHours + ' giờ'
-                            : 'Thời gian giao sẽ được cập nhật'}
-                        </Text>
+                        <Text style={styles.optionTitle}>{providerNames.get(option.provider) || option.provider.toUpperCase()}{' · '}{option.serviceName}</Text>
+                        <Text style={styles.optionMeta}>{option.leadTimeHours > 0 ? 'Dự kiến ' + option.leadTimeHours + ' giờ' : 'Thời gian giao sẽ được cập nhật'}</Text>
                       </View>
-                      <Text style={styles.optionPrice}>
-                        {money(option.fee)}
-                      </Text>
+                      <Text style={styles.optionPrice}>{money(option.fee)}</Text>
                     </Pressable>
                   );
                 })}
@@ -736,25 +720,17 @@ export default function CheckoutScreen() {
 
           <View style={styles.section}>
             <View style={styles.sectionHeading}>
-              <View style={styles.stepBadge}>
-                <Text style={styles.stepBadgeText}>03</Text>
-              </View>
+              <View style={styles.stepBadge}><Text style={styles.stepBadgeText}>03</Text></View>
               <View style={styles.sectionCopy}>
                 <Text style={styles.sectionTitle}>Ưu đãi</Text>
-                <Text style={styles.sectionHint}>
-                  Coupon được backend kiểm tra theo đúng subtotal đã chọn.
-                </Text>
+                <Text style={styles.sectionHint}>Coupon được backend kiểm tra theo đúng subtotal đã chọn.</Text>
               </View>
             </View>
 
             {combo?.eligible ? (
               <View style={styles.comboCard}>
-                <Text style={styles.comboTitle}>
-                  {combo.message || 'Đã áp dụng ưu đãi combo'}
-                </Text>
-                <Text style={styles.comboValue}>
-                  {'Giảm ' + money(combo.discount)}
-                </Text>
+                <Text style={styles.comboTitle}>{combo.message || 'Đã áp dụng ưu đãi combo'}</Text>
+                <Text style={styles.comboValue}>{'Giảm ' + money(combo.discount)}</Text>
               </View>
             ) : null}
 
@@ -771,273 +747,118 @@ export default function CheckoutScreen() {
                   returnKeyType="done"
                   value={couponInput}
                   onSubmitEditing={() => void applyCoupon()}
-                  style={[
-                    styles.input,
-                    couponCode && styles.inputApplied,
-                  ]}
+                  style={[styles.input, couponCode && styles.inputApplied]}
                 />
               </View>
               {couponCode ? (
-                <Pressable
-                  accessibilityLabel="Bỏ mã giảm giá"
-                  accessibilityRole="button"
-                  onPress={removeCoupon}
-                  style={({ pressed }) => [
-                    styles.couponButtonSecondary,
-                    pressed && styles.pressed,
-                  ]}>
+                <Pressable accessibilityLabel="Bỏ mã giảm giá" accessibilityRole="button" onPress={removeCoupon} style={({ pressed }) => [styles.couponButtonSecondary, pressed && styles.pressed]}>
                   <Text style={styles.couponButtonSecondaryText}>Bỏ mã</Text>
                 </Pressable>
               ) : (
-                <Pressable
-                  accessibilityLabel="Áp dụng mã giảm giá"
-                  accessibilityRole="button"
-                  accessibilityState={{ disabled: couponBusy }}
-                  disabled={couponBusy}
-                  onPress={() => void applyCoupon()}
-                  style={({ pressed }) => [
-                    styles.couponButton,
-                    pressed && styles.pressed,
-                    couponBusy && styles.disabled,
-                  ]}>
-                  <Text style={styles.couponButtonText}>
-                    {couponBusy ? 'Đang kiểm tra' : 'Áp dụng'}
-                  </Text>
+                <Pressable accessibilityLabel="Áp dụng mã giảm giá" accessibilityRole="button" accessibilityState={{ disabled: couponBusy }} disabled={couponBusy} onPress={() => void applyCoupon()} style={({ pressed }) => [styles.couponButton, pressed && styles.pressed, couponBusy && styles.disabled]}>
+                  <Text style={styles.couponButtonText}>{couponBusy ? 'Đang kiểm tra' : 'Áp dụng'}</Text>
                 </Pressable>
               )}
             </View>
-
             {couponCode && coupon?.isValid ? (
-              <Text accessibilityLiveRegion="polite" style={styles.appliedText}>
-                {'Đã áp dụng ' +
-                  couponCode +
-                  ' · giảm ' +
-                  money(coupon.discountAmount)}
-              </Text>
+              <Text accessibilityLiveRegion="polite" style={styles.appliedText}>{'Đã áp dụng ' + couponCode + ' · giảm ' + money(coupon.discountAmount)}</Text>
             ) : null}
           </View>
 
           <View style={styles.section}>
             <View style={styles.sectionHeading}>
-              <View style={styles.stepBadge}>
-                <Text style={styles.stepBadgeText}>04</Text>
-              </View>
+              <View style={styles.stepBadge}><Text style={styles.stepBadgeText}>04</Text></View>
               <View style={styles.sectionCopy}>
                 <Text style={styles.sectionTitle}>Thanh toán</Text>
-                <Text style={styles.sectionHint}>
-                  Chọn COD, chuyển khoản hoặc tiếp tục tới form thanh toán thẻ.
-                </Text>
+                <Text style={styles.sectionHint}>Chọn COD, chuyển khoản hoặc tiếp tục tới form thanh toán thẻ.</Text>
               </View>
             </View>
 
+            {walletSummary ? (
+              <Pressable
+                accessibilityLabel="Dùng số dư Ví KaitoKid"
+                accessibilityRole="checkbox"
+                accessibilityState={{ checked: useWallet, disabled: walletSummary.availableBalance <= 0 }}
+                disabled={walletSummary.availableBalance <= 0}
+                onPress={() => setUseWallet((current) => !current)}
+                style={({ pressed }) => [styles.walletCard, useWallet && styles.walletCardSelected, pressed && styles.pressed, walletSummary.availableBalance <= 0 && styles.disabled]}>
+                <View style={[styles.walletCheck, useWallet && styles.walletCheckSelected]}>{useWallet ? <Text style={styles.walletCheckText}>✓</Text> : null}</View>
+                <View style={styles.optionCopy}>
+                  <Text style={styles.optionTitle}>Dùng số dư Ví KaitoKid</Text>
+                  <Text style={styles.optionMeta}>Khả dụng {money(walletSummary.availableBalance)}</Text>
+                  {useWallet ? <Text style={styles.walletMeta}>Ví dự kiến dùng {money(estimatedWalletUse)} · còn thanh toán {money(estimatedAmountDue)}</Text> : null}
+                </View>
+              </Pressable>
+            ) : null}
+
             <View style={styles.optionList}>
               {paymentConfig?.supportedMethods.includes('COD') ? (
-                <Pressable
-                  accessibilityLabel="Thanh toán khi nhận hàng"
-                  accessibilityRole="radio"
-                  accessibilityState={{ checked: !cardSelected && paymentMethod === 'COD' }}
-                  onPress={() => {
-                    setCardSelected(false);
-                    setPaymentMethod('COD');
-                  }}
-                  style={({ pressed }) => [
-                    styles.optionCard,
-                    !cardSelected && paymentMethod === 'COD' &&
-                      styles.optionCardSelected,
-                    pressed && styles.pressed,
-                  ]}>
-                  <View
-                    style={[
-                      styles.radio,
-                      !cardSelected && paymentMethod === 'COD' && styles.radioSelected,
-                    ]}>
-                    {!cardSelected && paymentMethod === 'COD' ? (
-                      <View style={styles.radioDot} />
-                    ) : null}
-                  </View>
-                  <View style={styles.optionCopy}>
-                    <Text style={styles.optionTitle}>
-                      Thanh toán khi nhận hàng
-                    </Text>
-                    <Text style={styles.optionMeta}>
-                      Thanh toán cho đơn sau khi nhận sản phẩm.
-                    </Text>
-                  </View>
+                <Pressable accessibilityLabel="Thanh toán khi nhận hàng" accessibilityRole="radio" accessibilityState={{ checked: !cardSelected && paymentMethod === 'COD' }} onPress={() => { setCardSelected(false); setPaymentMethod('COD'); }} style={({ pressed }) => [styles.optionCard, !cardSelected && paymentMethod === 'COD' && styles.optionCardSelected, pressed && styles.pressed]}>
+                  <View style={[styles.radio, !cardSelected && paymentMethod === 'COD' && styles.radioSelected]}>{!cardSelected && paymentMethod === 'COD' ? <View style={styles.radioDot} /> : null}</View>
+                  <View style={styles.optionCopy}><Text style={styles.optionTitle}>Thanh toán khi nhận hàng</Text><Text style={styles.optionMeta}>Thanh toán phần còn lại sau Ví KaitoKid khi nhận sản phẩm.</Text></View>
                 </Pressable>
               ) : null}
 
               {paymentConfig?.supportedMethods.includes('ATM') ? (
-                <Pressable
-                  accessibilityLabel="Thanh toán chuyển khoản ngân hàng hoặc VietQR"
-                  accessibilityRole="radio"
-                  accessibilityState={{ checked: !cardSelected && paymentMethod === 'ATM' }}
-                  onPress={() => {
-                    setCardSelected(false);
-                    setPaymentMethod('ATM');
-                  }}
-                  style={({ pressed }) => [
-                    styles.optionCard,
-                    !cardSelected && paymentMethod === 'ATM' &&
-                      styles.optionCardSelected,
-                    pressed && styles.pressed,
-                  ]}>
-                  <View
-                    style={[
-                      styles.radio,
-                      !cardSelected && paymentMethod === 'ATM' && styles.radioSelected,
-                    ]}>
-                    {!cardSelected && paymentMethod === 'ATM' ? (
-                      <View style={styles.radioDot} />
-                    ) : null}
-                  </View>
-                  <View style={styles.optionCopy}>
-                    <Text style={styles.optionTitle}>
-                      {paymentConfig.vietQrConfigured
-                        ? 'Chuyển khoản / VietQR'
-                        : 'Chuyển khoản ngân hàng'}
-                    </Text>
-                    <Text style={styles.optionMeta}>
-                      Tạo đơn trước, sau đó thanh toán trong thời hạn backend cấp.
-                    </Text>
-                  </View>
+                <Pressable accessibilityLabel="Thanh toán chuyển khoản ngân hàng hoặc VietQR" accessibilityRole="radio" accessibilityState={{ checked: !cardSelected && paymentMethod === 'ATM' }} onPress={() => { setCardSelected(false); setPaymentMethod('ATM'); }} style={({ pressed }) => [styles.optionCard, !cardSelected && paymentMethod === 'ATM' && styles.optionCardSelected, pressed && styles.pressed]}>
+                  <View style={[styles.radio, !cardSelected && paymentMethod === 'ATM' && styles.radioSelected]}>{!cardSelected && paymentMethod === 'ATM' ? <View style={styles.radioDot} /> : null}</View>
+                  <View style={styles.optionCopy}><Text style={styles.optionTitle}>{paymentConfig.vietQrConfigured ? 'Chuyển khoản / VietQR' : 'Chuyển khoản ngân hàng'}</Text><Text style={styles.optionMeta}>payOS chỉ thu phần còn lại sau số dư Ví KaitoKid.</Text></View>
                 </Pressable>
               ) : null}
 
-              <Pressable
-                accessibilityLabel="Thanh toán bằng thẻ tín dụng hoặc thẻ ghi nợ"
-                accessibilityRole="radio"
-                accessibilityState={{ checked: cardSelected }}
-                onPress={() => setCardSelected(true)}
-                style={({ pressed }) => [
-                  styles.optionCard,
-                  cardSelected && styles.optionCardSelected,
-                  pressed && styles.pressed,
-                ]}>
-                <View
-                  style={[
-                    styles.radio,
-                    cardSelected && styles.radioSelected,
-                  ]}>
-                  {cardSelected ? <View style={styles.radioDot} /> : null}
-                </View>
-                <View style={styles.optionCopy}>
-                  <Text style={styles.optionTitle}>
-                    Thẻ tín dụng / thẻ ghi nợ
-                  </Text>
-                  <Text style={styles.optionMeta}>
-                    Nhập thông tin thẻ ở bước tiếp theo. Giao dịch thẻ thật chưa được backend xử lý.
-                  </Text>
-                </View>
+              <Pressable accessibilityLabel="Thanh toán bằng thẻ tín dụng hoặc thẻ ghi nợ" accessibilityRole="radio" accessibilityState={{ checked: cardSelected }} onPress={() => setCardSelected(true)} style={({ pressed }) => [styles.optionCard, cardSelected && styles.optionCardSelected, pressed && styles.pressed]}>
+                <View style={[styles.radio, cardSelected && styles.radioSelected]}>{cardSelected ? <View style={styles.radioDot} /> : null}</View>
+                <View style={styles.optionCopy}><Text style={styles.optionTitle}>Thẻ tín dụng / thẻ ghi nợ</Text><Text style={styles.optionMeta}>Nhập thông tin thẻ ở bước tiếp theo. Giao dịch thẻ thật chưa được backend xử lý.</Text></View>
               </Pressable>
             </View>
 
-            {paymentConfig &&
-            paymentConfig.supportedMethods.length === 0 ? (
-              <View style={styles.infoCard}>
-                <Text style={styles.infoText}>
-                  COD và chuyển khoản đang tắt; form thanh toán thẻ vẫn có thể mở để tiếp tục giao diện thẻ.
-                </Text>
-              </View>
+            {paymentConfig && paymentConfig.supportedMethods.length === 0 ? (
+              <View style={styles.infoCard}><Text style={styles.infoText}>COD và chuyển khoản đang tắt; form thanh toán thẻ vẫn có thể mở để tiếp tục giao diện thẻ.</Text></View>
             ) : null}
           </View>
 
           <View style={styles.section}>
             <Text style={styles.fieldLabel}>Ghi chú đơn hàng</Text>
-            <TextInput
-              accessibilityLabel="Ghi chú đơn hàng"
-              multiline
-              onChangeText={setNote}
-              placeholder="Ví dụ: gọi trước khi giao..."
-              placeholderTextColor="#9CA3AF"
-              textAlignVertical="top"
-              value={note}
-              style={[styles.input, styles.noteInput]}
-            />
+            <TextInput accessibilityLabel="Ghi chú đơn hàng" multiline onChangeText={setNote} placeholder="Ví dụ: gọi trước khi giao..." placeholderTextColor="#9CA3AF" textAlignVertical="top" value={note} style={[styles.input, styles.noteInput]} />
           </View>
 
           <View style={styles.section}>
             <View style={styles.sectionHeading}>
-              <View style={styles.stepBadge}>
-                <Text style={styles.stepBadgeText}>05</Text>
-              </View>
-              <View style={styles.sectionCopy}>
-                <Text style={styles.sectionTitle}>Sản phẩm đã chọn</Text>
-                <Text style={styles.sectionHint}>
-                  Chỉ các dòng này sẽ được đưa vào đơn.
-                </Text>
-              </View>
+              <View style={styles.stepBadge}><Text style={styles.stepBadgeText}>05</Text></View>
+              <View style={styles.sectionCopy}><Text style={styles.sectionTitle}>Sản phẩm đã chọn</Text><Text style={styles.sectionHint}>Chỉ các dòng này sẽ được đưa vào đơn.</Text></View>
             </View>
-
             <View style={styles.itemList}>
               {selectedItems.map((item) => (
                 <View key={item.id} style={styles.itemRow}>
-                  <View style={styles.itemCopy}>
-                    <Text numberOfLines={2} style={styles.itemName}>
-                      {item.name}
-                    </Text>
-                    <Text style={styles.itemMeta}>
-                      {[item.color, item.size ? 'Size ' + item.size : '', 'SL ' + item.quantity]
-                        .filter(Boolean)
-                        .join(' · ')}
-                    </Text>
-                  </View>
-                  <Text style={styles.itemPrice}>
-                    {money(item.price * item.quantity)}
-                  </Text>
+                  <View style={styles.itemCopy}><Text numberOfLines={2} style={styles.itemName}>{item.name}</Text><Text style={styles.itemMeta}>{[item.color, item.size ? 'Size ' + item.size : '', 'SL ' + item.quantity].filter(Boolean).join(' · ')}</Text></View>
+                  <Text style={styles.itemPrice}>{money(item.price * item.quantity)}</Text>
                 </View>
               ))}
             </View>
           </View>
 
-          <CheckoutOrderSummary
-            comboDiscount={comboDiscount}
-            couponDiscount={couponDiscount}
-            shippingFee={shippingFee}
-            subtotal={subtotal}
-            total={total}
-          />
+          <CheckoutOrderSummary comboDiscount={comboDiscount} couponDiscount={couponDiscount} shippingFee={shippingFee} subtotal={subtotal} total={total} />
+
+          {useWallet && estimatedWalletUse > 0 ? (
+            <View style={styles.walletSummary}>
+              <View style={styles.walletSummaryRow}><Text style={styles.walletSummaryLabel}>Ví KaitoKid</Text><Text style={styles.walletSummaryValue}>−{money(estimatedWalletUse)}</Text></View>
+              <View style={styles.walletSummaryRow}><Text style={styles.walletSummaryLabelStrong}>Còn thanh toán</Text><Text style={styles.walletSummaryValueStrong}>{money(estimatedAmountDue)}</Text></View>
+              <Text style={styles.walletSummaryHint}>Số tiền chính xác được backend khóa và tính lại lúc tạo đơn.</Text>
+            </View>
+          ) : null}
 
           <Pressable
-            accessibilityLabel={
-              cardSelected
-                ? 'Tiếp tục tới form thanh toán thẻ'
-                : 'Xem lại đơn hàng trước khi đặt'
-            }
+            accessibilityLabel={cardSelected ? 'Tiếp tục tới form thanh toán thẻ' : 'Xem lại đơn hàng trước khi đặt'}
             accessibilityRole="button"
-            accessibilityState={{
-              disabled:
-                submitting ||
-                !selectedAddress ||
-                !selectedShipping ||
-                !paymentSelectionAvailable,
-            }}
-            disabled={
-              submitting ||
-              !selectedAddress ||
-              !selectedShipping ||
-              !paymentSelectionAvailable
-            }
+            accessibilityState={{ disabled: submitting || !selectedAddress || !selectedShipping || !paymentSelectionAvailable }}
+            disabled={submitting || !selectedAddress || !selectedShipping || !paymentSelectionAvailable}
             onPress={openReview}
-            style={({ pressed }) => [
-              styles.submitButton,
-              pressed && styles.pressed,
-              (submitting ||
-                !selectedAddress ||
-                !selectedShipping ||
-                !paymentSelectionAvailable) &&
-                styles.submitButtonDisabled,
-            ]}>
+            style={({ pressed }) => [styles.submitButton, pressed && styles.pressed, (submitting || !selectedAddress || !selectedShipping || !paymentSelectionAvailable) && styles.submitButtonDisabled]}>
             <View style={styles.submitCopy}>
-              <Text style={styles.submitText}>
-                {cardSelected ? 'Tiếp tục thanh toán thẻ' : 'Xem lại đơn hàng'}
-              </Text>
-              <Text style={styles.submitHint}>
-                {cardSelected
-                  ? 'Mở form nhập thông tin thẻ ở bước tiếp theo'
-                  : 'Backend sẽ kiểm tra lại toàn bộ giá trị'}
-              </Text>
+              <Text style={styles.submitText}>{cardSelected ? 'Tiếp tục thanh toán thẻ' : 'Xem lại đơn hàng'}</Text>
+              <Text style={styles.submitHint}>{cardSelected ? 'Mở form nhập thông tin thẻ ở bước tiếp theo' : useWallet ? 'Backend sẽ khóa số dư ví và kiểm tra lại toàn bộ giá trị' : 'Backend sẽ kiểm tra lại toàn bộ giá trị'}</Text>
             </View>
-            <Text style={styles.submitTotal}>{money(total)}</Text>
+            <Text style={styles.submitTotal}>{money(useWallet ? estimatedAmountDue : total)}</Text>
           </Pressable>
 
           <View style={styles.bottomSpace} />
@@ -1051,7 +872,7 @@ export default function CheckoutScreen() {
         items={selectedItems}
         onClose={() => setReviewVisible(false)}
         onConfirm={() => void createOrder()}
-        paymentLabel={paymentLabel}
+        paymentLabel={reviewPaymentLabel}
         shippingFee={shippingFee}
         shippingLabel={shippingLabel}
         submitting={submitting}
@@ -1065,469 +886,95 @@ export default function CheckoutScreen() {
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
-  safeArea: {
-    flex: 1,
-    backgroundColor: BRAND_COLORS.canvas,
-  },
-  content: {
-    width: '100%',
-    maxWidth: 760,
-    alignSelf: 'center',
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    gap: 18,
-  },
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  backButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: BRAND_COLORS.line,
-    backgroundColor: BRAND_COLORS.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  safeArea: { flex: 1, backgroundColor: BRAND_COLORS.canvas },
+  content: { width: '100%', maxWidth: 760, alignSelf: 'center', paddingHorizontal: 16, paddingTop: 12, gap: 18 },
+  headerRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  backButton: { width: 44, height: 44, borderRadius: 14, borderWidth: 1, borderColor: BRAND_COLORS.line, backgroundColor: BRAND_COLORS.surface, alignItems: 'center', justifyContent: 'center' },
   headerCopy: { flex: 1 },
-  eyebrow: {
-    color: BRAND_COLORS.primary,
-    fontSize: 10,
-    lineHeight: 14,
-    fontWeight: '900',
-    letterSpacing: 1.1,
-  },
-  title: {
-    color: BRAND_COLORS.ink,
-    fontSize: 26,
-    lineHeight: 32,
-    fontWeight: '900',
-  },
-  subtitle: {
-    color: BRAND_COLORS.muted,
-    fontSize: 12,
-    lineHeight: 17,
-    fontWeight: '700',
-    marginTop: 2,
-  },
-  section: {
-    gap: 12,
-  },
-  sectionHeading: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  stepBadge: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    backgroundColor: BRAND_COLORS.primarySoft,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  stepBadgeText: {
-    color: BRAND_COLORS.primaryDark,
-    fontSize: 12,
-    lineHeight: 17,
-    fontWeight: '900',
-  },
+  eyebrow: { color: BRAND_COLORS.primary, fontSize: 10, lineHeight: 14, fontWeight: '900', letterSpacing: 1.1 },
+  title: { color: BRAND_COLORS.ink, fontSize: 26, lineHeight: 32, fontWeight: '900' },
+  subtitle: { color: BRAND_COLORS.muted, fontSize: 12, lineHeight: 17, fontWeight: '700', marginTop: 2 },
+  section: { gap: 12 },
+  sectionHeading: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  stepBadge: { width: 40, height: 40, borderRadius: 12, backgroundColor: BRAND_COLORS.primarySoft, alignItems: 'center', justifyContent: 'center' },
+  stepBadgeText: { color: BRAND_COLORS.primaryDark, fontSize: 12, lineHeight: 17, fontWeight: '900' },
   sectionCopy: { flex: 1, gap: 2 },
-  sectionTitle: {
-    color: BRAND_COLORS.ink,
-    fontSize: 18,
-    lineHeight: 23,
-    fontWeight: '900',
-  },
-  sectionHint: {
-    color: BRAND_COLORS.muted,
-    fontSize: 12,
-    lineHeight: 18,
-  },
-  selectedCard: {
-    borderRadius: 18,
-    borderWidth: 1.5,
-    borderColor: '#9CA3AF',
-    backgroundColor: '#F9FAFB',
-    padding: 14,
-    gap: 9,
-  },
-  selectedHeader: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 10,
-  },
-  addressName: {
-    color: BRAND_COLORS.ink,
-    fontSize: 15,
-    lineHeight: 20,
-    fontWeight: '900',
-  },
-  addressPhone: {
-    color: BRAND_COLORS.muted,
-    fontSize: 12,
-    lineHeight: 17,
-    fontWeight: '700',
-    marginTop: 2,
-  },
-  addressText: {
-    color: '#374151',
-    fontSize: 13,
-    lineHeight: 19,
-  },
-  defaultBadge: {
-    borderRadius: 999,
-    backgroundColor: BRAND_COLORS.primarySoft,
-    paddingHorizontal: 9,
-    paddingVertical: 5,
-  },
-  defaultBadgeText: {
-    color: BRAND_COLORS.primaryDark,
-    fontSize: 11,
-    lineHeight: 15,
-    fontWeight: '900',
-  },
-  outlineAction: {
-    minHeight: 44,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#D1D5DB',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 12,
-  },
-  outlineActionText: {
-    color: BRAND_COLORS.primaryDark,
-    fontSize: 13,
-    lineHeight: 18,
-    fontWeight: '900',
-  },
-  emptyAction: {
-    minHeight: 124,
-    borderRadius: 18,
-    borderWidth: 1.5,
-    borderStyle: 'dashed',
-    borderColor: '#9CA3AF',
-    backgroundColor: BRAND_COLORS.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 18,
-    gap: 5,
-  },
-  emptyActionTitle: {
-    color: BRAND_COLORS.ink,
-    fontSize: 15,
-    lineHeight: 20,
-    fontWeight: '900',
-  },
-  emptyActionText: {
-    color: BRAND_COLORS.muted,
-    fontSize: 12,
-    lineHeight: 18,
-    textAlign: 'center',
-  },
-  emptyActionLink: {
-    color: BRAND_COLORS.primary,
-    fontSize: 13,
-    lineHeight: 18,
-    fontWeight: '900',
-    marginTop: 5,
-  },
+  sectionTitle: { color: BRAND_COLORS.ink, fontSize: 18, lineHeight: 23, fontWeight: '900' },
+  sectionHint: { color: BRAND_COLORS.muted, fontSize: 12, lineHeight: 18 },
+  selectedCard: { borderRadius: 18, borderWidth: 1.5, borderColor: '#9CA3AF', backgroundColor: '#F9FAFB', padding: 14, gap: 9 },
+  selectedHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+  addressName: { color: BRAND_COLORS.ink, fontSize: 15, lineHeight: 20, fontWeight: '900' },
+  addressPhone: { color: BRAND_COLORS.muted, fontSize: 12, lineHeight: 17, fontWeight: '700', marginTop: 2 },
+  addressText: { color: '#374151', fontSize: 13, lineHeight: 19 },
+  defaultBadge: { borderRadius: 999, backgroundColor: BRAND_COLORS.primarySoft, paddingHorizontal: 9, paddingVertical: 5 },
+  defaultBadgeText: { color: BRAND_COLORS.primaryDark, fontSize: 11, lineHeight: 15, fontWeight: '900' },
+  outlineAction: { minHeight: 44, borderRadius: 12, borderWidth: 1, borderColor: '#D1D5DB', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 12 },
+  outlineActionText: { color: BRAND_COLORS.primaryDark, fontSize: 13, lineHeight: 18, fontWeight: '900' },
+  emptyAction: { minHeight: 124, borderRadius: 18, borderWidth: 1.5, borderStyle: 'dashed', borderColor: '#9CA3AF', backgroundColor: BRAND_COLORS.surface, alignItems: 'center', justifyContent: 'center', padding: 18, gap: 5 },
+  emptyActionTitle: { color: BRAND_COLORS.ink, fontSize: 15, lineHeight: 20, fontWeight: '900' },
+  emptyActionText: { color: BRAND_COLORS.muted, fontSize: 12, lineHeight: 18, textAlign: 'center' },
+  emptyActionLink: { color: BRAND_COLORS.primary, fontSize: 13, lineHeight: 18, fontWeight: '900', marginTop: 5 },
   optionList: { gap: 8 },
-  optionCard: {
-    minHeight: 76,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: BRAND_COLORS.line,
-    backgroundColor: BRAND_COLORS.surface,
-    paddingHorizontal: 13,
-    paddingVertical: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 11,
-  },
-  optionCardSelected: {
-    borderWidth: 1.5,
-    borderColor: BRAND_COLORS.primary,
-    backgroundColor: '#F9FAFB',
-  },
-  radio: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    borderWidth: 1.5,
-    borderColor: '#9CA3AF',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  radioSelected: {
-    borderColor: BRAND_COLORS.primary,
-  },
-  radioDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: BRAND_COLORS.primary,
-  },
+  optionCard: { minHeight: 76, borderRadius: 16, borderWidth: 1, borderColor: BRAND_COLORS.line, backgroundColor: BRAND_COLORS.surface, paddingHorizontal: 13, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', gap: 11 },
+  optionCardSelected: { borderWidth: 1.5, borderColor: BRAND_COLORS.primary, backgroundColor: '#F9FAFB' },
+  radio: { width: 24, height: 24, borderRadius: 12, borderWidth: 1.5, borderColor: '#9CA3AF', alignItems: 'center', justifyContent: 'center' },
+  radioSelected: { borderColor: BRAND_COLORS.primary },
+  radioDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: BRAND_COLORS.primary },
   optionCopy: { flex: 1, gap: 3 },
-  optionTitle: {
-    color: BRAND_COLORS.ink,
-    fontSize: 14,
-    lineHeight: 19,
-    fontWeight: '900',
-  },
-  optionMeta: {
-    color: BRAND_COLORS.muted,
-    fontSize: 12,
-    lineHeight: 18,
-  },
-  optionPrice: {
-    color: BRAND_COLORS.primary,
-    fontSize: 14,
-    lineHeight: 19,
-    fontWeight: '900',
-  },
-  infoCard: {
-    borderRadius: 14,
-    backgroundColor: '#F3F4F6',
-    padding: 13,
-  },
-  loadingCard: {
-    minHeight: 60,
-    borderRadius: 14,
-    backgroundColor: BRAND_COLORS.surface,
-    borderWidth: 1,
-    borderColor: BRAND_COLORS.line,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 13,
-    gap: 10,
-  },
-  infoText: {
-    color: '#4B5563',
-    fontSize: 12,
-    lineHeight: 18,
-  },
-  comboCard: {
-    borderRadius: 14,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: '#A7F3D0',
-    backgroundColor: '#ECFDF5',
-    padding: 12,
-    gap: 3,
-  },
-  comboTitle: {
-    color: '#047857',
-    fontSize: 12,
-    lineHeight: 18,
-    fontWeight: '800',
-  },
-  comboValue: {
-    color: '#065F46',
-    fontSize: 14,
-    lineHeight: 19,
-    fontWeight: '900',
-  },
-  couponRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    gap: 8,
-  },
+  optionTitle: { color: BRAND_COLORS.ink, fontSize: 14, lineHeight: 19, fontWeight: '900' },
+  optionMeta: { color: BRAND_COLORS.muted, fontSize: 12, lineHeight: 18 },
+  optionPrice: { color: BRAND_COLORS.primary, fontSize: 14, lineHeight: 19, fontWeight: '900' },
+  infoCard: { borderRadius: 14, backgroundColor: '#F3F4F6', padding: 13 },
+  loadingCard: { minHeight: 60, borderRadius: 14, backgroundColor: BRAND_COLORS.surface, borderWidth: 1, borderColor: BRAND_COLORS.line, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 13, gap: 10 },
+  infoText: { color: '#4B5563', fontSize: 12, lineHeight: 18 },
+  comboCard: { borderRadius: 14, borderWidth: StyleSheet.hairlineWidth, borderColor: '#A7F3D0', backgroundColor: '#ECFDF5', padding: 12, gap: 3 },
+  comboTitle: { color: '#047857', fontSize: 12, lineHeight: 18, fontWeight: '800' },
+  comboValue: { color: '#065F46', fontSize: 14, lineHeight: 19, fontWeight: '900' },
+  couponRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 8 },
   couponField: { flex: 1, gap: 5 },
-  fieldLabel: {
-    color: BRAND_COLORS.ink,
-    fontSize: 12,
-    lineHeight: 17,
-    fontWeight: '900',
-  },
-  input: {
-    minHeight: 48,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#D1D5DB',
-    backgroundColor: BRAND_COLORS.surface,
-    paddingHorizontal: 12,
-    color: BRAND_COLORS.ink,
-    fontSize: 14,
-  },
-  inputApplied: {
-    borderColor: '#A7F3D0',
-    backgroundColor: '#F0FDF4',
-  },
-  noteInput: {
-    minHeight: 96,
-    paddingTop: 12,
-    paddingBottom: 12,
-  },
-  couponButton: {
-    minHeight: 48,
-    borderRadius: 12,
-    backgroundColor: BRAND_COLORS.ink,
-    paddingHorizontal: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  couponButtonText: {
-    color: '#FFFFFF',
-    fontSize: 13,
-    lineHeight: 18,
-    fontWeight: '900',
-  },
-  couponButtonSecondary: {
-    minHeight: 48,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#FECACA',
-    backgroundColor: '#FEF2F2',
-    paddingHorizontal: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  couponButtonSecondaryText: {
-    color: BRAND_COLORS.danger,
-    fontSize: 13,
-    lineHeight: 18,
-    fontWeight: '900',
-  },
-  appliedText: {
-    color: BRAND_COLORS.success,
-    fontSize: 12,
-    lineHeight: 18,
-    fontWeight: '800',
-  },
-  itemList: {
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: BRAND_COLORS.line,
-    backgroundColor: BRAND_COLORS.surface,
-    paddingHorizontal: 13,
-  },
-  itemRow: {
-    minHeight: 68,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: BRAND_COLORS.line,
-  },
+  fieldLabel: { color: BRAND_COLORS.ink, fontSize: 12, lineHeight: 17, fontWeight: '900' },
+  input: { minHeight: 48, borderRadius: 12, borderWidth: 1, borderColor: '#D1D5DB', backgroundColor: BRAND_COLORS.surface, paddingHorizontal: 12, color: BRAND_COLORS.ink, fontSize: 14 },
+  inputApplied: { borderColor: '#A7F3D0', backgroundColor: '#F0FDF4' },
+  noteInput: { minHeight: 96, paddingTop: 12, paddingBottom: 12 },
+  couponButton: { minHeight: 48, borderRadius: 12, backgroundColor: BRAND_COLORS.ink, paddingHorizontal: 14, alignItems: 'center', justifyContent: 'center' },
+  couponButtonText: { color: '#FFFFFF', fontSize: 13, lineHeight: 18, fontWeight: '900' },
+  couponButtonSecondary: { minHeight: 48, borderRadius: 12, borderWidth: 1, borderColor: '#FECACA', backgroundColor: '#FEF2F2', paddingHorizontal: 14, alignItems: 'center', justifyContent: 'center' },
+  couponButtonSecondaryText: { color: BRAND_COLORS.danger, fontSize: 13, lineHeight: 18, fontWeight: '900' },
+  appliedText: { color: BRAND_COLORS.success, fontSize: 12, lineHeight: 18, fontWeight: '800' },
+  walletCard: { minHeight: 86, borderRadius: 16, borderWidth: 1, borderColor: BRAND_COLORS.line, backgroundColor: BRAND_COLORS.surface, paddingHorizontal: 13, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', gap: 11 },
+  walletCardSelected: { borderWidth: 1.5, borderColor: BRAND_COLORS.primary, backgroundColor: '#F9FAFB' },
+  walletCheck: { width: 24, height: 24, borderRadius: 7, borderWidth: 1.5, borderColor: '#9CA3AF', alignItems: 'center', justifyContent: 'center' },
+  walletCheckSelected: { borderColor: BRAND_COLORS.primary, backgroundColor: BRAND_COLORS.primary },
+  walletCheckText: { color: '#FFFFFF', fontSize: 14, fontWeight: '900' },
+  walletMeta: { color: BRAND_COLORS.ink, fontSize: 12, lineHeight: 18, fontWeight: '800', marginTop: 3 },
+  walletSummary: { borderRadius: 14, borderWidth: 1, borderColor: BRAND_COLORS.line, backgroundColor: BRAND_COLORS.surface, padding: 13, gap: 8 },
+  walletSummaryRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 12 },
+  walletSummaryLabel: { color: BRAND_COLORS.muted, fontSize: 13, lineHeight: 19 },
+  walletSummaryValue: { color: BRAND_COLORS.ink, fontSize: 13, lineHeight: 19, fontWeight: '800' },
+  walletSummaryLabelStrong: { color: BRAND_COLORS.ink, fontSize: 14, lineHeight: 20, fontWeight: '900' },
+  walletSummaryValueStrong: { color: BRAND_COLORS.ink, fontSize: 15, lineHeight: 20, fontWeight: '900' },
+  walletSummaryHint: { color: BRAND_COLORS.muted, fontSize: 11, lineHeight: 17 },
+  itemList: { borderRadius: 16, borderWidth: 1, borderColor: BRAND_COLORS.line, backgroundColor: BRAND_COLORS.surface, paddingHorizontal: 13 },
+  itemRow: { minHeight: 68, flexDirection: 'row', alignItems: 'center', gap: 10, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: BRAND_COLORS.line },
   itemCopy: { flex: 1, gap: 3 },
-  itemName: {
-    color: BRAND_COLORS.ink,
-    fontSize: 13,
-    lineHeight: 18,
-    fontWeight: '800',
-  },
-  itemMeta: {
-    color: BRAND_COLORS.muted,
-    fontSize: 11,
-    lineHeight: 16,
-  },
-  itemPrice: {
-    color: BRAND_COLORS.ink,
-    fontSize: 13,
-    lineHeight: 18,
-    fontWeight: '900',
-  },
-  submitButton: {
-    minHeight: 60,
-    borderRadius: 16,
-    backgroundColor: BRAND_COLORS.primary,
-    paddingHorizontal: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 12,
-  },
-  submitButtonDisabled: {
-    backgroundColor: '#9CA3AF',
-  },
+  itemName: { color: BRAND_COLORS.ink, fontSize: 13, lineHeight: 18, fontWeight: '800' },
+  itemMeta: { color: BRAND_COLORS.muted, fontSize: 11, lineHeight: 16 },
+  itemPrice: { color: BRAND_COLORS.ink, fontSize: 13, lineHeight: 18, fontWeight: '900' },
+  submitButton: { minHeight: 60, borderRadius: 16, backgroundColor: BRAND_COLORS.primary, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
+  submitButtonDisabled: { backgroundColor: '#9CA3AF' },
   submitCopy: { flex: 1, gap: 2 },
-  submitText: {
-    color: '#FFFFFF',
-    fontSize: 15,
-    lineHeight: 20,
-    fontWeight: '900',
-  },
-  submitHint: {
-    color: '#F3F4F6',
-    fontSize: 11,
-    lineHeight: 16,
-  },
-  submitTotal: {
-    color: '#FFFFFF',
-    fontSize: 15,
-    lineHeight: 20,
-    fontWeight: '900',
-  },
-  errorCard: {
-    borderRadius: 14,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: '#FECACA',
-    backgroundColor: '#FEF2F2',
-    padding: 12,
-  },
-  errorText: {
-    color: '#B91C1C',
-    fontSize: 12,
-    lineHeight: 18,
-    fontWeight: '700',
-  },
-  retryButton: {
-    minHeight: 44,
-    alignSelf: 'flex-start',
-    marginTop: 8,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#FECACA',
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  retryButtonText: {
-    color: '#B91C1C',
-    fontSize: 12,
-    lineHeight: 17,
-    fontWeight: '900',
-  },
-  centerState: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 30,
-    gap: 10,
-  },
-  stateTitle: {
-    color: BRAND_COLORS.ink,
-    fontSize: 20,
-    lineHeight: 26,
-    fontWeight: '900',
-    textAlign: 'center',
-  },
-  stateText: {
-    color: BRAND_COLORS.muted,
-    fontSize: 13,
-    lineHeight: 19,
-    textAlign: 'center',
-    maxWidth: 360,
-  },
-  primaryButton: {
-    minHeight: 48,
-    borderRadius: 14,
-    backgroundColor: BRAND_COLORS.primary,
-    paddingHorizontal: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  primaryButtonText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    lineHeight: 19,
-    fontWeight: '900',
-  },
+  submitText: { color: '#FFFFFF', fontSize: 15, lineHeight: 20, fontWeight: '900' },
+  submitHint: { color: '#F3F4F6', fontSize: 11, lineHeight: 16 },
+  submitTotal: { color: '#FFFFFF', fontSize: 15, lineHeight: 20, fontWeight: '900' },
+  errorCard: { borderRadius: 14, borderWidth: StyleSheet.hairlineWidth, borderColor: '#FECACA', backgroundColor: '#FEF2F2', padding: 12 },
+  errorText: { color: '#B91C1C', fontSize: 12, lineHeight: 18, fontWeight: '700' },
+  retryButton: { minHeight: 44, alignSelf: 'flex-start', marginTop: 8, borderRadius: 12, borderWidth: 1, borderColor: '#FECACA', backgroundColor: '#FFFFFF', paddingHorizontal: 12, alignItems: 'center', justifyContent: 'center' },
+  retryButtonText: { color: '#B91C1C', fontSize: 12, lineHeight: 17, fontWeight: '900' },
+  centerState: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 30, gap: 10 },
+  stateTitle: { color: BRAND_COLORS.ink, fontSize: 20, lineHeight: 26, fontWeight: '900', textAlign: 'center' },
+  stateText: { color: BRAND_COLORS.muted, fontSize: 13, lineHeight: 19, textAlign: 'center', maxWidth: 360 },
+  primaryButton: { minHeight: 48, borderRadius: 14, backgroundColor: BRAND_COLORS.primary, paddingHorizontal: 18, alignItems: 'center', justifyContent: 'center' },
+  primaryButtonText: { color: '#FFFFFF', fontSize: 14, lineHeight: 19, fontWeight: '900' },
   pressed: { opacity: 0.72 },
   disabled: { opacity: 0.5 },
   bottomSpace: { height: 28 },
