@@ -1,34 +1,29 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import AdminIcon from '../components/admin/AdminIcon';
 import { useAdminUi } from '../components/admin/AdminUiProvider';
-import { orderService } from '../services/orderService';
-import { productService } from '../services/productService';
 import { customerApi } from '../services/api';
-import type { CustomerDTO } from '../services/api/customerApi';
+import type {
+  CustomerDTO,
+  CustomerOrderStatus,
+  CustomerPurchaseAnalyticsDTO,
+} from '../services/api/customerApi';
 import LoadingSpinner from '../components/LoadingSpinner';
-import type { Order, Product } from '../types';
 import { formatCurrency, formatDate } from '../utils/format';
 import toast from 'react-hot-toast';
 import {
-  buildCustomerSummaries,
+  getDefaultCareStatus,
   readStoredCustomerProfiles,
   saveStoredCustomerProfiles,
   type CustomerCareStatus,
-  type CustomerSummary,
   type CustomerTier,
 } from '../utils/customerProfiles';
 
-interface RawCustomer {
-  id?: number;
-  name: string;
-  email: string;
-  phone?: string;
-  createdAt?: string;
-  password?: string;
-  isActive?: boolean;
-  orderCount?: number;
-  totalSpent?: number;
+interface AdminCustomerView extends CustomerDTO {
+  tier: CustomerTier;
+  careStatus: CustomerCareStatus;
+  note: string;
+  tags: string[];
 }
 
 const CARE_OPTIONS: Array<{ value: CustomerCareStatus; label: string; detail: string }> = [
@@ -45,16 +40,35 @@ const TIER_LABELS: Record<CustomerTier, string> = {
   'at-risk': 'Nguy cơ rời bỏ',
 };
 
-const ORDER_STATUS_LABELS: Record<Order['status'], string> = {
+const ORDER_STATUS_LABELS: Record<CustomerOrderStatus, string> = {
   pending: 'Chờ xác nhận',
   confirmed: 'Đã xác nhận',
   shipping: 'Đang giao',
   completed: 'Hoàn tất',
   cancelled: 'Đã hủy',
+  returned: 'Đã trả hàng',
 };
 
-function getCustomerKey(customer: CustomerSummary) {
-  return customer.email.toLowerCase();
+function deriveCustomerTier(customer: CustomerDTO): CustomerTier {
+  if (customer.totalSpent >= 5_000_000 || customer.completedOrders >= 8) {
+    return 'vip';
+  }
+
+  if (customer.lastCompletedOrderAt) {
+    const inactiveDays = (Date.now() - new Date(customer.lastCompletedOrderAt).getTime()) / 86_400_000;
+    if (inactiveDays >= 90) {
+      return 'at-risk';
+    }
+  }
+
+  if (customer.createdAt) {
+    const accountAgeDays = (Date.now() - new Date(customer.createdAt).getTime()) / 86_400_000;
+    if (accountAgeDays <= 30) {
+      return 'new';
+    }
+  }
+
+  return 'regular';
 }
 
 function getCareLabel(status: CustomerCareStatus) {
@@ -82,50 +96,29 @@ function getInitials(name: string) {
 export default function AdminCustomers() {
   const [searchParams] = useSearchParams();
   const { confirm, notify } = useAdminUi();
-  const [users, setUsers] = useState<RawCustomer[]>([]);
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [products, setProducts] = useState<Product[]>([]);
-  const [profiles, setProfiles] = useState(readStoredCustomerProfiles());
+  const [users, setUsers] = useState<CustomerDTO[]>([]);
+  const [profiles, setProfiles] = useState(() => readStoredCustomerProfiles());
+  const [analyticsByCustomerId, setAnalyticsByCustomerId] = useState<Record<number, CustomerPurchaseAnalyticsDTO>>({});
+  const [analyticsLoadingId, setAnalyticsLoadingId] = useState<number | null>(null);
+  const [analyticsError, setAnalyticsError] = useState('');
+  const [analyticsReloadToken, setAnalyticsReloadToken] = useState(0);
   const [loading, setLoading] = useState(true);
   const searchKeyword = searchParams.get('search') || '';
   const [searchTerm, setSearchTerm] = useState(searchKeyword);
   const [tierFilter, setTierFilter] = useState<'all' | CustomerTier>('all');
   const [careFilter, setCareFilter] = useState<'all' | CustomerCareStatus>('all');
-  const [selectedCustomerKey, setSelectedCustomerKey] = useState<string | null>(null);
+  const [selectedCustomerId, setSelectedCustomerId] = useState<number | null>(null);
   const [detailCareStatus, setDetailCareStatus] = useState<CustomerCareStatus>('following');
   const [detailNote, setDetailNote] = useState('');
   const [detailTags, setDetailTags] = useState('');
 
-  // Fetch customers from backend
-  useEffect(() => {
-    fetchCustomers();
-    setOrders(orderService.getAll());
-    setProducts(productService.getAll());
-    setProfiles(readStoredCustomerProfiles());
-  }, []);
-
-  async function fetchCustomers() {
+  const fetchCustomers = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await customerApi.getCustomers({
-        search: searchKeyword || undefined,
-        page: 1,
-        pageSize: 1000, // Get all customers for now
-      });
+      const response = await customerApi.getAllCustomers();
 
       if (response.success && response.data) {
-        // Map backend response (PascalCase) to RawCustomer format (camelCase)
-        const mappedUsers: RawCustomer[] = response.data.items.map((customer: any) => ({
-          id: customer.Id || customer.id,
-          name: customer.HoTen || customer.name,
-          email: customer.Email || customer.email,
-          phone: customer.SoDienThoai || customer.phone,
-          createdAt: customer.NgayTao || customer.createdAt,
-          isActive: customer.TrangThai !== undefined ? customer.TrangThai : customer.isActive,
-          orderCount: customer.OrderCount ?? customer.orderCount ?? 0,
-          totalSpent: customer.TotalSpent ?? customer.totalSpent ?? 0,
-        }));
-        setUsers(mappedUsers);
+        setUsers(response.data);
       } else {
         toast.error(response.error || 'Không thể tải danh sách khách hàng');
         setUsers([]);
@@ -137,16 +130,28 @@ export default function AdminCustomers() {
     } finally {
       setLoading(false);
     }
-  }
+  }, []);
+
+  useEffect(() => {
+    void fetchCustomers();
+  }, [fetchCustomers]);
 
   useEffect(() => {
     setSearchTerm(searchKeyword);
   }, [searchKeyword]);
 
-  const customers = useMemo(
-    () => buildCustomerSummaries(users, orders, profiles, products),
-    [orders, products, profiles, users],
-  );
+  const customers = useMemo<AdminCustomerView[]>(() => users.map((customer) => {
+    const tier = deriveCustomerTier(customer);
+    const storedProfile = profiles[customer.email.toLowerCase()];
+
+    return {
+      ...customer,
+      tier,
+      careStatus: storedProfile?.careStatus || getDefaultCareStatus(tier),
+      note: storedProfile?.note || '',
+      tags: storedProfile?.tags || [],
+    };
+  }).sort((left, right) => right.totalSpent - left.totalSpent || right.completedOrders - left.completedOrders), [profiles, users]);
 
   const filteredCustomers = useMemo(() => {
     const normalizedSearch = searchTerm.trim().toLowerCase();
@@ -167,14 +172,14 @@ export default function AdminCustomers() {
 
   useEffect(() => {
     if (filteredCustomers.length === 0) {
-      setSelectedCustomerKey(null);
+      setSelectedCustomerId(null);
       return;
     }
 
-    if (!selectedCustomerKey || !filteredCustomers.some((customer) => getCustomerKey(customer) === selectedCustomerKey)) {
-      setSelectedCustomerKey(getCustomerKey(filteredCustomers[0]));
+    if (!selectedCustomerId || !filteredCustomers.some((customer) => customer.id === selectedCustomerId)) {
+      setSelectedCustomerId(filteredCustomers[0].id);
     }
-  }, [filteredCustomers, selectedCustomerKey]);
+  }, [filteredCustomers, selectedCustomerId]);
 
   const stats = useMemo(
     () => ({
@@ -182,10 +187,10 @@ export default function AdminCustomers() {
       vip: customers.filter((customer) => customer.tier === 'vip').length,
       newCustomers: customers.filter((customer) => customer.tier === 'new').length,
       atRisk: customers.filter((customer) => customer.tier === 'at-risk').length,
-      repeated: customers.filter((customer) => customer.orderCount >= 2).length,
+      repeated: customers.filter((customer) => customer.completedOrders >= 2).length,
       tagged: customers.filter((customer) => customer.tags.length > 0).length,
       noPhone: customers.filter((customer) => !customer.phone).length,
-      totalRevenue: customers.reduce((sum, customer) => sum + customer.totalSpend, 0),
+      totalRevenue: customers.reduce((sum, customer) => sum + customer.totalSpent, 0),
     }),
     [customers],
   );
@@ -200,7 +205,44 @@ export default function AdminCustomers() {
   );
 
   const selectedCustomer =
-    (selectedCustomerKey && customers.find((customer) => getCustomerKey(customer) === selectedCustomerKey)) || null;
+    (selectedCustomerId && customers.find((customer) => customer.id === selectedCustomerId)) || null;
+
+  const selectedAnalytics = selectedCustomer ? analyticsByCustomerId[selectedCustomer.id] : undefined;
+  const selectedAnalyticsLoading = Boolean(selectedCustomer && analyticsLoadingId === selectedCustomer.id);
+  const selectedOrders = selectedAnalytics?.orders ?? [];
+
+  useEffect(() => {
+    if (!selectedCustomer || analyticsByCustomerId[selectedCustomer.id]) {
+      setAnalyticsError('');
+      return;
+    }
+
+    let cancelled = false;
+    const customerId = selectedCustomer.id;
+    setAnalyticsLoadingId(customerId);
+    setAnalyticsError('');
+
+    void customerApi.getPurchaseAnalytics(customerId).then((response) => {
+      if (cancelled) return;
+      if (response.success && response.data) {
+        setAnalyticsByCustomerId((current) => ({ ...current, [customerId]: response.data! }));
+        return;
+      }
+      setAnalyticsError(response.error || 'Không thể tải lịch sử mua hàng');
+    }).catch((error) => {
+      if (cancelled) return;
+      console.error('Failed to fetch customer analytics:', error);
+      setAnalyticsError('Không thể tải lịch sử mua hàng');
+    }).finally(() => {
+      if (!cancelled) {
+        setAnalyticsLoadingId((current) => current === customerId ? null : current);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [analyticsByCustomerId, analyticsReloadToken, selectedCustomer]);
 
   useEffect(() => {
     if (!selectedCustomer) {
@@ -213,15 +255,15 @@ export default function AdminCustomers() {
   }, [selectedCustomer]);
 
   const selectedProfileUpdatedAt = selectedCustomer
-    ? profiles[getCustomerKey(selectedCustomer)]?.updatedAt
+    ? profiles[selectedCustomer.email.toLowerCase()]?.updatedAt
     : undefined;
 
   const selectedRank = selectedCustomer
-    ? customers.findIndex((customer) => getCustomerKey(customer) === getCustomerKey(selectedCustomer)) + 1
+    ? customers.findIndex((customer) => customer.id === selectedCustomer.id) + 1
     : 0;
 
   const selectedRevenueShare = selectedCustomer && stats.totalRevenue > 0
-    ? Number(((selectedCustomer.totalSpend / stats.totalRevenue) * 100).toFixed(1))
+    ? Number(((selectedCustomer.totalSpent / stats.totalRevenue) * 100).toFixed(1))
     : 0;
 
   const persistProfiles = (
@@ -238,7 +280,7 @@ export default function AdminCustomers() {
       return;
     }
 
-    const customerKey = getCustomerKey(selectedCustomer);
+    const customerKey = selectedCustomer.email.toLowerCase();
     persistProfiles(
       {
         ...profiles,
@@ -254,36 +296,28 @@ export default function AdminCustomers() {
     );
   };
 
-  const handleDelete = async (customer: CustomerSummary) => {
+  const handleToggleStatus = async (customer: AdminCustomerView) => {
+    const locking = customer.isActive;
     const accepted = await confirm({
-      title: 'Khóa tài khoản khách hàng',
-      message: `Tài khoản ${customer.name} sẽ bị khóa (inactive). Bạn có thể mở khóa lại sau.`,
-      confirmLabel: 'Khóa tài khoản',
-      tone: 'danger',
-      icon: 'fa-user-slash',
+      title: locking ? 'Khóa tài khoản khách hàng' : 'Mở khóa tài khoản khách hàng',
+      message: locking
+        ? `Tài khoản ${customer.name} sẽ bị khóa. Bạn có thể mở khóa lại sau.`
+        : `Tài khoản ${customer.name} sẽ được kích hoạt lại.`,
+      confirmLabel: locking ? 'Khóa tài khoản' : 'Mở khóa',
+      tone: locking ? 'danger' : 'success',
+      icon: locking ? 'fa-user-slash' : 'fa-check-circle',
     });
 
     if (!accepted) {
       return;
     }
 
-    // Find customer ID from users list
-    const user = users.find((u) => u.email.toLowerCase() === customer.email.toLowerCase());
-    if (!user || !user.id) {
-      notify({ message: 'Không tìm thấy ID khách hàng.', tone: 'error' });
-      return;
-    }
-
     try {
-      const response = await customerApi.toggleStatus(user.id);
+      const response = await customerApi.toggleStatus(customer.id);
       
       if (response.success) {
         notify({ message: 'Đã cập nhật trạng thái khách hàng.', tone: 'success' });
-        fetchCustomers(); // Refresh list
-        
-        if (selectedCustomerKey === customer.email.toLowerCase()) {
-          setSelectedCustomerKey(null);
-        }
+        await fetchCustomers();
       } else {
         notify({ message: response.error || 'Không thể cập nhật trạng thái.', tone: 'error' });
       }
@@ -433,13 +467,13 @@ export default function AdminCustomers() {
               </div>
             ) : (
               filteredCustomers.map((customer) => {
-                const isSelected = selectedCustomerKey === getCustomerKey(customer);
+                const isSelected = selectedCustomerId === customer.id;
 
                 return (
                   <article
                     key={customer.email}
                     className={`customers-roster-card ${isSelected ? 'is-selected' : ''}`}
-                    onClick={() => setSelectedCustomerKey(getCustomerKey(customer))}
+                    onClick={() => setSelectedCustomerId(customer.id)}
                   >
                     <div className="customers-roster-main">
                       <div className="customers-roster-avatar">{getInitials(customer.name)}</div>
@@ -462,14 +496,14 @@ export default function AdminCustomers() {
                         <div className="customers-metric-grid">
                           <div>
                             <span>Tổng chi tiêu</span>
-                            <strong>{formatCurrency(customer.totalSpend)}</strong>
+                            <strong>{formatCurrency(customer.totalSpent)}</strong>
                           </div>
                           <div>
                             <span>Đơn hàng</span>
                             <strong>{customer.orderCount}</strong>
                           </div>
                           <div>
-                            <span>Đơn hợp lệ</span>
+                            <span>Đơn hoàn thành</span>
                             <strong>{customer.completedOrders}</strong>
                           </div>
                           <div>
@@ -478,38 +512,30 @@ export default function AdminCustomers() {
                           </div>
                         </div>
 
-                        <div className="customers-tag-strip">
-                          {(customer.tags.length > 0 ? customer.tags : customer.topCategories.slice(0, 2)).map((tag) => (
-                            <span key={tag} className="customers-tag-chip">{tag}</span>
-                          ))}
-                          {customer.tags.length === 0 && customer.topCategories.length === 0 ? (
-                            <span className="customers-tag-chip is-muted">Chưa có tag hoặc sở thích nổi bật</span>
-                          ) : null}
-                        </div>
+                        {customer.tags.length > 0 ? (
+                          <div className="customers-tag-strip">
+                            {customer.tags.map((tag) => (
+                              <span key={tag} className="customers-tag-chip">{tag}</span>
+                            ))}
+                          </div>
+                        ) : null}
                       </div>
                     </div>
 
                     <div className="customers-roster-actions">
                       <button type="button" className="customers-card-btn" onClick={(event) => {
                         event.stopPropagation();
-                        const customerKey = getCustomerKey(customer);
-                        // Force re-render by setting to null first if already selected
-                        if (selectedCustomerKey === customerKey) {
-                          setSelectedCustomerKey(null);
-                          setTimeout(() => setSelectedCustomerKey(customerKey), 0);
-                        } else {
-                          setSelectedCustomerKey(customerKey);
-                        }
+                        setSelectedCustomerId(customer.id);
                       }}>
                         <AdminIcon name="fa-eye" />
                         <span>Mở hồ sơ</span>
                       </button>
-                      <button type="button" className="customers-card-btn is-danger" onClick={(event) => {
+                      <button type="button" className={`customers-card-btn ${customer.isActive ? 'is-danger' : ''}`} onClick={(event) => {
                         event.stopPropagation();
-                        void handleDelete(customer);
+                        void handleToggleStatus(customer);
                       }}>
-                        <AdminIcon name="fa-ban" />
-                        <span>Khóa</span>
+                        <AdminIcon name={customer.isActive ? 'fa-ban' : 'fa-check-circle'} />
+                        <span>{customer.isActive ? 'Khóa' : 'Mở khóa'}</span>
                       </button>
                     </div>
                   </article>
@@ -545,16 +571,17 @@ export default function AdminCustomers() {
                 </div>
 
                 <div className="customers-dossier-metrics">
-                  <article><span>Tổng chi tiêu</span><strong>{formatCurrency(selectedCustomer.totalSpend)}</strong></article>
+                  <article><span>Tổng chi tiêu</span><strong>{formatCurrency(selectedCustomer.totalSpent)}</strong></article>
                   <article><span>Đơn hàng</span><strong>{selectedCustomer.orderCount}</strong></article>
+                  <article><span>Đơn hoàn thành</span><strong>{selectedCustomer.completedOrders}</strong></article>
                   <article><span>Tỷ trọng doanh thu</span><strong>{selectedRevenueShare}%</strong></article>
-                  <article><span>Tham gia</span><strong>{selectedCustomer.createdAt ? formatDate(selectedCustomer.createdAt) : '--'}</strong></article>
                 </div>
 
                 <div className="customers-detail-list">
                   <div><span>Đơn đầu tiên</span><strong>{selectedCustomer.firstOrderAt ? formatDate(selectedCustomer.firstOrderAt) : '--'}</strong></div>
                   <div><span>Đơn gần nhất</span><strong>{selectedCustomer.lastOrderAt ? formatDate(selectedCustomer.lastOrderAt) : '--'}</strong></div>
                   <div><span>Trạng thái gần nhất</span><strong>{selectedCustomer.lastOrderStatus ? ORDER_STATUS_LABELS[selectedCustomer.lastOrderStatus] : 'Chưa có'}</strong></div>
+                  <div><span>Tham gia</span><strong>{selectedCustomer.createdAt ? formatDate(selectedCustomer.createdAt) : '--'}</strong></div>
                   <div><span>Lần cập nhật hồ sơ</span><strong>{selectedProfileUpdatedAt ? formatDate(selectedProfileUpdatedAt) : 'Chưa cập nhật'}</strong></div>
                 </div>
               </section>
@@ -601,9 +628,9 @@ export default function AdminCustomers() {
                     <AdminIcon name="fa-save" />
                     <span>Lưu hồ sơ</span>
                   </button>
-                  <button type="button" className="customers-ghost-btn is-danger" onClick={() => void handleDelete(selectedCustomer)}>
-                    <AdminIcon name="fa-ban" />
-                    <span>Khóa khách hàng</span>
+                  <button type="button" className={`customers-ghost-btn ${selectedCustomer.isActive ? 'is-danger' : ''}`} onClick={() => void handleToggleStatus(selectedCustomer)}>
+                    <AdminIcon name={selectedCustomer.isActive ? 'fa-ban' : 'fa-check-circle'} />
+                    <span>{selectedCustomer.isActive ? 'Khóa khách hàng' : 'Mở khóa khách hàng'}</span>
                   </button>
                 </div>
               </section>
@@ -616,23 +643,36 @@ export default function AdminCustomers() {
                   </div>
                 </div>
 
-                <div className="customers-interest-block">
-                  <span>Danh mục mua nhiều</span>
-                  <div className="customer-tag-list">
-                    {(selectedCustomer.topCategories.length > 0 ? selectedCustomer.topCategories : ['Chưa có dữ liệu']).map((category) => (
-                      <span key={category} className="customer-tag">{category}</span>
-                    ))}
+                {selectedAnalyticsLoading ? (
+                  <div className="customers-dossier-empty"><p>Đang tải dữ liệu mua hàng...</p></div>
+                ) : analyticsError ? (
+                  <div className="customers-dossier-empty">
+                    <p>{analyticsError}</p>
+                    <button type="button" className="customers-ghost-btn" onClick={() => setAnalyticsReloadToken((value) => value + 1)}>
+                      Thử lại
+                    </button>
                   </div>
-                </div>
+                ) : (
+                  <>
+                    <div className="customers-interest-block">
+                      <span>Danh mục mua nhiều</span>
+                      <div className="customer-tag-list">
+                        {(selectedAnalytics?.topCategories.length ? selectedAnalytics.topCategories : ['Chưa có dữ liệu']).map((category) => (
+                          <span key={category} className="customer-tag">{category}</span>
+                        ))}
+                      </div>
+                    </div>
 
-                <div className="customers-interest-block">
-                  <span>Sản phẩm mua nhiều</span>
-                  <div className="customer-tag-list">
-                    {(selectedCustomer.purchasedProducts.length > 0 ? selectedCustomer.purchasedProducts : ['Chưa có dữ liệu']).map((product) => (
-                      <span key={product} className="customer-tag subtle">{product}</span>
-                    ))}
-                  </div>
-                </div>
+                    <div className="customers-interest-block">
+                      <span>Sản phẩm mua nhiều</span>
+                      <div className="customer-tag-list">
+                        {(selectedAnalytics?.purchasedProducts.length ? selectedAnalytics.purchasedProducts : ['Chưa có dữ liệu']).map((product) => (
+                          <span key={product} className="customer-tag subtle">{product}</span>
+                        ))}
+                      </div>
+                    </div>
+                  </>
+                )}
 
                 {selectedCustomer.tags.length > 0 ? (
                   <div className="customers-interest-block">
@@ -654,18 +694,22 @@ export default function AdminCustomers() {
                   </div>
                 </div>
 
-                {selectedCustomer.orders.length === 0 ? (
+                {selectedAnalyticsLoading ? (
+                  <div className="customers-dossier-empty"><p>Đang tải lịch sử đơn hàng...</p></div>
+                ) : analyticsError ? (
+                  <div className="customers-dossier-empty"><p>{analyticsError}</p></div>
+                ) : selectedOrders.length === 0 ? (
                   <div className="customers-dossier-empty">
                     <AdminIcon name="fa-shopping-bag" />
                     <p>Khách hàng này chưa có đơn hàng nào.</p>
                   </div>
                 ) : (
                   <div className="customer-order-list">
-                    {selectedCustomer.orders.map((order) => (
+                    {selectedOrders.map((order) => (
                       <article key={order.id} className="customer-order-item">
                         <div>
-                          <strong>#{order.id}</strong>
-                          <span>{formatDate(order.createdAt)} • {order.items.length} sản phẩm</span>
+                          <strong>{order.orderCode || `#${order.id}`}</strong>
+                          <span>{formatDate(order.createdAt)} • {order.itemCount} sản phẩm</span>
                         </div>
                         <div className="customer-order-meta">
                           <span className={`customer-order-status ${order.status}`}>{ORDER_STATUS_LABELS[order.status]}</span>
