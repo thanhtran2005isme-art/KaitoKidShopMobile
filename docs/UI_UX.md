@@ -178,3 +178,11 @@ Luồng guest account, login, register và forgot-password dùng cùng một vis
 - `useReducedMotion()` phải tắt entrance/transition không cần thiết cho người nhạy cảm với chuyển động;
 - màu tím là action/focus chính; cam chỉ là accent thương hiệu;
 - không thêm social login chỉ để trang trí nếu Mobile chưa tích hợp OAuth flow thật.
+
+## Mobile Search — tìm kiếm dữ liệu thật
+
+- Ô tìm ở Home là `Pressable` mở route `/search` để tránh nhập hai lần; search page sở hữu `TextInput` với phím Search, clear, focus và suggestions.
+- API tìm kiếm dùng `/api/search` và `/api/search/suggestions` của Node: backend lọc sản phẩm `active`, tính total/facets và phân trang; Mobile không cắt 20 sản phẩm rồi tự coi là tất cả.
+- Debounce từ khóa 350ms; áp dụng generation guard cho request thay đổi từ khóa/bộ lọc hoặc load-more để dữ liệu cũ không ghi đè dữ liệu mới.
+- Sắp xếp theo backend `sortBy`, category và khoảng giá theo backend. Kết quả có loading/error/retry/empty/đề xuất từ khóa; không tạo dữ liệu demo, không fake con số.
+- Giữ giao diện monochrome theo `BRAND_COLORS` của source (ưu tiên tokens đang dùng, không lấy palette tím cũ trong tài liệu).
