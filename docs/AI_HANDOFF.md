@@ -53,6 +53,7 @@ Node là background worker owner duy nhất; critical workers vẫn điều khi�
 - Physical device: LAN auto-detect hoặc ADB reverse `5300`
 - Google native login cần development/native build; Expo Go không chứa native Google module.
 - `ShoppingContext` phải chờ `AuthContext` restore session xong trước khi xử lý trạng thái no-token/logout.
+- Mobile Quantity: Product Detail và Cart cho chạm số lượng để nhập bàn phím số, commit khi blur/Done. Product lấy max từ tồn biến thể, Cart lấy max từ số đang giữ + số chưa giữ; backend xác thực cập nhật tồn kho.
 - Mobile Search: Home bar là lối vào `/search`; `apps/mobile/src/services/product-search.api.ts` dùng `/api/search` + `/api/search/suggestions` (Node :5300) cho gợi ý, lọc category/giá, sort và phân trang thật. Không lọc catalog cục bộ hoặc dùng dữ liệu giả.
 - Partial checkout giữ continuity qua reload bằng cách chỉ persist `CartItemIds` đã chọn: Expo Web dùng `localStorage`, native dùng `expo-secure-store`. Sau restore, Mobile tải cart thật từ backend rồi giữ các ID còn hợp lệ; logout xóa selection đã persist.
 - Không persist snapshot sản phẩm/giá/tồn kho/coupon/shipping làm source of truth ở checkout; backend vẫn authoritative theo D015 và D024.

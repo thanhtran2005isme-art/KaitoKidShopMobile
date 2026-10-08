@@ -186,3 +186,12 @@ Luồng guest account, login, register và forgot-password dùng cùng một vis
 - Debounce từ khóa 350ms; áp dụng generation guard cho request thay đổi từ khóa/bộ lọc hoặc load-more để dữ liệu cũ không ghi đè dữ liệu mới.
 - Sắp xếp theo backend `sortBy`, category và khoảng giá theo backend. Kết quả có loading/error/retry/empty/đề xuất từ khóa; không tạo dữ liệu demo, không fake con số.
 - Giữ giao diện monochrome theo `BRAND_COLORS` của source (ưu tiên tokens đang dùng, không lấy palette tím cũ trong tài liệu).
+
+## Mobile Quantity — nhập thủ công khi mua hàng
+
+- Product Detail và Cart sử dụng cùng ô nhập `QuantityNumberInput`, giữ hai nút tăng/giảm cho thao tác nhanh.
+- Chạm vào số để mở bàn phím số; chọn toàn bộ số cũ, nhập số nguyên dương mới, nhấn Done hoặc rời ô để áp dụng.
+- Không gửi request cập nhật Cart trên mỗi phím bấm: chỉ commit khi hoàn thành nhập; `0` về `1`, chuỗi rỗng trả về số trước đó, số vượt tồn kho được giới hạn bằng tồn kho hiện hành.
+- Product Detail giới hạn theo `availableStock` của biến thể; Cart giới hạn tổng bằng `item.quantity + item.availableStock` vì lượng trong Cart đã được reserve.
+- Cart gọi API cập nhật giỏ thật, có trạng thái busy/lỗi và refresh khi backend từ chối; backend là nguồn kiểm tra tồn kho cuối cùng.
+- Kiểm tra bàn phím số Android/iOS/Expo Web, nút +/- cạnh ô nhập, chuyển biến thể, cập nhật giỏ nhiều dòng và chống submit trùng.

@@ -17,6 +17,7 @@ import { ProductGallery } from '@/components/product/product-gallery';
 import { ProductReviewsPreview } from '@/components/product/product-reviews-preview';
 import { ProductSizeGuide } from '@/components/product/product-size-guide';
 import { AppIcon } from '@/components/ui/app-icon';
+import { QuantityNumberInput } from '@/components/ui/quantity-number-input';
 import { BRAND, BRAND_COLORS } from '@/constants/brand';
 import { useAuth } from '@/context/AuthContext';
 import { useShopping } from '@/context/ShoppingContext';
@@ -580,7 +581,13 @@ export default function ProductDetailScreen() {
                   style={[styles.stepButton, quantity <= 1 && styles.stepDisabled]}>
                   <Text style={styles.stepText}>−</Text>
                 </Pressable>
-                <Text accessibilityLiveRegion="polite" style={styles.stepValue}>{availableStock > 0 ? quantity : 0}</Text>
+                <QuantityNumberInput
+                  max={availableStock}
+                  onChange={setQuantity}
+                  value={quantity}
+                  variant="dark"
+                  disabled={actionBusy !== null}
+                />
                 <Pressable
                   accessibilityLabel="Tăng số lượng"
                   accessibilityRole="button"
@@ -725,7 +732,6 @@ const styles = StyleSheet.create({
   stepButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   stepDisabled: { opacity: 0.32 },
   stepText: { color: '#FFFFFF', fontSize: 20, lineHeight: 24, fontWeight: '800' },
-  stepValue: { minWidth: 34, textAlign: 'center', color: '#FFFFFF', fontSize: 13, lineHeight: 18, fontWeight: '900' },
   feedback: { borderRadius: 10, paddingHorizontal: 11, paddingVertical: 9, borderWidth: StyleSheet.hairlineWidth },
   feedbackSuccess: { backgroundColor: 'rgba(6,78,59,0.34)', borderColor: '#10B981' },
   feedbackError: { backgroundColor: 'rgba(127,29,29,0.34)', borderColor: '#F87171' },
