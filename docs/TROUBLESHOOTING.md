@@ -249,3 +249,12 @@ npm --prefix apps\api run build
 ```
 
 Build hợp lệ tạo `apps/api/dist/main.js`, `dist/modules/*`, `dist/scripts/*`.
+
+## Mobile / Expo Web: hai nút xác nhận giao hàng không phản hồi
+
+- `/orders/[id]` trong PR #75 có nút nhận/chưa nhận khi backend trả `canConfirmReceived` hoặc `canReportNotReceived`.
+- Expo Web không hỗ trợ `Alert.alert()` như native; hai nút dùng `Modal` React Native để xác nhận trên Web, Android và iOS.
+- Nút `Để sau` không gọi API. Đồng ý mới gọi `POST /api/orders/:id/confirm-received` hoặc `POST /api/orders/:id/report-not-received` với token chủ đơn.
+- Khóa gửi lặp, hiển thị đang xử lý; thành công thông báo ngay trong màn hình và tải lại trạng thái đơn. Nếu thao tác thành công nhưng tải lại lỗi, vẫn báo thao tác đã ghi nhận và hướng dẫn kéo để làm mới.
+- Xác nhận nhận hàng mới chuyển `received_by_customer`/`completed`, bắt đầu cửa sổ hậu mãi server trả. Báo chưa nhận thành `delivery_disputed` để đối soát, không tự hủy hoặc hoàn kho.
+- Nghiệm thu trên Expo Web và Android/iOS: thử đồng ý/từ chối modal; xác nhận rằng chỉ đồng ý mới gửi 1 request; kiểm tra trạng thái và lịch sử vận chuyển trong DB.
