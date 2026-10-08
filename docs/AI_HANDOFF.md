@@ -1,6 +1,6 @@
 # AI Handoff — Current State
 
-Last updated: 2026-10-04
+Last updated: 2026-10-08
 
 ## Repository
 
@@ -63,6 +63,7 @@ Node là background worker owner duy nhất; critical workers vẫn điều khi�
 - Customer + Staff/Admin cùng gọi Node `:5300`
 - Staff auth dùng chung `adminApiClient`; không fallback về legacy `localhost:5053`.
 - Chat realtime gọi Socket.IO Node `/chatHub`
+- Admin Khách hàng có `GET /api/admin/customers/summary` trả số liệu toàn tệp trực tiếp từ MariaDB theo `NguoiDungId`, độc lập với phân trang Web. Doanh thu chỉ tính đơn hoàn thành; lỗi API không còn bị ngụy trang thành tệp khách rỗng.
 
 ## Database
 

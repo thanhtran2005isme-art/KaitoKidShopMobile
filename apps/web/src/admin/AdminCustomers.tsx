@@ -7,6 +7,7 @@ import type {
   CustomerDTO,
   CustomerOrderStatus,
   CustomerPurchaseAnalyticsDTO,
+  CustomerSummaryDTO,
 } from '../services/api/customerApi';
 import LoadingSpinner from '../components/LoadingSpinner';
 import { formatCurrency, formatDate } from '../utils/format';
@@ -97,6 +98,9 @@ export default function AdminCustomers() {
   const [searchParams] = useSearchParams();
   const { confirm, notify } = useAdminUi();
   const [users, setUsers] = useState<CustomerDTO[]>([]);
+  const [summary, setSummary] = useState<CustomerSummaryDTO | null>(null);
+  const [customersError, setCustomersError] = useState('');
+  const [summaryError, setSummaryError] = useState('');
   const [profiles, setProfiles] = useState(() => readStoredCustomerProfiles());
   const [analyticsByCustomerId, setAnalyticsByCustomerId] = useState<Record<number, CustomerPurchaseAnalyticsDTO>>({});
   const [analyticsLoadingId, setAnalyticsLoadingId] = useState<number | null>(null);
@@ -115,18 +119,29 @@ export default function AdminCustomers() {
   const fetchCustomers = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await customerApi.getAllCustomers();
+      const [response, summaryResponse] = await Promise.all([
+        customerApi.getAllCustomers(),
+        customerApi.getSummary(),
+      ]);
 
       if (response.success && response.data) {
         setUsers(response.data);
+        setCustomersError('');
       } else {
-        toast.error(response.error || 'Không thể tải danh sách khách hàng');
-        setUsers([]);
+        const message = response.error || 'Không thể tải danh sách khách hàng.';
+        setCustomersError(message);
+        toast.error(message);
+      }
+
+      if (summaryResponse.success && summaryResponse.data) {
+        setSummary(summaryResponse.data);
+        setSummaryError('');
+      } else {
+        setSummaryError(summaryResponse.error || 'Không thể tải thống kê khách hàng.');
       }
     } catch (error) {
       console.error('Failed to fetch customers:', error);
-      toast.error('Không thể tải danh sách khách hàng');
-      setUsers([]);
+      setCustomersError('Không thể kết nối API khách hàng. Kiểm tra Node :5300 và quyền customers.view.');
     } finally {
       setLoading(false);
     }
@@ -183,16 +198,20 @@ export default function AdminCustomers() {
 
   const stats = useMemo(
     () => ({
-      total: customers.length,
+      total: summary?.totalCustomers ?? customers.length,
       vip: customers.filter((customer) => customer.tier === 'vip').length,
       newCustomers: customers.filter((customer) => customer.tier === 'new').length,
       atRisk: customers.filter((customer) => customer.tier === 'at-risk').length,
-      repeated: customers.filter((customer) => customer.completedOrders >= 2).length,
+      repeated: summary?.repeatCustomers ?? customers.filter((customer) => customer.completedOrders >= 2).length,
+      withOrders: summary?.customersWithOrders ?? customers.filter((customer) => customer.orderCount > 0).length,
+      withoutOrders: summary?.customersWithoutOrders ?? customers.filter((customer) => customer.orderCount === 0).length,
+      completedOrders: summary?.completedOrders ?? customers.reduce((sum, customer) => sum + customer.completedOrders, 0),
+      cancelledOrders: summary?.cancelledOrders ?? customers.reduce((sum, customer) => sum + customer.cancelledOrders, 0),
       tagged: customers.filter((customer) => customer.tags.length > 0).length,
       noPhone: customers.filter((customer) => !customer.phone).length,
-      totalRevenue: customers.reduce((sum, customer) => sum + customer.totalSpent, 0),
+      totalRevenue: summary?.totalRevenue ?? customers.reduce((sum, customer) => sum + customer.totalSpent, 0),
     }),
-    [customers],
+    [customers, summary],
   );
 
   const careCounts = useMemo(
@@ -335,6 +354,13 @@ export default function AdminCustomers() {
         <div className="customers-concierge-shell">
         <aside className="customers-sideboard">
           <section className="customers-brand-card">
+            {customersError ? (
+              <div role="alert" className="customers-dossier-empty">
+                <strong>Không tải được dữ liệu khách hàng</strong>
+                <p>{customersError}</p>
+                <button type="button" className="customers-ghost-btn" onClick={() => void fetchCustomers()}>Thử tải lại</button>
+              </div>
+            ) : null}
             <span className="customers-overline">Quản lý khách hàng</span>
             <h1>Khách hàng</h1>
             <p>
@@ -370,7 +396,21 @@ export default function AdminCustomers() {
             <div className="customers-money-block">
               <span className="customers-overline">Tổng chi tiêu</span>
               <strong>{formatCurrency(stats.totalRevenue)}</strong>
-              <p>{stats.repeated} khách đã mua từ 2 đơn trở lên, {stats.tagged} hồ sơ đã có gắn tag.</p>
+              <p>Doanh thu chỉ tính từ đơn đã hoàn thành.</p>
+              <p>{stats.repeated} khách mua lại, {stats.tagged} hồ sơ có gắn tag.</p>
+            </div>
+
+            {summaryError ? (
+              <div className="customers-mini-note" role="alert">
+                <span>{summaryError} Đang dùng số liệu danh sách đã tải.</span>
+                <button type="button" className="customers-ghost-btn" onClick={() => void fetchCustomers()}>Thử lại</button>
+              </div>
+            ) : null}
+            <div className="customers-detail-list">
+              <div><span>Khách đã đặt hàng</span><strong>{stats.withOrders}</strong></div>
+              <div><span>Khách chưa đặt hàng</span><strong>{stats.withoutOrders}</strong></div>
+              <div><span>Đơn hoàn thành</span><strong>{stats.completedOrders}</strong></div>
+              <div><span>Đơn đã hủy</span><strong>{stats.cancelledOrders}</strong></div>
             </div>
           </section>
 
