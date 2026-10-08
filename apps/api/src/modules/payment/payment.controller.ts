@@ -1,5 +1,5 @@
 import {
-  BadRequestException,
+  Body,
   Controller,
   ForbiddenException,
   Get,
@@ -44,6 +44,16 @@ export class PaymentController {
     const result = await this.payment.getStatus(user.id, orderCode);
     if (!result) throw new NotFoundException("Không tìm thấy đơn hàng");
     return result;
+  }
+
+  /**
+   * Public endpoint do payOS gọi. Không dùng KaitoKid JWT; trust boundary là
+   * checksum signature được PayOsService.verifyWebhook() xác thực.
+   */
+  @Post("payos/webhook")
+  @HttpCode(HttpStatus.OK)
+  payOsWebhook(@Body() body: unknown) {
+    return this.payment.handlePayOsWebhook(body);
   }
 
   @Post("mark-paid/:orderCode")

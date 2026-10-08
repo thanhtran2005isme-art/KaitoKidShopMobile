@@ -20,7 +20,7 @@ export { pageApi, type PageDTO } from './pageApi';
 export { menuApi, type MenuDTO } from './menuApi';
 export { collectionApi, type CollectionDTO, type PublicCollectionDTO } from './collectionApi';
 export { lookbookApi, type LookbookDTO, type PublicLookbookDTO, type LookbookHotspotDTO } from './lookbookApi';
-export { settingsApi, type SettingDTO, type UpsertSettingDTO } from './settingsApi';
+export { settingsApi, type SettingDTO, type UpsertSettingDTO, type VietQrBankDTO, type VietQrAccountLookupDTO } from './settingsApi';
 export { cartApi, type CartItemDTO as CartItemBackendDTO, type AddToCartPayload, type ComboDiscountResult, type ReorderResult } from './cartApi';
 export { customerOrderApi, customerReviewApi, type CustomerOrderDTO, type CustomerOrderItemDTO, type CreateReviewPayload, type ReviewDTO as CustomerReviewDTO } from './customerOrderApi';
 export { accountApi, type AccountDTO, type UpdateAccountPayload, type ChangePasswordPayload, type PointsHistoryDTO, type RedeemResultDTO, type PersonalVoucher } from './accountApi';
@@ -38,7 +38,13 @@ export { adminShippingApi, type ShippingConfig as AdminShippingConfig, type Ship
 
 export { ghnLocationApi, type GhnProvince as GhnProvinceItem2, type GhnDistrict as GhnDistrictItem2, type GhnWard as GhnWardItem } from './ghnLocationApi';
 
-export { paymentApi, type PaymentStatus, type PaymentConfig } from './paymentApi';
+export {
+  paymentApi,
+  type PaymentStatus,
+  type PaymentConfig,
+  type PaymentInstructions,
+  type PaymentInstructionBankAccount,
+} from './paymentApi';
 
 export { searchApi, type SearchRequest, type SearchResult, type SearchFacets, type SuggestionResponse, type ImageSearchItem, type ImageSearchResult } from './searchApi';
 

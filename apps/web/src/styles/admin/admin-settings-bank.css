@@ -1,0 +1,111 @@
+.admin-wrapper .settings-field select {
+  width: 100%;
+  min-height: 46px;
+  padding: 13px 42px 13px 14px;
+  border: 1px solid rgba(88, 69, 50, 0.14);
+  border-radius: 14px;
+  background: #fffdf9;
+  color: var(--settings-ink);
+  font: inherit;
+}
+
+.admin-wrapper .settings-field input:read-only {
+  background: #f4f1eb;
+  color: #4b443c;
+  cursor: default;
+}
+
+.admin-wrapper .settings-bank-select-row {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+}
+
+.admin-wrapper .settings-bank-logo {
+  width: 44px;
+  height: 44px;
+  object-fit: contain;
+  border: 1px solid var(--settings-line);
+  border-radius: 12px;
+  background: #fff;
+  padding: 4px;
+}
+
+.admin-wrapper .settings-bank-verify-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 14px;
+}
+
+.admin-wrapper .settings-bank-status,
+.admin-wrapper .settings-bank-catalog-error {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 44px;
+  padding: 10px 13px;
+  border-radius: 14px;
+  border: 1px solid var(--settings-line);
+  background: rgba(255, 255, 255, 0.72);
+  color: var(--settings-muted);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.admin-wrapper .settings-bank-status.is-verified {
+  color: #276447;
+  border-color: rgba(39, 100, 71, 0.24);
+  background: rgba(39, 100, 71, 0.08);
+}
+
+.admin-wrapper .settings-bank-status.is-error,
+.admin-wrapper .settings-bank-catalog-error {
+  color: #a43b36;
+  border-color: rgba(164, 59, 54, 0.24);
+  background: rgba(164, 59, 54, 0.07);
+}
+
+.admin-wrapper .settings-bank-status.is-loading {
+  color: #405f68;
+  border-color: rgba(64, 95, 104, 0.22);
+  background: rgba(64, 95, 104, 0.07);
+}
+
+.admin-wrapper .settings-bank-catalog-error {
+  justify-content: flex-start;
+  width: 100%;
+}
+
+.admin-wrapper .settings-bank-catalog-error .settings-secondary-btn {
+  margin-left: auto;
+}
+
+.admin-wrapper .settings-primary-btn:disabled,
+.admin-wrapper .settings-secondary-btn:disabled,
+.admin-wrapper .settings-field select:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+@media (max-width: 700px) {
+  .admin-wrapper .settings-bank-select-row {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-wrapper .settings-bank-logo {
+    display: none;
+  }
+
+  .admin-wrapper .settings-bank-verify-row {
+    align-items: stretch;
+  }
+
+  .admin-wrapper .settings-bank-status,
+  .admin-wrapper .settings-bank-verify-row .settings-secondary-btn {
+    width: 100%;
+  }
+}

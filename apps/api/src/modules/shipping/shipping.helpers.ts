@@ -12,6 +12,7 @@ export interface ShippingConfig {
   mockEnabled: boolean;
   ghnEnabled: boolean;
   ghtkEnabled: boolean;
+  lalamoveEnabled: boolean;
   ghnBaseUrl: string;
   ghnToken: string | null;
   ghnShopId: string | null;
@@ -22,6 +23,15 @@ export interface ShippingConfig {
   ghtkToken: string | null;
   ghtkPickProvince: string | null;
   ghtkPickDistrict: string | null;
+  lalamoveBaseUrl: string;
+  lalamoveMarket: string;
+  lalamoveApiKey: string | null;
+  lalamoveApiSecret: string | null;
+  lalamoveServiceType: string;
+  pickupAddress: string | null;
+  pickupName: string | null;
+  pickupPhone: string | null;
+  defaultWeightGram: number;
   kaitoKidBranches: KaitoKidBranch[];
   mockOnlyServeBranches: boolean;
   mockFeeSameProvince: number;
@@ -164,7 +174,6 @@ export function numberValue(value: unknown, fallback: number): number {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : fallback;
 }
-
 
 export function normalizeGhnName(value: string | null | undefined): string {
   let result = (value ?? "").trim().toLowerCase();

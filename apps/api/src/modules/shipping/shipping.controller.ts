@@ -16,15 +16,27 @@ import { CurrentUser } from "../../auth/current-user.decorator.js";
 import type { AuthenticatedUser } from "../../auth/authenticated-user.js";
 import { JwtAuthGuard } from "../../auth/jwt-auth.guard.js";
 import { queryOptionalInt } from "../../common/query-value.js";
+import { LalamoveShippingService } from "./lalamove-shipping.service.js";
 import { ShippingService } from "./shipping.service.js";
 
 @Controller("api/shipping")
 export class ShippingController {
-  constructor(private readonly shipping: ShippingService) {}
+  constructor(
+    private readonly shipping: ShippingService,
+    private readonly lalamove: LalamoveShippingService,
+  ) {}
 
   @Get("providers")
-  getProviders() {
-    return this.shipping.getProviders();
+  async getProviders() {
+    const providers = await this.shipping.getProviders();
+    return providers.map((provider) =>
+      provider.code === "lalamove"
+        ? {
+            ...provider,
+            note: "Phí và vận đơn thật qua Lalamove API; trạng thái đồng bộ bằng webhook/tracking.",
+          }
+        : provider
+    );
   }
 
   @Post("quote")
@@ -61,6 +73,19 @@ export class ShippingController {
       toWardCode:
         typeof body.toWardCode === "string" ? body.toWardCode : null,
     });
+  }
+
+  @Post("lalamove/webhook")
+  @HttpCode(HttpStatus.OK)
+  lalamoveWebhook(@Body() body: Record<string, unknown>) {
+    // Lalamove validates a newly configured webhook URL with an initial
+    // request that can contain no body and requires HTTP 200. Only that
+    // empty validation request bypasses HMAC verification; every real event
+    // still goes through LalamoveShippingService.handleWebhook().
+    if (!body || Object.keys(body).length === 0) {
+      return { received: true, validation: true };
+    }
+    return this.lalamove.handleWebhook(body);
   }
 
   @Get("track/:orderCode")

@@ -33,7 +33,7 @@ docs           durable project context
 
 `apps/api` chạy mặc định ở port `5300` và chứa các module Auth, Staff/RBAC, catalog, cart/reservation, checkout/order, coupon, payment, shipping, account, addresses, wishlist, reviews, notifications, referral, search/recommendation, chat/realtime, admin/CMS/inventory/stock receipts và media/static.
 
-Realtime dùng Socket.IO trên cùng origin với path:
+Realtime chat dùng Socket.IO trên cùng origin với path:
 
 ```text
 /chatHub
@@ -92,6 +92,23 @@ USB launcher reverse `8081` và `5300` khi có đúng một thiết bị ADB aut
 ## Media
 
 Node phục vụ upload/public assets và mount shared `apps/web/public`. Fallback `/products/*` và `/lookbook/*` vẫn giữ để dữ liệu legacy không tạo 404.
+
+## Payment boundary
+
+Online payment hiện hành trên PR #75 là payOS:
+
+- secrets chỉ ở Node: `PAYOS_CLIENT_ID`, `PAYOS_API_KEY`, `PAYOS_CHECKSUM_KEY`;
+- `DonHang.Id` là integer `orderCode` gửi sang payOS; `MaDonHang` là display code;
+- QR/payment link được backend tạo/khôi phục và trả qua owner-scoped payment instructions;
+- `POST /api/payment/payos/webhook` là public provider callback nhưng bắt buộc verify checksum + amount + currency + order mapping;
+- `NgayThanhToan`/`confirmed` chỉ được set qua verified provider/reconcile path hoặc admin/dev compatibility path hiện có;
+- Web/Mobile poll payment status khoảng 3 giây khi pending để refresh UI; polling không phải payment authority và không thay webhook verification;
+- cancel/expiry của online payment phải provider-first rồi mới commerce-second;
+- online shipment chỉ được tạo sau khi paid;
+- runtime online payment chỉ bật khi đủ payOS credentials và `payosEnabled` không bị đặt `false`;
+- `bankEnabled`, `enableBankTransfer`, `bankAccounts`/VietQR legacy không còn quyền kích hoạt ATM cho đơn mới; chúng chỉ được giữ để không phá dữ liệu/config legacy trong migration window.
+
+DB compatibility code vẫn dùng `PhuongThucThanhToan='ATM'` cho online payment trong PR #75. Đổi enum/schema, nếu cần, là migration riêng.
 
 ## Source-of-truth business boundaries
 

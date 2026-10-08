@@ -2,6 +2,7 @@ import { Injectable } from "@nestjs/common";
 import { randomInt } from "node:crypto";
 import { toNumber } from "../../common/db-value.js";
 import { PrismaService } from "../../database/prisma.service.js";
+import { lalamoveRequest } from "./lalamove.client.js";
 import {
   boolValue,
   calculateMockQuote,
@@ -63,6 +64,16 @@ export class ShippingService {
         enabled: cfg.ghtkEnabled && Boolean(cfg.ghtkToken),
         note: "Phí thật từ Giao Hàng Tiết Kiệm (chỉ tính phí, không tạo đơn thật).",
       },
+      {
+        code: "lalamove",
+        name: "Lalamove",
+        enabled:
+          cfg.lalamoveEnabled &&
+          Boolean(cfg.lalamoveApiKey) &&
+          Boolean(cfg.lalamoveApiSecret) &&
+          Boolean(this.lalamovePickupAddress(cfg)),
+        note: "Phí API Lalamove Sandbox/Production; tạo vận đơn Lalamove sẽ được nối ở bước tiếp theo.",
+      },
     ];
   }
 
@@ -77,9 +88,10 @@ export class ShippingService {
 
     const cfg = await this.loadConfig();
     const requested = (req.provider ?? "mock").trim().toLowerCase();
+    const supported = ["mock", "ghn", "ghtk", "lalamove"];
     const codes = requested === "all"
-      ? ["mock", "ghn", "ghtk"]
-      : ["mock", "ghn", "ghtk"].includes(requested)
+      ? supported
+      : supported.includes(requested)
         ? [requested]
         : ["mock"];
 
@@ -100,10 +112,23 @@ export class ShippingService {
         cfg.ghtkToken
       ) {
         options.push(...await this.quoteGhtk(req, cfg));
+      } else if (
+        code === "lalamove" &&
+        cfg.lalamoveEnabled &&
+        cfg.lalamoveApiKey &&
+        cfg.lalamoveApiSecret
+      ) {
+        options.push(...await this.quoteLalamove(req, cfg));
       }
     }
 
-    if (options.length === 0) {
+    // Không được giả thành Mock khi user đã chọn một carrier thật nhưng carrier lỗi.
+    // Với provider=all, Mock đã được tính ngay trong vòng lặp nếu được bật.
+    if (
+      options.length === 0 &&
+      requested === "mock" &&
+      cfg.mockEnabled
+    ) {
       options.push(...calculateMockQuote(req, cfg));
     }
 
@@ -186,6 +211,14 @@ export class ShippingService {
       const requested = (provider || "mock").trim().toLowerCase();
       const selected = providers.find((item) => item.code === requested)
         ?? providers.find((item) => item.code === "mock")!;
+
+      // Báo giá Lalamove đã là API thật. Không tạo mã vận đơn giả cho provider này.
+      // OrdersService đang bắt lỗi hậu tạo đơn nên order KaitoKid vẫn hợp lệ,
+      // còn place-order/webhook Lalamove sẽ được tích hợp ở phase kế tiếp.
+      if (selected.code === "lalamove") {
+        throw new Error("Lalamove place-order chưa được tích hợp; không tạo mã vận đơn giả.");
+      }
+
       const now = new Date();
       const stamp = [
         String(now.getUTCFullYear()).slice(-2),
@@ -323,6 +356,7 @@ export class ShippingService {
       mockEnabled: boolValue(valueCaseInsensitive(raw, "MockEnabled"), true),
       ghnEnabled: boolValue(valueCaseInsensitive(raw, "GhnEnabled"), true),
       ghtkEnabled: boolValue(valueCaseInsensitive(raw, "GhtkEnabled"), true),
+      lalamoveEnabled: boolValue(valueCaseInsensitive(raw, "LalamoveEnabled"), false),
       ghnBaseUrl:
         textValue(valueCaseInsensitive(raw, "GhnBaseUrl"))
         ?? process.env.GHN_BASE_URL
@@ -358,6 +392,29 @@ export class ShippingService {
       ghtkPickDistrict:
         textValue(valueCaseInsensitive(raw, "GhtkPickDistrict"))
         ?? textValue(process.env.GHTK_PICK_DISTRICT),
+      lalamoveBaseUrl:
+        textValue(valueCaseInsensitive(raw, "LalamoveBaseUrl"))
+        ?? process.env.LALAMOVE_BASE_URL
+        ?? "https://rest.sandbox.lalamove.com",
+      lalamoveMarket:
+        textValue(valueCaseInsensitive(raw, "LalamoveMarket"))
+        ?? process.env.LALAMOVE_MARKET
+        ?? "VN",
+      lalamoveApiKey: textValue(process.env.LALAMOVE_API_KEY),
+      lalamoveApiSecret: textValue(process.env.LALAMOVE_API_SECRET),
+      lalamoveServiceType:
+        textValue(valueCaseInsensitive(raw, "LalamoveServiceType"))
+        ?? process.env.LALAMOVE_SERVICE_TYPE
+        ?? "MOTORCYCLE",
+      pickupAddress:
+        textValue(valueCaseInsensitive(raw, "PickupAddress"))
+        ?? textValue(process.env.LALAMOVE_PICKUP_ADDRESS),
+      pickupName: textValue(valueCaseInsensitive(raw, "PickupName")),
+      pickupPhone: textValue(valueCaseInsensitive(raw, "PickupPhone")),
+      defaultWeightGram: numberValue(
+        valueCaseInsensitive(raw, "DefaultWeightGram"),
+        300,
+      ),
       kaitoKidBranches: branches,
       mockOnlyServeBranches: boolValue(
         valueCaseInsensitive(raw, "MockOnlyServeBranches"),
@@ -384,6 +441,82 @@ export class ShippingService {
         2,
       ),
     };
+  }
+
+  private lalamovePickupAddress(cfg: ShippingConfig): string | null {
+    if (cfg.pickupAddress?.trim()) return cfg.pickupAddress.trim();
+    const branch = cfg.kaitoKidBranches.find((item) => item.active && item.address?.trim());
+    if (!branch) return null;
+    return [branch.address, branch.district, branch.province]
+      .filter((value): value is string => Boolean(value?.trim()))
+      .join(", ");
+  }
+
+  private async quoteLalamove(
+    req: ShippingQuoteInput,
+    cfg: ShippingConfig,
+  ): Promise<ShippingQuoteOption[]> {
+    if (!cfg.lalamoveApiKey || !cfg.lalamoveApiSecret) return [];
+    const pickupAddress = this.lalamovePickupAddress(cfg);
+    const dropoffAddress = [
+      req.toAddress,
+      req.toWard,
+      req.toDistrict,
+      req.toProvince,
+    ]
+      .filter((value): value is string => Boolean(value?.trim()))
+      .join(", ");
+    if (!pickupAddress || !dropoffAddress) return [];
+
+    const body = {
+      data: {
+        serviceType: cfg.lalamoveServiceType,
+        language: "vi_VN",
+        stops: [
+          { address: pickupAddress },
+          { address: dropoffAddress },
+        ],
+      },
+    };
+
+    try {
+      const response = await lalamoveRequest(
+        {
+          baseUrl: cfg.lalamoveBaseUrl,
+          market: cfg.lalamoveMarket,
+          apiKey: cfg.lalamoveApiKey,
+          apiSecret: cfg.lalamoveApiSecret,
+        },
+        "POST",
+        "/v3/quotations",
+        body,
+      );
+      if (!response.ok) return [];
+      const json = await response.json() as Record<string, any>;
+      const data = objectValue(json.data);
+      const priceBreakdown = objectValue(data.priceBreakdown);
+      const fee = Number(priceBreakdown.total ?? 0);
+      const serviceType = String(data.serviceType ?? cfg.lalamoveServiceType);
+      if (!Number.isFinite(fee) || fee <= 0) return [];
+
+      const serviceName = serviceType.toUpperCase() === "MOTORCYCLE"
+        ? "Lalamove · Xe máy"
+        : `Lalamove · ${serviceType}`;
+
+      return [{
+        provider: "lalamove",
+        serviceCode: serviceType,
+        serviceName,
+        fee,
+        insuranceFee: 0,
+        // Lalamove quotation không trả ETA giờ trong contract hiện tại.
+        // 2h chỉ là ETA hiển thị tạm cho flow on-demand, không dùng để tính giá.
+        leadTimeHours: 2,
+        deliveryType: "on_demand",
+      }];
+    } catch {
+      return [];
+    }
   }
 
   private async quoteGhtk(

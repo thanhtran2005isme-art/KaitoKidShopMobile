@@ -8,7 +8,10 @@ export function canCancelOrder(
       shippingStatus === null ||
       shippingStatus === undefined ||
       shippingStatus === "ready_to_pick" ||
-      shippingStatus === "picking"
+      shippingStatus === "picking" ||
+      // Carrier có thể xác nhận hủy qua webhook trước khi transaction hủy
+      // commerce order chạy. Khi đó vẫn phải cho phép hoàn tồn/coupon nội bộ.
+      shippingStatus === "cancelled"
     )
   );
 }
