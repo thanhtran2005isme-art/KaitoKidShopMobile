@@ -79,6 +79,15 @@ USB launcher hiện reverse:
 - `8081`
 - `5300`
 
+## Trang Admin Khách hàng không hiển thị thống kê
+
+- `/admin/customers` gọi Node API `:5300`: `GET /api/admin/customers`, `GET /api/admin/customers/summary` và `GET /api/admin/customers/:id/analytics`. Các request dùng staff JWT.
+- 401: đăng nhập lại Staff/Admin. 403: kiểm tra quyền `customers.view`. 500: đọc log NestJS và kiểm tra MariaDB `kaitokid`.
+- Không coi lỗi API là tệp khách rỗng; màn hình hiển thị lỗi và có nút Thử tải lại.
+- Số lượng khách/đơn và doanh thu tổng quan truy vấn tại MariaDB theo `NguoiDung.Id` và `DonHang.NguoiDungId`, không tính từ một trang danh sách phân trang.
+- Doanh thu, AOV, nhóm sản phẩm/danh mục mua nhiều chỉ tính đơn có `TrangThai='completed'`. Khách có đơn `pending/confirmed/shipping` sẽ có số đơn nhưng chi tiêu hoàn thành có thể bằng 0.
+- Với đơn đã hoàn thành mà vẫn không thấy ở khách, kiểm tra `NguoiDungId` và `TrangThai` bằng SQL chỉ đọc; không ghép theo Email hay sửa trạng thái order để tăng số liệu.
+
 ## Expo Web vs Vite Web
 
 - `127.0.0.1:8081` -> Expo Web của `apps/mobile`

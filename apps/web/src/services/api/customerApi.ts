@@ -25,6 +25,17 @@ export interface CustomerDTO {
   lastCompletedOrderAt?: string;
 }
 
+export interface CustomerSummaryDTO {
+  totalCustomers: number;
+  customersWithOrders: number;
+  customersWithoutOrders: number;
+  repeatCustomers: number;
+  totalOrders: number;
+  completedOrders: number;
+  cancelledOrders: number;
+  totalRevenue: number;
+}
+
 export interface CustomerListParams {
   search?: string;
   page?: number;
@@ -52,6 +63,17 @@ export interface CustomerPurchaseAnalyticsDTO {
   topCategories: string[];
   purchasedProducts: string[];
   orders: CustomerOrderSummaryDTO[];
+}
+
+interface RawCustomerSummaryDTO {
+  totalCustomers?: unknown;
+  customersWithOrders?: unknown;
+  customersWithoutOrders?: unknown;
+  repeatCustomers?: unknown;
+  totalOrders?: unknown;
+  completedOrders?: unknown;
+  cancelledOrders?: unknown;
+  totalRevenue?: unknown;
 }
 
 interface RawCustomerDTO {
@@ -126,6 +148,19 @@ function asOrderStatus(value: unknown): CustomerOrderStatus | undefined {
     : undefined;
 }
 
+function mapCustomerSummary(raw: RawCustomerSummaryDTO): CustomerSummaryDTO {
+  return {
+    totalCustomers: asNumber(raw.totalCustomers),
+    customersWithOrders: asNumber(raw.customersWithOrders),
+    customersWithoutOrders: asNumber(raw.customersWithoutOrders),
+    repeatCustomers: asNumber(raw.repeatCustomers),
+    totalOrders: asNumber(raw.totalOrders),
+    completedOrders: asNumber(raw.completedOrders),
+    cancelledOrders: asNumber(raw.cancelledOrders),
+    totalRevenue: asNumber(raw.totalRevenue),
+  };
+}
+
 function mapCustomer(customer: RawCustomerDTO): CustomerDTO {
   return {
     id: asNumber(customer.id),
@@ -179,6 +214,16 @@ function mapPurchaseAnalytics(data: RawCustomerPurchaseAnalyticsDTO): CustomerPu
 }
 
 export const customerApi = {
+  /** Thống kê trên MariaDB cho toàn bộ tệp khách hàng. */
+  async getSummary(): Promise<ApiResponse<CustomerSummaryDTO>> {
+    try {
+      const response = await adminApiClient.get<RawCustomerSummaryDTO>('/api/admin/customers/summary');
+      return { success: true, data: mapCustomerSummary(response.data) };
+    } catch (error) {
+      return { success: false, error: getErrorMessage(error) };
+    }
+  },
+
   /**
    * Lấy danh sách khách hàng (Admin)
    */

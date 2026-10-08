@@ -134,6 +134,19 @@ test("raw MariaDB rows are converted to ASP.NET-compatible camelCase JSON", () =
   });
 });
 
+test("customer summary aggregates MariaDB orders by user, with completed-only revenue", () => {
+  const start = catalogSource.indexOf('@Get("summary")');
+  const end = catalogSource.indexOf('  @Get()', start);
+  assert.ok(start >= 0 && end > start);
+  const summarySource = catalogSource.slice(start, end);
+  assert.match(summarySource, /assertStaffPermission\(user, "customers.view"\)/);
+  assert.match(summarySource, /GROUP BY d\.NguoiDungId/);
+  assert.match(summarySource, /o\.UserId=n\.Id/);
+  assert.match(summarySource, /WHERE n\.VaiTro='user'/);
+  assert.match(summarySource, /d\.TrangThai='completed' THEN d\.TongTien ELSE 0/);
+  assert.match(summarySource, /d\.TrangThai='cancelled'/);
+});
+
 test("customer purchase analytics use NguoiDungId and completed orders for value and interests", () => {
   assert.ok(catalogSource.includes('@Get(":id/analytics")'));
   assert.ok(catalogSource.includes("d.NguoiDungId=n.Id AND d.TrangThai='completed'"));
