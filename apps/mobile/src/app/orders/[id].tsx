@@ -6,6 +6,7 @@ import {
   Alert,
   AppState,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   Pressable,
   RefreshControl,
@@ -40,6 +41,8 @@ type OrderAction =
   | 'confirm-received'
   | 'report-not-received'
   | 'return-request';
+
+type DeliveryDecision = 'confirm-received' | 'report-not-received';
 
 const LALAMOVE_POLL_MS = 10_000;
 const LALAMOVE_TERMINAL_SHIPPING_STATUSES = new Set([
@@ -77,6 +80,9 @@ export default function OrderDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [actionBusy, setActionBusy] = useState<OrderAction | null>(null);
+  const [deliveryDecision, setDeliveryDecision] = useState<DeliveryDecision | null>(null);
+  const [actionNotice, setActionNotice] = useState<string | null>(null);
+  const deliverySubmissionLock = useRef(false);
   const [showReturnForm, setShowReturnForm] = useState(false);
   const [returnReason, setReturnReason] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -181,76 +187,61 @@ export default function OrderDetailScreen() {
     );
   };
 
-  const confirmReceived = () => {
-    if (!token || !order || !order.canConfirmReceived || actionBusy) return;
-
-    Alert.alert(
-      'Xác nhận đã nhận hàng?',
-      'Chỉ xác nhận khi bạn thực sự đã nhận được hàng. Thời hạn yêu cầu hoàn hàng 7 ngày sẽ bắt đầu từ thời điểm này.',
-      [
-        { text: 'Để sau', style: 'cancel' },
-        {
-          text: 'Đã nhận hàng',
-          onPress: () => {
-            void (async () => {
-              setActionBusy('confirm-received');
-              setError(null);
-              try {
-                const result = await ordersApi.confirmReceived(token, order.id);
-                await loadOrder('refresh');
-                Alert.alert(
-                  'Đã xác nhận nhận hàng',
-                  result.returnDeadline
-                    ? 'Bạn có thể yêu cầu hoàn hàng nếu có lỗi đến ' +
-                      formatDateTime(result.returnDeadline) +
-                      '.'
-                    : result.message,
-                );
-              } catch (actionError) {
-                setError(
-                  messageFrom(actionError, 'Không thể xác nhận nhận hàng.'),
-                );
-              } finally {
-                setActionBusy(null);
-              }
-            })();
-          },
-        },
-      ],
-    );
+  const openDeliveryDecision = (decision: DeliveryDecision) => {
+    if (!token || !order || actionBusy || deliverySubmissionLock.current) return;
+    if (decision === 'confirm-received' && !order.canConfirmReceived) return;
+    if (decision === 'report-not-received' && !order.canReportNotReceived) return;
+    setError(null);
+    setDeliveryDecision(decision);
   };
 
-  const reportNotReceived = () => {
-    if (!token || !order || !order.canReportNotReceived || actionBusy) return;
+  const submitDeliveryDecision = async () => {
+    if (!token || !order || !deliveryDecision || actionBusy || deliverySubmissionLock.current) return;
 
-    Alert.alert(
-      'Bạn chưa nhận được hàng?',
-      'Đơn vị vận chuyển đang báo giao thành công. KaitoKid sẽ ghi nhận khiếu nại để đối soát; đơn không bị tự hủy hoặc hoàn tồn kho.',
-      [
-        { text: 'Đóng', style: 'cancel' },
-        {
-          text: 'Báo chưa nhận',
-          style: 'destructive',
-          onPress: () => {
-            void (async () => {
-              setActionBusy('report-not-received');
-              setError(null);
-              try {
-                const result = await ordersApi.reportNotReceived(token, order.id);
-                await loadOrder('refresh');
-                Alert.alert('Đã ghi nhận', result.message);
-              } catch (actionError) {
-                setError(
-                  messageFrom(actionError, 'Không thể gửi báo cáo chưa nhận hàng.'),
-                );
-              } finally {
-                setActionBusy(null);
-              }
-            })();
-          },
-        },
-      ],
-    );
+    const decision = deliveryDecision;
+    // Backend là nguồn sự thật cuối cùng; kiểm tra lại quyền từ đơn đang hiển thị.
+    if (decision === 'confirm-received' && !order.canConfirmReceived) return;
+    if (decision === 'report-not-received' && !order.canReportNotReceived) return;
+
+    deliverySubmissionLock.current = true;
+    setActionBusy(decision);
+    setActionNotice(null);
+    setError(null);
+
+    try {
+      const result = decision === 'confirm-received'
+        ? await ordersApi.confirmReceived(token, order.id)
+        : await ordersApi.reportNotReceived(token, order.id);
+      setDeliveryDecision(null);
+      setActionNotice(
+        decision === 'confirm-received' && result.returnDeadline
+          ? 'Đã xác nhận nhận hàng. Có thể yêu cầu hoàn hàng đến ' +
+            formatDateTime(result.returnDeadline) + '.'
+          : result.message,
+      );
+      // Đồng bộ quyền thao tác và trạng thái từ API thật.
+      try {
+        setOrder(await ordersApi.getOrder(token, order.id));
+      } catch (refreshError) {
+        setError(
+          'Đã ghi nhận thao tác, nhưng chưa tải lại được trạng thái đơn. ' +
+            messageFrom(refreshError, 'Vui lòng kéo xuống để làm mới.'),
+        );
+      }
+    } catch (actionError) {
+      setDeliveryDecision(null);
+      setError(
+        messageFrom(
+          actionError,
+          decision === 'confirm-received'
+            ? 'Không thể xác nhận đã nhận hàng.'
+            : 'Không thể gửi báo cáo chưa nhận hàng.',
+        ),
+      );
+    } finally {
+      deliverySubmissionLock.current = false;
+      setActionBusy(null);
+    }
   };
 
   const submitReturnRequest = async () => {
@@ -463,6 +454,11 @@ export default function OrderDetailScreen() {
               <Text style={styles.errorText}>{error}</Text>
             </View>
           ) : null}
+          {actionNotice ? (
+            <View style={[styles.noticeCard, styles.noticeSuccess]} accessibilityRole="alert">
+              <Text style={styles.noticeText}>{actionNotice}</Text>
+            </View>
+          ) : null}
 
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
@@ -569,7 +565,7 @@ export default function OrderDetailScreen() {
                   accessibilityLabel="Xác nhận đã nhận hàng"
                   accessibilityRole="button"
                   disabled={actionBusy !== null}
-                  onPress={confirmReceived}
+                  onPress={() => openDeliveryDecision('confirm-received')}
                   style={({ pressed }) => [
                     styles.primaryAction,
                     pressed && styles.pressed,
@@ -588,7 +584,7 @@ export default function OrderDetailScreen() {
                   accessibilityLabel="Báo chưa nhận được hàng"
                   accessibilityRole="button"
                   disabled={actionBusy !== null}
-                  onPress={reportNotReceived}
+                  onPress={() => openDeliveryDecision('report-not-received')}
                   style={({ pressed }) => [
                     styles.cancelAction,
                     pressed && styles.pressed,
@@ -847,6 +843,64 @@ export default function OrderDetailScreen() {
           <View style={styles.bottomSpace} />
         </ScrollView>
       </KeyboardAvoidingView>
+      <Modal
+        animationType="fade"
+        onRequestClose={() => {
+          if (!deliverySubmissionLock.current) setDeliveryDecision(null);
+        }}
+        transparent
+        visible={deliveryDecision !== null}>
+        <View style={styles.deliveryModalBackdrop}>
+          <View style={styles.deliveryModalCard} accessibilityViewIsModal>
+            <Text style={styles.deliveryModalTitle}>
+              {deliveryDecision === 'confirm-received'
+                ? 'Xác nhận đã nhận hàng?'
+                : 'Bạn chưa nhận được hàng?'}
+            </Text>
+            <Text style={styles.deliveryModalText}>
+              {deliveryDecision === 'confirm-received'
+                ? 'Chỉ xác nhận khi bạn thực sự đã nhận được hàng. Thời hạn yêu cầu hoàn hàng ' +
+                  (order.returnWindowDays ?? 7) + ' ngày sẽ bắt đầu từ thời điểm này.'
+                : 'Đơn vị vận chuyển đang báo giao thành công. KaitoKid sẽ ghi nhận khiếu nại để đối soát; đơn không tự hủy hoặc hoàn tồn kho.'}
+            </Text>
+            <View style={styles.deliveryModalActions}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Đóng hộp xác nhận giao hàng"
+                disabled={actionBusy !== null}
+                onPress={() => setDeliveryDecision(null)}
+                style={({ pressed }) => [
+                  styles.deliveryModalCancel,
+                  pressed && styles.pressed,
+                  actionBusy !== null && styles.disabled,
+                ]}>
+                <Text style={styles.deliveryModalCancelText}>Để sau</Text>
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={deliveryDecision === 'confirm-received'
+                  ? 'Xác nhận tôi đã nhận hàng'
+                  : 'Xác nhận báo chưa nhận hàng'}
+                disabled={actionBusy !== null}
+                onPress={() => void submitDeliveryDecision()}
+                style={({ pressed }) => [
+                  styles.deliveryModalConfirm,
+                  deliveryDecision === 'report-not-received' && styles.deliveryModalDanger,
+                  pressed && styles.pressed,
+                  actionBusy !== null && styles.disabled,
+                ]}>
+                {actionBusy === 'confirm-received' || actionBusy === 'report-not-received' ? (
+                  <ActivityIndicator color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.deliveryModalConfirmText}>
+                    {deliveryDecision === 'confirm-received' ? 'Đã nhận hàng' : 'Báo chưa nhận'}
+                  </Text>
+                )}
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -876,6 +930,64 @@ function SummaryRow({
 }
 
 const styles = StyleSheet.create({
+  deliveryModalBackdrop: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.48)',
+    paddingHorizontal: 20,
+  },
+  deliveryModalCard: {
+    width: '100%',
+    maxWidth: 440,
+    borderRadius: 18,
+    backgroundColor: BRAND_COLORS.surface,
+    padding: 20,
+    gap: 16,
+  },
+  deliveryModalTitle: {
+    color: BRAND_COLORS.ink,
+    fontSize: 19,
+    fontWeight: '800',
+    lineHeight: 26,
+  },
+  deliveryModalText: {
+    color: BRAND_COLORS.muted,
+    fontSize: 14,
+    lineHeight: 21,
+  },
+  deliveryModalActions: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  deliveryModalCancel: {
+    flex: 1,
+    minHeight: 48,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: BRAND_COLORS.line,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  deliveryModalCancelText: {
+    color: BRAND_COLORS.ink,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  deliveryModalConfirm: {
+    flex: 1,
+    minHeight: 48,
+    borderRadius: 12,
+    backgroundColor: BRAND_COLORS.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  deliveryModalDanger: { backgroundColor: BRAND_COLORS.danger },
+  deliveryModalConfirmText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '700',
+  },
   flex: { flex: 1 },
   safeArea: { flex: 1, backgroundColor: BRAND_COLORS.canvas },
   content: {
