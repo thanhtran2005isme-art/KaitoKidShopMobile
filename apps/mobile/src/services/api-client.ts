@@ -2,6 +2,8 @@ import Constants from 'expo-constants';
 import * as Device from 'expo-device';
 import { Platform } from 'react-native';
 
+import { ApiTransportError, fetchWithTransportRetry } from './network-retry';
+
 const fallbackApiUrl = Platform.select({
   android: 'http://10.0.2.2:5300',
   ios: 'http://localhost:5300',
@@ -40,21 +42,23 @@ async function getErrorMessage(response: Response) {
   }
 }
 
+function safeRequestLabel(path: string) {
+  const parts = path.split('?')[0].split('/').filter(Boolean);
+  // Omit order IDs, search queries and other potentially private path parameters.
+  return '/' + parts.slice(0, 2).join('/');
+}
+
 async function fetchWithTimeout(path: string, init: RequestInit | undefined, timeoutMs: number) {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    return await fetch(`${API_BASE_URL}${path.startsWith('/') ? path : `/${path}`}`, {
-      ...init,
-      headers: { Accept: 'application/json', ...init?.headers },
-      signal: controller.signal,
-    });
-  } finally {
-    clearTimeout(timeout);
-  }
+  return fetchWithTransportRetry(
+    `${API_BASE_URL}${path.startsWith('/') ? path : `/${path}`}`,
+    path.startsWith('/') ? path : `/${path}`,
+    init,
+    timeoutMs,
+  );
 }
 
 export async function apiRequest<T>(path: string, init?: RequestInit, timeoutMs = 15000): Promise<T> {
+  const started = Date.now();
   try {
     let response = await fetchWithTimeout(path, init, timeoutMs);
     const requestHeaders = new Headers(init?.headers);
@@ -68,6 +72,10 @@ export async function apiRequest<T>(path: string, init?: RequestInit, timeoutMs 
       }
     }
 
+    if (__DEV__ && Date.now() - started >= 4000) {
+      console.warn(`[KaitoKid API Slow] ${(init?.method ?? 'GET').toUpperCase()} ${safeRequestLabel(path)} HTTP ${response.status} ${Date.now() - started}ms`);
+    }
+
     if (!response.ok) {
       if (response.status === 401 && authorization) throw new Error('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
       throw new Error(await getErrorMessage(response));
@@ -75,10 +83,19 @@ export async function apiRequest<T>(path: string, init?: RequestInit, timeoutMs 
     if (response.status === 204) return undefined as T;
     return (await response.json()) as T;
   } catch (error) {
-    const message = error instanceof Error ? error.message.toLowerCase() : '';
-    const wasCanceled = (error instanceof Error && error.name === 'AbortError') || message.includes('canceled') || message.includes('cancelled');
-    if (wasCanceled) throw new Error(`Kết nối tới ${API_BASE_URL} bị hủy hoặc quá thời gian. Kiểm tra Node API cổng 5300.`);
-    if (error instanceof TypeError) throw new Error(`Không thể kết nối tới ${API_BASE_URL}. Nếu dùng điện thoại thật, kiểm tra LAN/Wi-Fi, firewall hoặc ADB reverse cổng 5300.`);
+    if (error instanceof ApiTransportError) {
+      if (__DEV__) {
+        console.warn(`[KaitoKid API Transport] ${error.kind} ${safeRequestLabel(path)} after ${error.attempts} attempt(s)`);
+      }
+      if (error.kind === 'timeout') {
+        throw new Error(`Node API ${API_BASE_URL} không phản hồi trong ${Math.round(timeoutMs / 1000)} giây mỗi lần gọi. Kiểm tra kết nối LAN và log request chậm của NestJS.`);
+      }
+      if (error.kind === 'canceled') {
+        throw new Error('Yêu cầu đã bị hủy. Vui lòng thử tải lại.');
+      }
+      throw new Error(`Không thể kết nối ổn định tới ${API_BASE_URL}. Kiểm tra Wi-Fi/LAN và Node API cổng 5300.`);
+    }
+    if (error instanceof TypeError) throw new Error(`Không thể xử lý phản hồi từ ${API_BASE_URL}. Kiểm tra trạng thái API trong Network.`);
     throw error;
   }
 }

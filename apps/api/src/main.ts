@@ -4,6 +4,7 @@ import { existsSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { NestFactory } from "@nestjs/core";
 import type { NestExpressApplication } from "@nestjs/platform-express";
+import type { Request, Response, NextFunction } from "express";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 import { AppModule } from "./app.module.js";
 import { isCorsOriginAllowed, parseCorsOrigins } from "./common/cors.js";
@@ -68,6 +69,24 @@ async function bootstrap(): Promise<void> {
   // định ~100 KB của Express sẽ trả 413 trước khi request tới controller.
   // Giữ một ngưỡng hữu hạn để hỗ trợ payload cấu hình thực tế mà không mở vô hạn.
   app.useBodyParser("json", { limit: "16mb" });
+
+  // Chỉ ghi nhận endpoint chậm hoặc lỗi 5xx; không log URL đầy đủ, query,
+  // token, userId hay orderCode. Dùng để phân biệt LAN timeout với Node/DB slow.
+  const configuredSlowMs = Number(process.env.API_SLOW_LOG_MS ?? 4000);
+  const slowMs = Number.isFinite(configuredSlowMs) && configuredSlowMs >= 500
+    ? configuredSlowMs : 4000;
+  app.use((req: Request, res: Response, next: NextFunction) => {
+    const start = process.hrtime.bigint();
+    res.once("finish", () => {
+      const durationMs = Number(process.hrtime.bigint() - start) / 1_000_000;
+      if (durationMs < slowMs && res.statusCode < 500) return;
+      // Always truncate to just the API resource name, never an object ID.
+      const parts = req.path.split("/").filter(Boolean);
+      const resource = "/" + parts.slice(0, 2).join("/");
+      console.warn(`[API PERF] ${req.method} ${resource} HTTP ${res.statusCode} ${durationMs.toFixed(0)}ms`);
+    });
+    next();
+  });
 
   const origins = parseCorsOrigins(process.env.CORS_ORIGINS);
 
