@@ -359,3 +359,18 @@ Runbook đầy đủ: `docs/runbooks/PAYOS_PAYMENT_E2E.md`.
 - Race login/refresh/restore được chặn bằng session generation và hàng đợi ghi storage để refresh cũ không ghi đè/xóa session đăng nhập mới.
 - Nếu UI vẫn hiển thị sai sau khi pull: dừng Expo, chạy `npx expo start --clear` trong `apps/mobile`, rồi thử đăng nhập mới. Không cần xóa toàn bộ storage của những người dùng khác.
 - `"shadow*" style props are deprecated` là cảnh báo React Native Web độc lập với 401; không ảnh hưởng refresh token.
+
+## Mobile / Expo Web thi thoảng timeout API :5300 trên LAN
+
+Triệu chứng: `GET /api/wallet`, Home, Cart hoặc Checkout đôi lúc báo hết thời gian dù request khác chạy được.
+
+- Trước tiên xác định **Node/DB chậm** hay **đường LAN lỗi**: chạy cùng lúc tại máy backend trong CMD:
+  `curl.exe -sS -m 8 -o NUL -w "localhost HTTP %{http_code} %{time_total}s\n" http://127.0.0.1:5300/health`
+  và
+  `curl.exe -sS -m 8 -o NUL -w "LAN HTTP %{http_code} %{time_total}s\n" http://10.243.156.66:5300/health`.
+  Thay IP LAN hiện tại theo `ipconfig`; lặp lại vài lần đúng khi lỗi xảy ra.
+- Localhost nhanh mà LAN lỗi: kiểm tra Wi-Fi/hotspot/Windows Firewall, IP `EXPO_PUBLIC_NODE_API_URL` và `EXPO_PUBLIC_API_URL`, thiết bị cùng mạng; USB authorized có thể dùng `adb reverse tcp:5300 tcp:5300`.
+- Cả localhost và LAN chậm: kiểm tra terminal NestJS có log `[API PERF] METHOD /api/resource HTTP STATUS NNNNms`; mặc định ghi request >= 4s và 5xx. Có thể đặt `API_SLOW_LOG_MS=2000` trong `apps/api/.env` để chẩn đoán. Dò truy vấn MariaDB, pool/lock transaction, external Lalamove/payOS và Node restart khi `start:dev`.
+- Mobile tự thử lại **tối đa 1 lần** khi lỗi transport trên các GET đọc dữ liệu đã cho phép (catalog, cart, ví, ...). Không retry POST/PUT/DELETE hoặc `GET /api/payment/instructions` vì có thể gây tác dụng phụ ở nhà cung cấp thanh toán.
+- Không kết luận thanh toán thất bại chỉ vì Mobile timeout: kiểm tra danh sách đơn/checkout status từ backend trước khi bấm Tạo đơn lần nữa.
+- HTTP 401, 400, 500 là phản hồi có thật từ server và không bị client tự retry. Không sửa bằng cách đặt balance hay order giả vào localStorage.

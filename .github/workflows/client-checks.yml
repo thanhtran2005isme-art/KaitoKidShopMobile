@@ -56,3 +56,5 @@ jobs:
         run: npm run typecheck
       - name: Auth refresh session regression contracts
         run: node --test test/auth-refresh-session.test.mjs
+      - name: API network retry safety tests
+        run: node --test test/network-retry.test.mjs
