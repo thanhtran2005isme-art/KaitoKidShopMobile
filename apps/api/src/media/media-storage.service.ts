@@ -7,7 +7,7 @@ import { randomUUID } from "node:crypto";
 export class MediaStorageService {
   readonly publicRoot = resolve(process.env.PUBLIC_ROOT ?? join(process.cwd(), "public"));
 
-  async save(area: "avatars" | "reviews", buffer: Buffer, extension: string, prefix?: string) {
+  async save(area: "avatars" | "reviews" | "returns", buffer: Buffer, extension: string, prefix?: string) {
     const safeExtension = extension.startsWith(".") ? extension.toLowerCase() : `.${extension.toLowerCase()}`;
     const dir = join(this.publicRoot, "uploads", area);
     await mkdir(dir, { recursive: true });

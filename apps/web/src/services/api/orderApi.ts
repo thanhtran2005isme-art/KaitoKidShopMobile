@@ -70,6 +70,7 @@ export interface AdminAfterSalesCase {
   deliveryIssueOpen: boolean;
   returnStatus: AdminReturnStatus;
   returnReason?: string | null;
+  returnEvidence?: string[];
   returnShipment?: ReturnShipmentDTO | null;
   decisionNote?: string | null;
   disposition?: 'restock' | 'quarantine' | null;

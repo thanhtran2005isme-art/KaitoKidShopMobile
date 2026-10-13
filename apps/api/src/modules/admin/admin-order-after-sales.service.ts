@@ -20,6 +20,7 @@ const REFUND_MARKERS = [
   "refund_wallet_credited",
 ] as const;
 const CASE_MARKERS = [
+  "return_evidence",
   "return_shipping_placed",
   "return_shipping_delivered",
   "delivery_disputed",
@@ -189,6 +190,7 @@ export class AdminOrderAfterSalesService {
       returnShipment,
       returnStatus,
       returnReason,
+      returnEvidence: history.filter((row) => row.status === "return_evidence" && row.description?.startsWith("/uploads/returns/")).map((row) => row.description as string).slice(0, 3),
       decisionNote:
         latestReturn && ["return_approved", "return_rejected"].includes(latestReturn.status)
           ? latestReturn.description

@@ -195,3 +195,13 @@ Luồng guest account, login, register và forgot-password dùng cùng một vis
 - Product Detail giới hạn theo `availableStock` của biến thể; Cart giới hạn tổng bằng `item.quantity + item.availableStock` vì lượng trong Cart đã được reserve.
 - Cart gọi API cập nhật giỏ thật, có trạng thái busy/lỗi và refresh khi backend từ chối; backend là nguồn kiểm tra tồn kho cuối cùng.
 - Kiểm tra bàn phím số Android/iOS/Expo Web, nút +/- cạnh ô nhập, chuyển biến thể, cập nhật giỏ nhiều dòng và chống submit trùng.
+
+
+## Hoàn hàng — chọn lý do và bằng chứng sản phẩm
+
+- Mobile/Expo Web và Customer Web có cùng lựa chọn: lỗi sản xuất/đường may, rách hỏng khi nhận, giao sai hàng, sai size/màu, khác mô tả, thiếu sản phẩm/phụ kiện, Khác.
+- Chỉ khi chọn **Khác** mới bắt buộc mô tả chi tiết (5–380 ký tự). Các lý do khác có thể bổ sung mô tả tùy chọn.
+- Đính kèm tối đa 3 ảnh JPEG/PNG/WebP, mỗi ảnh ≤5MB, có preview và xóa trước khi gửi; ảnh là bằng chứng để Admin kiểm tra, không tự kích hoạt refund.
+- Form có nhãn thật, chọn dropdown có trạng thái, hỗ trợ bàn phím/touch và báo lỗi tại màn, vô hiệu khi đang gửi. Hạn yêu cầu dùng 15 ngày từ API.
+- Backend nhận multipart tại POST `/api/orders/:id/return-request`, kiểm tra JWT/order ownership/time window, lưu ảnh và marker `return_evidence` trong cùng transaction `return_requested`; khi lỗi dọn ảnh vừa tạo.
+- Admin xem ảnh bằng chứng trong phần hậu mãi của đơn hàng. Không thay đổi điều kiện nhận hàng hoàn qua Lalamove ở D029.

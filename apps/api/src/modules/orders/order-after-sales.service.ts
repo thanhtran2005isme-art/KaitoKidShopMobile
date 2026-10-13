@@ -2,6 +2,10 @@ import { BadRequestException, Injectable } from "@nestjs/common";
 import { toNumber } from "../../common/db-value.js";
 import type { SqlClient } from "../../common/sql-client.js";
 import { PrismaService } from "../../database/prisma.service.js";
+import { MediaStorageService } from "../../media/media-storage.service.js";
+import { normalizeReturnReason, validateReturnImages } from "./return-request.helpers.js";
+import type { ReturnEvidenceImage } from "./return-request.helpers.js";
+export type { ReturnEvidenceImage } from "./return-request.helpers.js";
 
 const RETURN_WINDOW_DAYS = 15;
 const RETURN_WINDOW_MS = RETURN_WINDOW_DAYS * 24 * 60 * 60 * 1000;
@@ -70,7 +74,7 @@ function refundStatus(marker?: string): CustomerRefundStatus {
 
 @Injectable()
 export class OrderAfterSalesService {
-  constructor(private readonly db: PrismaService) {}
+  constructor(private readonly db: PrismaService, private readonly media: MediaStorageService) {}
 
   async decorateMany<T extends { id: number; status: string }>(
     userId: number,
@@ -98,14 +102,16 @@ export class OrderAfterSalesService {
       orderId: unknown;
       status: string;
       at: Date | string;
+      description: string | null;
     }>>(
-      `SELECT Id AS id, DonHangId AS orderId, TrangThai AS status, ThoiGian AS at
+      `SELECT Id AS id, DonHangId AS orderId, TrangThai AS status, ThoiGian AS at, MoTa AS description
        FROM LichSuTrangThaiVanChuyen
        WHERE DonHangId IN (${marks})
          AND TrangThai IN (
            'received_by_customer',
            'return_requested','return_approved','return_rejected',
            'return_received_restock','return_received_quarantine',
+           'return_evidence',
            'refund_pending','refund_completed_manual','refund_wallet_credited'
          )
        ORDER BY ThoiGian ASC, Id ASC`,
@@ -114,9 +120,14 @@ export class OrderAfterSalesService {
     const receiptIds = new Set<number>();
     const latestReturnById = new Map<number, CustomerReturnStatus>();
     const latestRefundById = new Map<number, CustomerRefundStatus>();
+    const evidenceById = new Map<number, string[]>();
     for (const marker of markerRows) {
       const id = toNumber(marker.orderId);
       if (marker.status === "received_by_customer") receiptIds.add(id);
+      if (marker.status === "return_evidence" && marker.description?.startsWith("/uploads/returns/")) {
+        const existing = evidenceById.get(id) ?? [];
+        if (existing.length < 3) evidenceById.set(id, [...existing, marker.description]);
+      }
       if ((RETURN_MARKERS as readonly string[]).includes(marker.status)) {
         latestReturnById.set(id, returnStatus(marker.status));
       }
@@ -133,6 +144,7 @@ export class OrderAfterSalesService {
         receiptIds.has(order.id),
         latestReturnById.get(order.id) ?? "none",
         latestRefundById.get(order.id) ?? "none",
+        evidenceById.get(order.id) ?? [],
       ),
     );
   }
@@ -251,66 +263,70 @@ export class OrderAfterSalesService {
     };
   }
 
-  async requestReturn(userId: number, orderId: number, rawReason: unknown) {
-    const reason = typeof rawReason === "string" ? rawReason.trim() : "";
-    if (reason.length < 5) {
-      throw new BadRequestException("Vui lòng mô tả lý do hoàn hàng ít nhất 5 ký tự.");
+  async requestReturn(
+    userId: number,
+    orderId: number,
+    body: Record<string, unknown>,
+    files: ReturnEvidenceImage[] = [],
+  ) {
+    const reason = normalizeReturnReason(body);
+    const images = validateReturnImages(files);
+    const urls: string[] = [];
+    try {
+      for (const picture of images) {
+        urls.push(await this.media.save("returns", picture.buffer, picture.extension));
+      }
+      const result = await this.db.$transaction(async (tx) => {
+        const order = await this.lockOrder(tx, userId, orderId);
+        if (normalized(order.status) !== "completed") {
+          throw new BadRequestException("Chỉ đơn hàng đã nhận mới có thể yêu cầu hoàn hàng.");
+        }
+        if (!(await this.hasMarker(tx, orderId, "received_by_customer"))) {
+          throw new BadRequestException("Khách hàng chưa xác nhận đã nhận hàng nên chưa thể yêu cầu hoàn hàng.");
+        }
+        const completedAt = asDate(order.completedAt);
+        if (!completedAt) throw new BadRequestException("Đơn hàng chưa có mốc xác nhận nhận hàng hợp lệ.");
+        const deadline = new Date(completedAt.getTime() + RETURN_WINDOW_MS);
+        if (Date.now() > deadline.getTime()) {
+          throw new BadRequestException(`Đã quá thời hạn hoàn hàng ${RETURN_WINDOW_DAYS} ngày kể từ lúc nhận hàng.`);
+        }
+        const latest = await this.latestReturnMarker(tx, orderId);
+        if (latest === "return_requested" || latest === "return_approved") {
+          return { changed: false, deadline };
+        }
+        if (latest) {
+          throw new BadRequestException("Yêu cầu hoàn hàng trước đó đã được xử lý; không thể tạo yêu cầu mới cho cùng đơn.");
+        }
+        const now = new Date();
+        await tx.$executeRawUnsafe(
+          `INSERT INTO LichSuTrangThaiVanChuyen
+             (DonHangId, TrangThai, MoTa, ViTri, ThoiGian)
+           VALUES (?, 'return_requested', ?, 'Khách hàng', ?)`,
+          orderId, "Khách hàng yêu cầu hoàn hàng: " + reason, now,
+        );
+        for (const url of urls) {
+          await tx.$executeRawUnsafe(
+            `INSERT INTO LichSuTrangThaiVanChuyen
+               (DonHangId, TrangThai, MoTa, ViTri, ThoiGian)
+             VALUES (?, 'return_evidence', ?, 'Khách hàng', ?)`,
+            orderId, url, now,
+          );
+        }
+        return { changed: true, deadline };
+      });
+      if (!result.changed) {
+        await Promise.all(urls.map((url) => this.media.removePublicFile(url)));
+      }
+      return {
+        message: result.changed
+          ? "Đã gửi yêu cầu hoàn hàng. KaitoKid sẽ kiểm tra và phản hồi."
+          : "Yêu cầu hoàn hàng đang được KaitoKid xử lý.",
+        returnDeadline: result.deadline,
+      };
+    } catch (error) {
+      await Promise.all(urls.map((url) => this.media.removePublicFile(url)));
+      throw error;
     }
-    if (reason.length > 500) {
-      throw new BadRequestException("Lý do hoàn hàng tối đa 500 ký tự.");
-    }
-
-    const result = await this.db.$transaction(async (tx) => {
-      const order = await this.lockOrder(tx, userId, orderId);
-      if (normalized(order.status) !== "completed") {
-        throw new BadRequestException("Chỉ đơn hàng đã nhận mới có thể yêu cầu hoàn hàng.");
-      }
-      if (!(await this.hasMarker(tx, orderId, "received_by_customer"))) {
-        throw new BadRequestException(
-          "Khách hàng chưa xác nhận đã nhận hàng nên chưa thể yêu cầu hoàn hàng.",
-        );
-      }
-
-      const completedAt = asDate(order.completedAt);
-      if (!completedAt) {
-        throw new BadRequestException(
-          "Đơn hàng chưa có mốc xác nhận nhận hàng hợp lệ.",
-        );
-      }
-      const deadline = new Date(completedAt.getTime() + RETURN_WINDOW_MS);
-      if (Date.now() > deadline.getTime()) {
-        throw new BadRequestException(
-          `Đã quá thời hạn hoàn hàng ${RETURN_WINDOW_DAYS} ngày kể từ lúc nhận hàng.`,
-        );
-      }
-
-      const latest = await this.latestReturnMarker(tx, orderId);
-      if (latest === "return_requested" || latest === "return_approved") {
-        return { changed: false, deadline };
-      }
-      if (latest) {
-        throw new BadRequestException(
-          "Yêu cầu hoàn hàng trước đó đã được xử lý; không thể tạo yêu cầu mới cho cùng đơn.",
-        );
-      }
-
-      await tx.$executeRawUnsafe(
-        `INSERT INTO LichSuTrangThaiVanChuyen
-           (DonHangId, TrangThai, MoTa, ViTri, ThoiGian)
-         VALUES (?, 'return_requested', ?, 'Khách hàng', ?)`,
-        orderId,
-        `Khách hàng yêu cầu hoàn hàng: ${reason}`,
-        new Date(),
-      );
-      return { changed: true, deadline };
-    });
-
-    return {
-      message: result.changed
-        ? "Đã gửi yêu cầu hoàn hàng. KaitoKid sẽ kiểm tra và phản hồi."
-        : "Yêu cầu hoàn hàng đang được KaitoKid xử lý.",
-      returnDeadline: result.deadline,
-    };
   }
 
   private decorate<T extends { id: number; status: string }>(
@@ -319,6 +335,7 @@ export class OrderAfterSalesService {
     receiptMarker: boolean,
     currentReturnStatus: CustomerReturnStatus,
     currentRefundStatus: CustomerRefundStatus,
+    returnEvidence: string[],
   ) {
     if (!row) return order;
 
@@ -362,6 +379,7 @@ export class OrderAfterSalesService {
       returnRequested,
       returnStatus: currentReturnStatus,
       refundStatus: currentRefundStatus,
+      returnEvidence,
       receivedAt: receiptConfirmed ? completedAt : null,
       returnDeadline,
       returnWindowDays: RETURN_WINDOW_DAYS,

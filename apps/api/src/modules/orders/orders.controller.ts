@@ -7,8 +7,11 @@ import {
   Param,
   Post,
   Put,
+  UploadedFiles,
   UseGuards,
+  UseInterceptors,
 } from "@nestjs/common";
+import { FilesInterceptor } from "@nestjs/platform-express";
 import { CurrentUser } from "../../auth/current-user.decorator.js";
 import type { AuthenticatedUser } from "../../auth/authenticated-user.js";
 import { JwtAuthGuard } from "../../auth/jwt-auth.guard.js";
@@ -16,6 +19,7 @@ import { pathInt } from "../../common/query-value.js";
 import { LalamoveShippingService } from "../shipping/lalamove-shipping.service.js";
 import { OrderAfterSalesService } from "./order-after-sales.service.js";
 import { OrdersService } from "./orders.service.js";
+import type { ReturnEvidenceImage } from "./order-after-sales.service.js";
 
 @Controller("api/orders")
 @UseGuards(JwtAuthGuard)
@@ -67,12 +71,14 @@ export class OrdersController {
   }
 
   @Post(":id/return-request")
+  @UseInterceptors(FilesInterceptor("images", 3, { limits: { fileSize: 5 * 1024 * 1024, files: 3 } }))
   requestReturn(
     @CurrentUser() user: AuthenticatedUser,
     @Param("id") rawId: string,
     @Body() body: Record<string, unknown>,
+    @UploadedFiles() images?: ReturnEvidenceImage[],
   ) {
-    return this.afterSales.requestReturn(user.id, pathInt(rawId), body.reason);
+    return this.afterSales.requestReturn(user.id, pathInt(rawId), body, images ?? []);
   }
 
   @Put(":id/cancel")

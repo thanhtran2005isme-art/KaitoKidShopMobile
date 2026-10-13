@@ -23,6 +23,13 @@ function returnShipmentLabel(status: string) {
   }
 }
 
+function evidenceUrl(path: string) {
+  const base = ((import.meta.env.VITE_NODE_API_URL as string | undefined)
+    || (import.meta.env.VITE_API_BASE_URL as string | undefined)
+    || 'http://localhost:5300').replace(/\/+$/, '');
+  return base + path;
+}
+
 function returnLabel(status: AdminAfterSalesCase['returnStatus']) {
   switch (status) {
     case 'requested': return 'Chờ duyệt yêu cầu hoàn';
@@ -217,6 +224,20 @@ export default function AdminAfterSalesPanel({ orderId, onChanged }: Props) {
         </div>
       )}
 
+      {Boolean(data.returnEvidence?.length) && (
+        <div className="after-sales-note-card">
+          <span>Ảnh sản phẩm khách gửi ({data.returnEvidence?.length})</span>
+          <div className="after-sales-evidence-grid">
+            {data.returnEvidence?.map((url, index) => (
+              <a key={url} href={evidenceUrl(url)} target="_blank" rel="noopener noreferrer"
+                 aria-label={'Xem ảnh bằng chứng số ' + (index + 1)}>
+                <img loading="lazy" src={evidenceUrl(url)} alt={'Bằng chứng hoàn hàng ' + (index + 1)} />
+              </a>
+            ))}
+          </div>
+        </div>
+      )}
+
       {(data.canApproveReturn || data.canRejectReturn) && (
         <div className="after-sales-action-card">
           <label htmlFor={`decision-note-${orderId}`}>Ghi chú duyệt / lý do từ chối</label>
@@ -338,7 +359,7 @@ export default function AdminAfterSalesPanel({ orderId, onChanged }: Props) {
       {data.history.length > 0 && (
         <div className="after-sales-timeline">
           <h5>Lịch sử hậu mãi</h5>
-          {data.history.slice().reverse().map((event) => (
+          {data.history.filter((event) => event.status !== 'return_evidence').slice().reverse().map((event) => (
             <div className="after-sales-event" key={event.id}>
               <div className="after-sales-event-dot" />
               <div>

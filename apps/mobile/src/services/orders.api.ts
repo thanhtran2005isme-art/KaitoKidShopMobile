@@ -1,4 +1,5 @@
 import { apiRequest } from '@/services/api-client';
+import { appendImageToFormData, type UploadImageAsset } from '@/utils/media-upload';
 import type {
   CustomerOrder,
   OrderAfterSalesResult,
@@ -53,14 +54,25 @@ export const ordersApi = {
     );
   },
 
-  requestReturn(token: string, orderId: number, reason: string) {
+  requestReturn(
+    token: string,
+    orderId: number,
+    reasonCode: string,
+    detail: string,
+    images: UploadImageAsset[],
+  ) {
+    const form = new FormData();
+    form.append('reasonCode', reasonCode);
+    form.append('detail', detail);
+    images.forEach((image) => appendImageToFormData(form, 'images', image, 'return'));
     return apiRequest<OrderAfterSalesResult>(
       '/api/orders/' + orderId + '/return-request',
       {
         method: 'POST',
-        headers: authHeaders(token, true),
-        body: JSON.stringify({ reason }),
+        headers: authHeaders(token),
+        body: form,
       },
+      45000,
     );
   },
 

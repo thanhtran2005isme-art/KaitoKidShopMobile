@@ -386,3 +386,12 @@ Triệu chứng: `GET /api/wallet`, Home, Cart hoặc Checkout đôi lúc báo h
 - Khi mã hoàn đã có, bấm Kiểm tra trạng thái từ Lalamove. Chỉ `COMPLETED` được backend xác minh mới mở nút nhận/kiểm hàng.
 - API `/receive` từ chối ngay cả khi gọi trực tiếp nếu chưa có bản ghi `VanDonHoanHang` đã `delivered`; không sửa DB để bypass.
 - Case đã được hoàn ví **trước** migration là lịch sử; không tạo vận đơn hoặc hoàn tiền lại.
+
+
+## Gửi yêu cầu hoàn hàng kèm ảnh bị lỗi
+
+- Kiểm tra backend port 5300, JWT customer, đơn đã được khách xác nhận nhận trong 15 ngày và chưa có case hoàn được xử lý.
+- Chọn lý do từ dropdown, `Khác` cần mô tả ≥5 ký tự; ảnh hỗ trợ JPEG/PNG/WebP tối đa 3 ảnh, mỗi ảnh ≤5MB. File giả ảnh không được backend chấp nhận.
+- API POST `/api/orders/:id/return-request` nhận multipart FormData `reasonCode`, `detail`, `images` (không tự set multipart boundary thủ công), timeout client 45s.
+- Backend lưu file `/uploads/returns/` theo UUID và event `return_evidence`. Admin thấy ảnh tại Đơn hàng → Chi tiết → Đối soát giao hàng & hoàn trả. Không dùng ảnh làm xác nhận giao hàng hoàn hoặc chi tiền.
+- Lỗi upload/transaction sẽ dọn ảnh đã tải lên; khi user gửi lặp, trạng thái không tạo case mới hoặc duplicate ảnh; retry thủ công sau khi xem lại trạng thái đơn.

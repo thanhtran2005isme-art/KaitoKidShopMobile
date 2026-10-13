@@ -176,3 +176,11 @@ Sau đó smoke Web customer + Admin + Mobile bằng **Node-only**. Không khởi
 - Chỉ khi hãng xác nhận `COMPLETED` thì `canReceiveReturn=true` và backend `/receive` mới cho nhập/quarantine + credit Ví KaitoKid đúng một lần.
 - No auto-retry Place Order không rõ kết quả; manual carrier reconciliation bắt buộc.
 - Live sandbox MariaDB/HTTPS return flow chưa được nghiệm thu trong môi trường này; xem `docs/decisions/D029-return-shipment-carrier-gated-refund.md`.
+
+
+## Bổ sung form yêu cầu hoàn hàng có bằng chứng
+
+- Mobile `apps/mobile/src/app/orders/[id].tsx` và Customer Web `apps/web/src/pages/OrderTracking.tsx` có dropdown lý do chuẩn, `Khác` bắt buộc mô tả, ảnh bằng chứng 0–3 JPEG/PNG/WebP mỗi ảnh ≤5MB.
+- `POST /api/orders/:id/return-request` hỗ trợ multipart `reasonCode`, `detail`, `images`, backward-compatible JSON `reason`. Backend kiểm tra nội dung ảnh và quyền sở hữu trước khi commit marker; lưu ảnh `public/uploads/returns` UUID, marker `return_evidence` trong `LichSuTrangThaiVanChuyen` cùng order; không thêm bảng/migration.
+- DTO customer trả `returnEvidence`, Admin snapshot trả `returnEvidence`, Admin `AdminAfterSalesPanel` xem ảnh; chỉ Admin mới quyết định duyệt/từ chối, request không hoàn tiền.
+- Cần chạy CI Web/Mobile, API checkout contracts và test thật chọn ảnh trên Expo Web/Android; không kết luận đã nghiệm thu runtime chỉ từ contract tests.

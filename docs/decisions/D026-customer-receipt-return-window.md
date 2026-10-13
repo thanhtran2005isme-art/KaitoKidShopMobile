@@ -117,3 +117,8 @@ Case cũ đã có `refund_pending` vẫn được đọc/hiển thị và có th
 - Hậu mãi dùng thêm subsystem Ví KaitoKid được định nghĩa tại D028.
 - `returned` là business state đã tồn tại trong schema và chỉ dùng khi hàng hoàn thực tế đã được nhận/kiểm tra.
 - UI Customer/Admin không tự suy quyền từ label; action được backend/state machine quyết định.
+
+
+## Bổ sung bằng chứng hoàn hàng (2026-10-13)
+
+Khách chọn mã lý do thuộc danh sách cho phép, có thể nhập mô tả thêm; mã `other` bắt buộc mô tả ít nhất 5 ký tự. Web/Mobile cho đính kèm tối đa ba ảnh JPEG/PNG/WebP, 5MB/ảnh. Backend lưu từng URL ảnh bằng event `return_evidence` vào lịch sử cùng transaction với `return_requested`; kiểm tra order ownership, deadline và chống case trùng, dọn file khi transaction không commit. Admin nhận đủ ảnh và lý do trong snapshot để xét duyệt. Đây chỉ là bằng chứng yêu cầu, không có quyền kích hoạt hoàn tiền/nhập kho; D029 vẫn quyết định điểm được nhận hàng hoàn.

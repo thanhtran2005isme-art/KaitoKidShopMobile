@@ -23,6 +23,7 @@ export type CustomerOrder = CreatedOrder & {
   canRequestReturn?: boolean;
   returnRequested?: boolean;
   returnStatus?: CustomerReturnStatus;
+  returnEvidence?: string[];
   refundStatus?: CustomerRefundStatus;
   receivedAt?: string | null;
   returnDeadline?: string | null;
