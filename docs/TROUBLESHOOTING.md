@@ -349,3 +349,13 @@ Khách phải xử lý/rút hết tiền và hoàn tất các yêu cầu đang c
 5. Web/Mobile poll `/api/payment/status/:orderCode`; nếu DB chưa có `NgayThanhToan`, kiểm tra webhook/provider trước chứ không sửa UI thành tự xác nhận.
 
 Runbook đầy đủ: `docs/runbooks/PAYOS_PAYMENT_E2E.md`.
+
+## Mobile / Expo Web POST /api/Auth/refresh trả HTTP 401
+
+- API `:5300` đã kết nối được; 401 nghĩa là refresh token bị từ chối, **không phải** lỗi Cloudflare, CORS hoặc LAN.
+- Backend hiện lưu 1 refresh token trên mỗi `NguoiDung`. Đăng nhập ở Web/thiết bị khác, đổi mật khẩu hoặc sau thời hạn `JWT_REFRESH_TOKEN_DAYS` (mặc định 7 ngày) có thể khiến refresh token cũ hết hiệu lực. Phải **đăng nhập lại một lần**; không tắt xác thực 401.
+- Mobile tự xóa session cũ khi refresh trả 401 và trở về chế độ guest; request 401 vẫn có thể xuất hiện trong Network của trình duyệt, nhưng app không log thêm `[KaitoKid Auth Error]` cho tình huống này.
+- Sự cố tạm thời (mất mạng, timeout hoặc API 5xx) **không xóa** refresh token đang lưu; lần gọi sau có thể thử lại. Không lưu token hoặc thông tin đăng nhập vào log.
+- Race login/refresh/restore được chặn bằng session generation và hàng đợi ghi storage để refresh cũ không ghi đè/xóa session đăng nhập mới.
+- Nếu UI vẫn hiển thị sai sau khi pull: dừng Expo, chạy `npx expo start --clear` trong `apps/mobile`, rồi thử đăng nhập mới. Không cần xóa toàn bộ storage của những người dùng khác.
+- `"shadow*" style props are deprecated` là cảnh báo React Native Web độc lập với 401; không ảnh hưởng refresh token.

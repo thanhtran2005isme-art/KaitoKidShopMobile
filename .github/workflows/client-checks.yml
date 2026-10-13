@@ -54,3 +54,5 @@ jobs:
         run: npm run lint
       - name: Typecheck Mobile
         run: npm run typecheck
+      - name: Auth refresh session regression contracts
+        run: node --test test/auth-refresh-session.test.mjs

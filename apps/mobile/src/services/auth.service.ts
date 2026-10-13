@@ -27,6 +27,13 @@ export type RegistrationPendingResponse = { message: string; email: string; expi
 export type AuthTokenResponse = { accessToken: string; refreshToken?: string; expiresAt?: string; user?: unknown; token?: string };
 export type GoogleLoginCredential = { idToken?: string; accessToken?: string };
 
+export class AuthHttpError extends Error {
+  constructor(message: string, public readonly status: number) {
+    super(message);
+    this.name = 'AuthHttpError';
+  }
+}
+
 async function request<T>(url: string, options: RequestInit): Promise<T> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 15000);
@@ -40,8 +47,16 @@ async function request<T>(url: string, options: RequestInit): Promise<T> {
     let data: any = null;
     try { data = raw ? JSON.parse(raw) : null; } catch { data = raw; }
     if (!response.ok) {
-      if (__DEV__) console.error('[KaitoKid Auth Error]', { status: response.status, url: `${API_URL}${url}`, response: data });
-      throw new Error(data?.message || data?.title || (typeof data === 'string' ? data : 'Có lỗi xảy ra'));
+      // Refresh token bị thu hồi/hết hạn là kết quả xác thực hợp lệ, không phải lỗi ứng dụng.
+      // DevTools vẫn có thể hiển thị HTTP 401 ở Network; không log thêm console.error.
+      const expectedExpiredRefresh = url === '/api/Auth/refresh' && response.status === 401;
+      if (__DEV__ && !expectedExpiredRefresh) {
+        console.error('[KaitoKid Auth Error]', { status: response.status, url: `${API_URL}${url}`, response: data });
+      }
+      throw new AuthHttpError(
+        data?.message || data?.title || (typeof data === 'string' ? data : 'Có lỗi xảy ra'),
+        response.status,
+      );
     }
     return data as T;
   } catch (error) {

@@ -13,6 +13,7 @@ import {
   login as loginApi,
   loginWithGoogle as googleLoginApi,
   refreshAccessToken,
+  AuthHttpError,
   type AuthTokenResponse,
   type GoogleLoginCredential,
 } from '@/services/auth.service';
@@ -69,70 +70,105 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const refreshPromiseRef = useRef<Promise<string | null> | null>(null);
   const sessionGenerationRef = useRef(0);
 
-  const clearSession = useCallback(async () => {
-    sessionGenerationRef.current += 1;
-
-    await Promise.all([
-      removeStorageItem(TOKEN_KEY),
-      removeStorageItem(REFRESH_KEY),
-      removeStorageItem(USER_KEY),
-      removeStorageItem(EXPIRES_KEY),
-    ]);
-
-    setToken(null);
-    setUser(null);
-    setExpiresAt(null);
+  // Serialize SecureStore/localStorage mutations; old refresh responses must never
+  // overwrite a newly logged-in session or erase it after a late 401.
+  const storageWriteRef = useRef<Promise<void>>(Promise.resolve());
+  const runSessionWrite = useCallback(async <T,>(action: () => Promise<T>): Promise<T> => {
+    const operation = storageWriteRef.current.then(action, action);
+    storageWriteRef.current = operation.then(() => undefined, () => undefined);
+    return operation;
   }, []);
 
-  const persistTokenResponse = useCallback(async (result: AuthTokenResponse) => {
+  const clearSession = useCallback(async () => {
+    const generation = ++sessionGenerationRef.current;
+    await runSessionWrite(async () => {
+      if (generation !== sessionGenerationRef.current) return;
+
+      await Promise.all([
+        removeStorageItem(TOKEN_KEY),
+        removeStorageItem(REFRESH_KEY),
+        removeStorageItem(USER_KEY),
+        removeStorageItem(EXPIRES_KEY),
+      ]);
+
+      if (generation !== sessionGenerationRef.current) return;
+      setToken(null);
+      setUser(null);
+      setExpiresAt(null);
+    });
+  }, [runSessionWrite]);
+
+  const persistTokenResponse = useCallback(async (
+    result: AuthTokenResponse,
+    expectedGeneration: number,
+  ): Promise<string | null> => {
     const accessToken = result.accessToken || result.token;
     if (!accessToken) {
       throw new Error('API.Auth không trả access token.');
     }
 
-    await setStorageItem(TOKEN_KEY, accessToken);
+    await runSessionWrite(async () => {
+      if (expectedGeneration !== sessionGenerationRef.current) return;
+      await setStorageItem(TOKEN_KEY, accessToken);
 
-    if (result.refreshToken) {
-      await setStorageItem(REFRESH_KEY, result.refreshToken);
-    }
+      if (result.refreshToken) {
+        await setStorageItem(REFRESH_KEY, result.refreshToken);
+      } else {
+        // Không giữ lại refresh token của account/phiên trước.
+        await removeStorageItem(REFRESH_KEY);
+      }
 
-    if (result.expiresAt) {
-      await setStorageItem(EXPIRES_KEY, result.expiresAt);
-      setExpiresAt(result.expiresAt);
-    } else {
-      await removeStorageItem(EXPIRES_KEY);
-      setExpiresAt(null);
-    }
+      if (result.expiresAt) {
+        await setStorageItem(EXPIRES_KEY, result.expiresAt);
+      } else {
+        await removeStorageItem(EXPIRES_KEY);
+      }
 
-    if (result.user) {
-      await setStorageItem(USER_KEY, JSON.stringify(result.user));
-      setUser(result.user);
-    }
+      if (result.user) {
+        await setStorageItem(USER_KEY, JSON.stringify(result.user));
+      } else {
+        await removeStorageItem(USER_KEY);
+      }
 
-    setToken(accessToken);
-    return accessToken;
-  }, []);
+      if (expectedGeneration !== sessionGenerationRef.current) return;
+      setExpiresAt(result.expiresAt || null);
+      setUser(result.user || null);
+      setToken(accessToken);
+    });
 
-  const refreshSession = useCallback(async () => {
+    return expectedGeneration === sessionGenerationRef.current ? accessToken : null;
+  }, [runSessionWrite]);
+
+  const refreshSession = useCallback(async (): Promise<string | null> => {
     if (refreshPromiseRef.current) return refreshPromiseRef.current;
 
     const refreshGeneration = sessionGenerationRef.current;
-    const refreshPromise = (async () => {
-      const savedRefreshToken = await getStorageItem(REFRESH_KEY);
-
-      if (!savedRefreshToken) {
-        await clearSession();
-        return null;
-      }
-
+    const refreshPromise: Promise<string | null> = (async () => {
+      let savedRefreshToken: string | null = null;
       try {
-        const result = await refreshAccessToken(savedRefreshToken);
-        if (refreshGeneration !== sessionGenerationRef.current) {
+        savedRefreshToken = await getStorageItem(REFRESH_KEY);
+        if (refreshGeneration !== sessionGenerationRef.current) return null;
+
+        if (!savedRefreshToken) {
+          await clearSession();
           return null;
         }
-        return await persistTokenResponse(result);
-      } catch {
-        await clearSession();
+
+        const result = await refreshAccessToken(savedRefreshToken);
+        if (refreshGeneration !== sessionGenerationRef.current) return null;
+        return await persistTokenResponse(result, refreshGeneration);
+      } catch (error) {
+        if (refreshGeneration !== sessionGenerationRef.current) return null;
+
+        // 401: refresh token đã hết hạn / bị thay thế -> trở về guest và đăng nhập lại.
+        // Network/5xx: giữ storage để có thể thử lại, không xóa phiên do lỗi mạng.
+        if (error instanceof AuthHttpError && error.status === 401) {
+          // Tab khác có thể vừa xoay refresh token trong localStorage.
+          const latestToken = await getStorageItem(REFRESH_KEY).catch(() => null);
+          if (latestToken === savedRefreshToken && refreshGeneration === sessionGenerationRef.current) {
+            await clearSession();
+          }
+        }
         return null;
       } finally {
         refreshPromiseRef.current = null;
@@ -149,31 +185,51 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [refreshSession]);
 
   const restoreSession = useCallback(async () => {
-    const [savedToken, savedRefreshToken, savedUser, savedExpiresAt] = await Promise.all([
-      getStorageItem(TOKEN_KEY),
-      getStorageItem(REFRESH_KEY),
-      getStorageItem(USER_KEY),
-      getStorageItem(EXPIRES_KEY),
-    ]);
+    const restoreGeneration = sessionGenerationRef.current;
+    try {
+      const [savedToken, savedRefreshToken, savedUser, savedExpiresAt] = await Promise.all([
+        getStorageItem(TOKEN_KEY),
+        getStorageItem(REFRESH_KEY),
+        getStorageItem(USER_KEY),
+        getStorageItem(EXPIRES_KEY),
+      ]);
+      if (restoreGeneration !== sessionGenerationRef.current) return;
 
-    const parsedExpiry = savedExpiresAt ? Date.parse(savedExpiresAt) : Number.NaN;
-    const shouldRefresh =
-      Boolean(savedRefreshToken) &&
-      (!savedToken ||
-        !Number.isFinite(parsedExpiry) ||
-        parsedExpiry <= Date.now() + REFRESH_EARLY_MS);
+      const parsedExpiry = savedExpiresAt ? Date.parse(savedExpiresAt) : Number.NaN;
+      const shouldRefresh =
+        Boolean(savedRefreshToken) &&
+        (!savedToken ||
+          !Number.isFinite(parsedExpiry) ||
+          parsedExpiry <= Date.now() + REFRESH_EARLY_MS);
 
-    if (shouldRefresh) {
-      await refreshSession();
+      if (shouldRefresh) {
+        await refreshSession();
+        return;
+      }
+
+      if (savedToken && !savedRefreshToken && Number.isFinite(parsedExpiry) && parsedExpiry <= Date.now()) {
+        await clearSession();
+        return;
+      }
+
+      if (restoreGeneration !== sessionGenerationRef.current) return;
+      let storedUser: unknown = null;
+      if (savedToken && savedUser) {
+        try {
+          storedUser = JSON.parse(savedUser);
+        } catch {
+          // User cache lỗi không được xóa access/refresh token còn hợp lệ.
+        }
+      }
+      setToken(savedToken);
+      setUser(storedUser);
+      setExpiresAt(savedExpiresAt);
+    } catch {
+      // Lỗi storage trên một nền tảng không được giữ splash/loading vô hạn.
+    } finally {
       setLoading(false);
-      return;
     }
-
-    setToken(savedToken);
-    setUser(savedUser ? JSON.parse(savedUser) : null);
-    setExpiresAt(savedExpiresAt);
-    setLoading(false);
-  }, [refreshSession]);
+  }, [clearSession, refreshSession]);
 
   useEffect(() => {
     void Promise.resolve().then(restoreSession);
@@ -194,14 +250,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [expiresAt, refreshSession, token]);
 
   async function login(email: string, password: string) {
+    const generation = ++sessionGenerationRef.current;
     const result = await loginApi({ email, password });
-    await persistTokenResponse(result);
+    const applied = await persistTokenResponse(result, generation);
+    if (!applied) throw new Error('Phiên đăng nhập đã thay đổi. Vui lòng thử lại.');
     return result;
   }
 
   async function loginWithGoogle(credential: GoogleLoginCredential) {
+    const generation = ++sessionGenerationRef.current;
     const result = await googleLoginApi(credential);
-    await persistTokenResponse(result);
+    const applied = await persistTokenResponse(result, generation);
+    if (!applied) throw new Error('Phiên đăng nhập đã thay đổi. Vui lòng thử lại.');
     return result;
   }
 
