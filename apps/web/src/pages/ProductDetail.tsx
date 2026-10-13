@@ -22,7 +22,7 @@ import {
   PiRulerBold,
   PiQuestion,
 } from 'react-icons/pi';
-import { productApi, customerReviewApi, wishlistApi, productExtrasApi, type CustomerReviewDTO, type VariantStockItem, type QAItem, type SizeChartResponse } from '../services/api';
+import { productApi, customerReviewApi, wishlistApi, productExtrasApi, type CustomerReviewDTO, type QAItem, type SizeChartResponse } from '../services/api';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import type { Product } from '../types';
@@ -79,7 +79,6 @@ export default function ProductDetail() {
 
   // "X người đang xem" — số thật từ session-based tracking (heartbeat 30s)
   const [watchersCount, setWatchersCount] = useState(0);
-  const [variantStocks, setVariantStocks] = useState<VariantStockItem[]>([]);
   const [sizeChart, setSizeChart] = useState<SizeChartResponse | null>(null);
   const [qaList, setQaList] = useState<QAItem[]>([]);
   const [qaInput, setQaInput] = useState('');
@@ -98,14 +97,6 @@ export default function ProductDetail() {
     setQuantity(1);
     setActiveTab('description');
   }, [id]);
-
-  // Variants stock thật từ API
-  useEffect(() => {
-    if (!product) return;
-    void productExtrasApi.getVariants(product.id).then((r) => {
-      if (r.success && r.data) setVariantStocks(r.data);
-    });
-  }, [product]);
 
   // Bảng size theo loại sản phẩm
   useEffect(() => {
@@ -164,7 +155,9 @@ export default function ProductDetail() {
 
       if (pRes.success && pRes.data) {
         setProduct(pRes.data);
-        if (pRes.data.colors?.length) setSelectedColor(pRes.data.colors[0]);
+        const firstAvailableColor = pRes.data.variantInventory?.find((item) => item.available > 0)?.color;
+        if (firstAvailableColor) setSelectedColor(firstAvailableColor);
+        else if (pRes.data.colors?.length) setSelectedColor(pRes.data.colors[0]);
         trackProductView({
           id: pRes.data.id,
           name: pRes.data.name,
@@ -192,54 +185,106 @@ export default function ProductDetail() {
     return Array.from(new Set(arr));
   }, [product]);
 
-  // Estimate stock theo từng size từ variants — nếu không có thì dùng product.stock
+  const variantInventory = useMemo(() => product?.variantInventory || [], [product?.variantInventory]);
+  const hasVariantInventory = variantInventory.length > 0;
+  const productAvailableStock = Math.max(0, product?.availableStock ?? product?.stock ?? 0);
+  const aggregateAvailableStock = hasVariantInventory
+    ? variantInventory.reduce((total, item) => total + Math.max(0, item.available || 0), 0)
+    : productAvailableStock;
+  const selectionComplete = Boolean(product)
+    && (!product?.colors?.length || Boolean(selectedColor))
+    && (!product?.sizes?.length || Boolean(selectedSize));
+  const selectedInventory = hasVariantInventory && selectionComplete
+    ? variantInventory.find((item) =>
+        (!product?.colors?.length || item.color === selectedColor)
+        && (!product?.sizes?.length || item.size === selectedSize))
+    : undefined;
+  const selectedAvailableStock = hasVariantInventory && selectionComplete
+    ? Math.max(0, selectedInventory?.available ?? 0)
+    : aggregateAvailableStock;
+
+  // Tồn kho theo size phải là available = stock - reserved, không dùng raw stock.
   const stockBySize = useMemo(() => {
     const m = new Map<string, number>();
-    if (!product) return m;
+    if (!product?.sizes?.length) return m;
 
-    // Ưu tiên variantStocks (API thật). Nếu user chọn màu, chỉ tính tồn kho cùng màu.
-    if (variantStocks.length > 0) {
+    if (hasVariantInventory) {
       const list = selectedColor
-        ? variantStocks.filter((v) => v.color === selectedColor)
-        : variantStocks;
-      list.forEach((v) => {
-        const prev = m.get(v.size) || 0;
-        m.set(v.size, prev + (v.stock ?? 0));
+        ? variantInventory.filter((item) => item.color === selectedColor)
+        : variantInventory;
+      list.forEach((item) => {
+        const prev = m.get(item.size) || 0;
+        m.set(item.size, prev + Math.max(0, item.available || 0));
       });
       return m;
     }
 
-    // Fallback khi chưa có variantStocks: chia đều product.stock cho các size.
-    if (product.sizes?.length) {
-      product.sizes.forEach((s) =>
-        m.set(s, Math.max(0, Math.floor((product.stock || 0) / product.sizes!.length)))
-      );
-    }
+    // Không có inventory biến thể: các size dùng chung tồn kho khả dụng cấp sản phẩm.
+    product.sizes.forEach((size) => m.set(size, productAvailableStock));
     return m;
-  }, [product, variantStocks, selectedColor]);
+  }, [hasVariantInventory, product, productAvailableStock, selectedColor, variantInventory]);
 
-  const handleAddToCart = useCallback(async () => {
-    if (!product) return;
+  // Khi đổi màu/size hoặc tồn kho thay đổi, quantity luôn được clamp về giới hạn thật.
+  useEffect(() => {
+    const maximum = selectionComplete ? selectedAvailableStock : aggregateAvailableStock;
+    setQuantity((current) => maximum > 0 ? Math.max(1, Math.min(current, maximum)) : 1);
+  }, [aggregateAvailableStock, selectedAvailableStock, selectionComplete]);
+
+  const handleAddToCart = useCallback(async (): Promise<boolean> => {
+    if (!product) return false;
     if (product.sizes?.length && !selectedSize) {
       toast.error('Vui lòng chọn size');
-      return;
+      return false;
     }
     if (product.colors?.length && !selectedColor) {
       toast.error('Vui lòng chọn màu sắc');
-      return;
+      return false;
+    }
+    if (product.status === 'out-of-stock' || selectedAvailableStock <= 0) {
+      toast.error('Sản phẩm hoặc biến thể này hiện đã hết hàng');
+      return false;
+    }
+    if (quantity > selectedAvailableStock) {
+      setQuantity(Math.max(1, selectedAvailableStock));
+      toast.error(`Chỉ còn ${selectedAvailableStock} sản phẩm khả dụng. Vui lòng giảm số lượng.`);
+      return false;
     }
     if (!user) {
       toast.error('Vui lòng đăng nhập để mua hàng');
       navigate('/login');
-      return;
+      return false;
     }
-    await addItem(product, selectedSize, selectedColor, quantity);
+
+    const added = await addItem(product, selectedSize, selectedColor, quantity);
+    if (!added) {
+      toast.error('Tồn kho vừa thay đổi hoặc không thể thêm sản phẩm. Vui lòng thử lại.');
+      return false;
+    }
+
+    setProduct((current) => {
+      if (!current) return current;
+      const nextAvailableStock = Math.max(0, (current.availableStock ?? current.stock) - quantity);
+      const nextVariantInventory = current.variantInventory?.map((item) =>
+        item.size === selectedSize && item.color === selectedColor
+          ? {
+              ...item,
+              reserved: item.reserved + quantity,
+              available: Math.max(0, item.available - quantity),
+            }
+          : item);
+      return {
+        ...current,
+        availableStock: nextAvailableStock,
+        variantInventory: nextVariantInventory,
+      };
+    });
     toast.success(`Đã thêm ${quantity} sản phẩm vào giỏ`);
-  }, [product, selectedSize, selectedColor, quantity, addItem, user, navigate]);
+    return true;
+  }, [addItem, navigate, product, quantity, selectedAvailableStock, selectedColor, selectedSize, user]);
 
   const handleBuyNow = useCallback(async () => {
-    await handleAddToCart();
-    setTimeout(() => navigate('/cart'), 500);
+    const added = await handleAddToCart();
+    if (added) navigate('/cart');
   }, [handleAddToCart, navigate]);
 
   const handleToggleFav = useCallback(async () => {
@@ -259,7 +304,7 @@ export default function ProductDetail() {
     setFavLoading(false);
   }, [user, product, isFav]);
 
-    const handleAddCompare = useCallback(() => {
+  const handleAddCompare = useCallback(() => {
     if (!product) return;
     try {
       const list: number[] = JSON.parse(localStorage.getItem('kk_compare') || '[]');
@@ -342,8 +387,22 @@ export default function ProductDetail() {
   const discount = product.oldPrice && product.oldPrice > product.price
     ? Math.round((1 - product.price / product.oldPrice) * 100)
     : 0;
-  const stockSelected = selectedSize ? stockBySize.get(selectedSize) || 0 : product.stock;
-  const isLowStock = stockSelected > 0 && stockSelected <= 5;
+  const isOutOfStock = product.status === 'out-of-stock' || aggregateAvailableStock <= 0;
+  const selectedOutOfStock = selectionComplete && selectedAvailableStock <= 0;
+  const canPurchase = !isOutOfStock && selectionComplete && !selectedOutOfStock;
+  const isLowStock = canPurchase && selectedAvailableStock <= 5;
+  const stockDisplayText = isOutOfStock
+    ? 'Hết hàng'
+    : hasVariantInventory && !selectionComplete
+      ? `Tổng còn ${aggregateAvailableStock} sản phẩm · chọn đủ màu và size để xem tồn kho chính xác`
+      : `Còn ${selectedAvailableStock} sản phẩm`;
+  const actionLabel = isOutOfStock
+    ? 'Hết hàng'
+    : selectedOutOfStock
+      ? 'Biến thể hết hàng'
+      : !selectionComplete
+        ? 'Chọn màu & size'
+        : 'Thêm vào giỏ';
 
   return (
     <div className="pd-page">
@@ -474,12 +533,18 @@ export default function ProductDetail() {
             )}
           </div>
 
-          {isLowStock && (
-            <div className="pd-urgency">
-              <PiFire />
-              <div>Chỉ còn <strong>{stockSelected} sản phẩm</strong>{selectedSize ? ` size ${selectedSize}` : ''}. Đặt ngay kẻo hết!</div>
-            </div>
-          )}
+          <div
+            aria-live="polite"
+            className="pd-size-stock"
+            style={{
+              color: isOutOfStock ? '#dc2626' : isLowStock ? '#d97706' : '#15803d',
+              fontSize: 13,
+              fontWeight: 600,
+              marginTop: 0,
+            }}
+          >
+            <PiPackage /> {stockDisplayText}
+          </div>
 
           {/* Color */}
           {product.colors && product.colors.length > 0 && (
@@ -488,16 +553,30 @@ export default function ProductDetail() {
                 <span>Màu sắc: <span className="selected">{selectedColor || 'Chưa chọn'}</span></span>
               </div>
               <div className="pd-color-options">
-                {product.colors.map((c) => (
-                  <button
-                    key={c}
-                    className={`pd-color-swatch ${selectedColor === c ? 'active' : ''}`}
-                    onClick={() => setSelectedColor(c)}
-                  >
-                    <span className="pd-color-dot" style={{ background: COLOR_MAP[c] || '#cbd5e1' }} />
-                    {c}
-                  </button>
-                ))}
+                {product.colors.map((c) => {
+                  const out = product.status === 'out-of-stock' || (hasVariantInventory
+                    ? !variantInventory.some((item) => item.color === c && (!selectedSize || item.size === selectedSize) && item.available > 0)
+                    : productAvailableStock <= 0);
+                  return (
+                    <button
+                      key={c}
+                      className={`pd-color-swatch ${selectedColor === c ? 'active' : ''}`}
+                      onClick={() => {
+                        if (out) return;
+                        setSelectedColor(c);
+                        setQuantity(1);
+                        if (selectedSize && hasVariantInventory && !variantInventory.some((item) => item.color === c && item.size === selectedSize && item.available > 0)) {
+                          setSelectedSize('');
+                        }
+                      }}
+                      disabled={out}
+                      title={out ? 'Hết hàng' : undefined}
+                    >
+                      <span className="pd-color-dot" style={{ background: COLOR_MAP[c] || '#cbd5e1' }} />
+                      {c}
+                    </button>
+                  );
+                })}
               </div>
             </div>
           )}
@@ -514,25 +593,24 @@ export default function ProductDetail() {
               <div className="pd-size-options">
                 {product.sizes.map((s) => {
                   const stock = stockBySize.get(s) || 0;
-                  const out = stock <= 0;
+                  const out = product.status === 'out-of-stock' || stock <= 0;
                   return (
                     <button
                       key={s}
                       className={`pd-size-btn ${selectedSize === s ? 'active' : ''} ${out ? 'out' : ''}`}
-                      onClick={() => !out && setSelectedSize(s)}
+                      onClick={() => {
+                        if (out) return;
+                        setSelectedSize(s);
+                        setQuantity(1);
+                      }}
                       disabled={out}
-                      title={out ? 'Hết hàng' : `Còn ${stock} cái`}
+                      title={out ? 'Hết hàng' : `Còn ${stock} sản phẩm khả dụng`}
                     >
                       {s}
                     </button>
                   );
                 })}
               </div>
-              {selectedSize && stockBySize.get(selectedSize)! <= 5 && stockBySize.get(selectedSize)! > 0 && (
-                <div className="pd-size-stock">
-                  <PiFire /> Chỉ còn {stockBySize.get(selectedSize)} sản phẩm size {selectedSize}
-                </div>
-              )}
             </div>
           )}
 
@@ -557,18 +635,51 @@ export default function ProductDetail() {
           {/* Quantity + Buy */}
           <div className="pd-actions">
             <div className="pd-qty">
-              <button onClick={() => setQuantity(Math.max(1, quantity - 1))}>−</button>
-              <input value={quantity} onChange={(e) => setQuantity(Math.max(1, Number(e.target.value) || 1))} />
-              <button onClick={() => setQuantity(quantity + 1)}>+</button>
+              <button
+                disabled={!canPurchase || quantity <= 1}
+                onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                title={!canPurchase ? 'Chọn biến thể còn hàng trước' : 'Giảm số lượng'}
+              >−</button>
+              <input
+                type="number"
+                min={canPurchase ? 1 : 0}
+                max={canPurchase ? selectedAvailableStock : 0}
+                value={canPurchase ? quantity : 0}
+                disabled={!canPurchase}
+                onChange={(e) => {
+                  const next = Number.parseInt(e.target.value, 10);
+                  const safe = Number.isFinite(next) ? next : 1;
+                  setQuantity(Math.max(1, Math.min(selectedAvailableStock, safe)));
+                }}
+                aria-label="Số lượng mua"
+              />
+              <button
+                disabled={!canPurchase || quantity >= selectedAvailableStock}
+                onClick={() => setQuantity(Math.min(selectedAvailableStock, quantity + 1))}
+                title={!canPurchase ? 'Chọn biến thể còn hàng trước' : `Tối đa ${selectedAvailableStock} sản phẩm`}
+              >+</button>
             </div>
-            <button className="pd-add-cart" onClick={handleAddToCart} disabled={product.stock === 0}>
+            <button className="pd-add-cart" onClick={() => void handleAddToCart()} disabled={!canPurchase}>
               <PiShoppingCartSimpleFill style={{ marginRight: 8, verticalAlign: -2 }} />
-              {product.stock === 0 ? 'Hết hàng' : 'Thêm vào giỏ'}
+              {actionLabel}
             </button>
           </div>
 
+          {selectionComplete && !isOutOfStock && (
+            <div className="pd-size-stock" aria-live="polite" style={{ color: selectedOutOfStock ? '#dc2626' : '#64748b', marginTop: -8 }}>
+              {selectedOutOfStock
+                ? 'Lựa chọn này đang hết hàng'
+                : `Bạn có thể mua tối đa ${selectedAvailableStock} sản phẩm ở lựa chọn hiện tại.`}
+            </div>
+          )}
+
           <div className="pd-secondary-actions">
-            <button className="pd-add-cart" style={{ background: '#dc2626' }} onClick={handleBuyNow} disabled={product.stock === 0}>
+            <button
+              className="pd-add-cart"
+              style={canPurchase ? { background: '#dc2626' } : undefined}
+              onClick={() => void handleBuyNow()}
+              disabled={!canPurchase}
+            >
               <PiCheckCircleFill style={{ marginRight: 8, verticalAlign: -2 }} />
               Mua ngay
             </button>
@@ -690,7 +801,7 @@ export default function ProductDetail() {
                 {product.colors?.length && <tr><th>Màu sắc</th><td>{product.colors.join(', ')}</td></tr>}
                 {product.sizes?.length && <tr><th>Kích cỡ</th><td>{product.sizes.join(', ')}</td></tr>}
                 {product.specs && <tr><th>Chi tiết kỹ thuật</th><td style={{ whiteSpace: 'pre-line' }}>{product.specs}</td></tr>}
-                <tr><th>Tình trạng</th><td>{product.stock > 0 ? `Còn hàng (${product.stock})` : 'Hết hàng'}</td></tr>
+                <tr><th>Tình trạng</th><td>{isOutOfStock ? 'Hết hàng' : `Còn hàng (${aggregateAvailableStock} sản phẩm khả dụng)`}</td></tr>
                 <tr><th>Đã bán</th><td>{product.soldCount.toLocaleString('vi-VN')}</td></tr>
               </tbody>
             </table>
@@ -783,8 +894,8 @@ export default function ProductDetail() {
           <div className="name">{product.name}</div>
           <div className="price">{formatCurrency(product.price)}</div>
         </div>
-        <button className="pd-sticky-cart" onClick={handleAddToCart}>
-          <PiShoppingCartSimpleFill /> Thêm vào giỏ
+        <button className="pd-sticky-cart" onClick={() => void handleAddToCart()} disabled={!canPurchase}>
+          <PiShoppingCartSimpleFill /> {actionLabel}
         </button>
       </div>
 

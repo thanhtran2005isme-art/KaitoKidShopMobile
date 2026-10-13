@@ -1,5 +1,7 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { QuantityNumberInput } from '@/components/ui/quantity-number-input';
+
 import { BRAND_COLORS } from '@/constants/brand';
 
 type QuantitySelectorProps = {
@@ -31,7 +33,7 @@ export function QuantitySelector({ value, max, onChange }: QuantitySelectorProps
           <Text style={styles.buttonText}>−</Text>
         </Pressable>
 
-        <Text style={styles.value}>{safeMax > 0 ? value : 0}</Text>
+        <QuantityNumberInput max={safeMax} onChange={onChange} value={value} />
 
         <Pressable
           accessibilityLabel="Tăng số lượng"
@@ -81,12 +83,5 @@ const styles = StyleSheet.create({
     color: BRAND_COLORS.ink,
     fontSize: 20,
     fontWeight: '800',
-  },
-  value: {
-    minWidth: 32,
-    textAlign: 'center',
-    color: BRAND_COLORS.ink,
-    fontSize: 13,
-    fontWeight: '900',
   },
 });

@@ -133,3 +133,34 @@ test("raw MariaDB rows are converted to ASP.NET-compatible camelCase JSON", () =
     tongTien: 120000,
   });
 });
+
+test("customer summary aggregates MariaDB orders by user, with completed-only revenue", () => {
+  const start = catalogSource.indexOf('@Get("summary")');
+  const end = catalogSource.indexOf('  @Get()', start);
+  assert.ok(start >= 0 && end > start);
+  const summarySource = catalogSource.slice(start, end);
+  assert.match(summarySource, /assertStaffPermission\(user, "customers.view"\)/);
+  assert.match(summarySource, /GROUP BY d\.NguoiDungId/);
+  assert.match(summarySource, /o\.UserId=n\.Id/);
+  assert.match(summarySource, /WHERE n\.VaiTro='user'/);
+  assert.match(summarySource, /d\.TrangThai='completed' THEN d\.TongTien ELSE 0/);
+  assert.match(summarySource, /d\.TrangThai='cancelled'/);
+});
+
+test("customer purchase analytics use NguoiDungId and completed orders for value and interests", () => {
+  assert.ok(catalogSource.includes('@Get(":id/analytics")'));
+  assert.ok(catalogSource.includes("d.NguoiDungId=n.Id AND d.TrangThai='completed'"));
+  assert.ok(catalogSource.includes("SUM(d.TongTien) FROM DonHang d WHERE d.NguoiDungId=n.Id AND d.TrangThai='completed'"));
+  assert.ok(catalogSource.includes("AVG(d.TongTien) FROM DonHang d WHERE d.NguoiDungId=n.Id AND d.TrangThai='completed'"));
+
+  const analyticsStart = catalogSource.indexOf('@Get(":id/analytics")');
+  const customerDetailStart = catalogSource.indexOf('@Get(":id")', analyticsStart);
+  const analyticsSource = catalogSource.slice(analyticsStart, customerDetailStart);
+  const completedFilters = analyticsSource.match(/WHERE d\.NguoiDungId=\? AND d\.TrangThai='completed'/g) || [];
+
+  assert.equal(completedFilters.length, 2, "top products and categories must both use completed orders");
+  assert.ok(analyticsSource.includes("WHERE d.NguoiDungId=?"));
+  assert.ok(analyticsSource.includes("JOIN ChiTietDonHang"));
+  assert.ok(analyticsSource.includes("LEFT JOIN SanPham"));
+  assert.doesNotMatch(analyticsSource, /Email|SoDienThoai/);
+});
