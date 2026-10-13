@@ -154,3 +154,5 @@ Sau đó smoke Web customer + Admin + Mobile bằng **Node-only**. Không khởi
 - Mobile có Expo USB/ADB launcher hardening, địa chỉ cascade tỉnh/huyện/xã, và màn payment payOS; order detail dùng Modal để xác nhận nhận/chưa nhận hàng trên Expo Web.
 - Merge gate còn yêu cầu E2E HTTPS webhook + Lalamove sandbox + paid/cancel/expiry race với DB thật: `docs/runbooks/PAYOS_PAYMENT_E2E.md`, `docs/runbooks/LALAMOVE_SANDBOX_E2E.md`.
 - Những hành vi trên chỉ thuộc nhánh PR #75 khi chưa merge. `main` vẫn là runtime source of truth.
+
+- Online payment trên PR #75 dùng payOS SDK chính thức (`@payos/node`), tức official payOS SDK; browser return và client polling không có quyền đánh dấu paid.
