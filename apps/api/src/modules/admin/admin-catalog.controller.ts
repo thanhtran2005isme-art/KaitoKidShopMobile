@@ -41,6 +41,34 @@ import {
 export class AdminCustomersController {
   constructor(private readonly prisma: PrismaService) {}
 
+  // Tổng quan lấy từ MariaDB, không phụ thuộc phân trang danh sách trên Web.
+  @Get("summary")
+  async summary(@CurrentUser() user: AuthenticatedUser) {
+    assertStaffPermission(user, "customers.view");
+    const rows = await this.prisma.$queryRawUnsafe<JsonRecord[]>(
+      `SELECT COUNT(*) AS TotalCustomers,
+              COALESCE(SUM(CASE WHEN COALESCE(o.OrderCount, 0) > 0 THEN 1 ELSE 0 END), 0) AS CustomersWithOrders,
+              COALESCE(SUM(CASE WHEN COALESCE(o.OrderCount, 0) = 0 THEN 1 ELSE 0 END), 0) AS CustomersWithoutOrders,
+              COALESCE(SUM(CASE WHEN COALESCE(o.CompletedOrders, 0) >= 2 THEN 1 ELSE 0 END), 0) AS RepeatCustomers,
+              COALESCE(SUM(COALESCE(o.OrderCount, 0)), 0) AS TotalOrders,
+              COALESCE(SUM(COALESCE(o.CompletedOrders, 0)), 0) AS CompletedOrders,
+              COALESCE(SUM(COALESCE(o.CancelledOrders, 0)), 0) AS CancelledOrders,
+              COALESCE(SUM(COALESCE(o.TotalSpent, 0)), 0) AS TotalRevenue
+       FROM NguoiDung n
+       LEFT JOIN (
+         SELECT d.NguoiDungId AS UserId,
+                COUNT(*) AS OrderCount,
+                SUM(CASE WHEN d.TrangThai='completed' THEN 1 ELSE 0 END) AS CompletedOrders,
+                SUM(CASE WHEN d.TrangThai='cancelled' THEN 1 ELSE 0 END) AS CancelledOrders,
+                SUM(CASE WHEN d.TrangThai='completed' THEN d.TongTien ELSE 0 END) AS TotalSpent
+         FROM DonHang d
+         GROUP BY d.NguoiDungId
+       ) o ON o.UserId=n.Id
+       WHERE n.VaiTro='user'`,
+    );
+    return jsonValue(rows[0] ?? {});
+  }
+
   @Get()
   async all(
     @CurrentUser() user: AuthenticatedUser,
