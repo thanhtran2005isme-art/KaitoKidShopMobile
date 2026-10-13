@@ -165,3 +165,5 @@ Sau đó smoke Web customer + Admin + Mobile bằng **Node-only**. Không khởi
 - Customer confirm-received mới bắt đầu cửa sổ return 15 ngày; chỉ credit toàn bộ order total vào ví đúng một lần khi Admin thực nhận hàng hoàn và chọn restock/quarantine. Quarantine không cộng tồn bán được.
 - Không xóa account khi còn số dư hoặc withdrawal pending/approved.
 - Chỉ nhập PR #78 sau khi PR #75 đủ live E2E và DB wallet migration + refund/withdrawal/partial payment race gates được nghiệm thu.
+
+- Online payment trên PR #75 dùng payOS SDK chính thức (`@payos/node`), tức official payOS SDK; browser return và client polling không có quyền đánh dấu paid.
