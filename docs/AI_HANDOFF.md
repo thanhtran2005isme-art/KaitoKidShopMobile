@@ -1,6 +1,6 @@
 # AI Handoff — Current State
 
-Last updated: 2026-10-08
+Last updated: 2026-10-13 (wallet integration branch)
 
 ## Repository
 
@@ -37,7 +37,7 @@ Legacy ASP.NET Core `backend/` đã retire trong retirement change. SQL/schema a
 - REST/Auth/Admin/Customer/media: same origin
 - Socket.IO path: `/chatHub`
 - MariaDB: `kaitokid`
-- Expected current base-table contract: 52 tables
+- Expected current base-table contract: 55 tables on wallet integration branch after applying wallet migration; main remains 52 until PR #78 merges
 - Secrets: `apps/api/.env` (gitignored)
 - Template: `apps/api/.env.example`
 - Local CORS cho phép loopback `localhost`/`127.0.0.1` dùng port dev động khi cùng scheme đã được allow; không mở rộng sang origin/LAN tùy ý.
@@ -154,5 +154,16 @@ Sau đó smoke Web customer + Admin + Mobile bằng **Node-only**. Không khởi
 - Mobile có Expo USB/ADB launcher hardening, địa chỉ cascade tỉnh/huyện/xã, và màn payment payOS; order detail dùng Modal để xác nhận nhận/chưa nhận hàng trên Expo Web.
 - Merge gate còn yêu cầu E2E HTTPS webhook + Lalamove sandbox + paid/cancel/expiry race với DB thật: `docs/runbooks/PAYOS_PAYMENT_E2E.md`, `docs/runbooks/LALAMOVE_SANDBOX_E2E.md`.
 - Những hành vi trên chỉ thuộc nhánh PR #75 khi chưa merge. `main` vẫn là runtime source of truth.
+
+## PR #78 — Ví KaitoKid / hoàn tiền / rút tiền (đang nghiệm thu)
+
+- Stacked trên PR #75; không coi wallet, return 15 ngày hay payOS amountDue mới là chức năng của main trước khi merge.
+- MariaDB: migration `database/migrations/20261006_wallet_refund_withdrawal.sql`; contract nhánh wallet 55 base tables so với 52 trên main.
+- `ViDienTu` có available/held balance; `GiaoDichVi` là append-only idempotent ledger; `YeuCauRutTien` có workflow approve/reject/complete và RBAC.
+- Checkout: client chỉ gửi `useWallet`, backend quyết định `walletUsed=min(available,TongTien)`, `amountDue=TongTien-walletUsed`, payOS chỉ thu `amountDue`.
+- Cancel/expiry đảo phần ví đã debit đúng một lần sau khi provider xác nhận chưa paid; không hoàn tiền/stock nếu provider có thể đã paid.
+- Customer confirm-received mới bắt đầu cửa sổ return 15 ngày; chỉ credit toàn bộ order total vào ví đúng một lần khi Admin thực nhận hàng hoàn và chọn restock/quarantine. Quarantine không cộng tồn bán được.
+- Không xóa account khi còn số dư hoặc withdrawal pending/approved.
+- Chỉ nhập PR #78 sau khi PR #75 đủ live E2E và DB wallet migration + refund/withdrawal/partial payment race gates được nghiệm thu.
 
 - Online payment trên PR #75 dùng payOS SDK chính thức (`@payos/node`), tức official payOS SDK; browser return và client polling không có quyền đánh dấu paid.

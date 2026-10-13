@@ -2,6 +2,7 @@ import { BadRequestException, Injectable } from "@nestjs/common";
 import { randomInt } from "node:crypto";
 import { PrismaService } from "../../database/prisma.service.js";
 import { CartService } from "../cart/cart.service.js";
+import { WalletService } from "../wallet/wallet.service.js";
 import { toNumber, toNullableNumber } from "../../common/db-value.js";
 import { normalizePhone, resolveNextTier, utcDateOnly } from "./account.helpers.js";
 
@@ -38,6 +39,7 @@ export class AccountService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly cart: CartService,
+    private readonly wallet: WalletService,
   ) {}
 
   async getProfile(userId: number) {
@@ -378,6 +380,8 @@ export class AccountService {
       );
       const user = users[0];
       if (!user) return null;
+
+      await this.wallet.assertAccountCanCloseInTransaction(tx, userId);
 
       await tx.$executeRawUnsafe(
         `UPDATE NguoiDung

@@ -256,6 +256,11 @@ export default function AccountScreen() {
             onPress={() => router.push('/orders')}
           />
           <MenuItem
+            title="Ví KaitoKid"
+            description="Tiền hoàn hàng, thanh toán bằng số dư và yêu cầu rút về ngân hàng."
+            onPress={() => router.push('/account/wallet')}
+          />
+          <MenuItem
             badge={unreadCount}
             title="Thông báo"
             description="Cập nhật đơn hàng, vận chuyển, thanh toán và ưu đãi."

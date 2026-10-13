@@ -12,8 +12,8 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import {
-  couponApi, settingsApi, shippingApi, paymentApi, cartApi, addressApi,
-  type SettingDTO, type ShippingQuoteOption, type ComboDiscountResult,
+  couponApi, settingsApi, shippingApi, paymentApi, cartApi, addressApi, walletApi,
+  type SettingDTO, type ShippingQuoteOption, type ComboDiscountResult, type WalletSummaryDTO,
 } from '../services/api';
 import apiClient from '../services/apiClient';
 import CheckoutForm from '../components/checkout/CheckoutForm';
@@ -24,9 +24,17 @@ import ReviewOrderModal from '../components/checkout/ReviewOrderModal';
 import PaymentStep from '../components/checkout/PaymentStep';
 import OrderCompleted from '../components/checkout/OrderCompleted';
 import { EMPTY_ADDRESS_FORM, type BankAccount, type CheckoutAddressForm } from '../components/checkout/types';
+import '../styles/wallet.css';
 
 type PaymentMethod = 'atm' | 'cod';
 type ShippingProviderCode = 'mock' | 'ghn' | 'ghtk' | 'lalamove' | 'all';
+
+type PendingOrder = {
+  orderCode: string;
+  orderTotal: number;
+  amountDue: number;
+  walletUsed: number;
+};
 
 export default function Checkout() {
   const { cart, subtotal, refreshCart } = useCart();
@@ -59,10 +67,14 @@ export default function Checkout() {
   // Combo discount (server-evaluated)
   const [combo, setCombo] = useState<ComboDiscountResult | null>(null);
 
+  // Ví KaitoKid
+  const [walletSummary, setWalletSummary] = useState<WalletSummaryDTO | null>(null);
+  const [useWallet, setUseWallet] = useState(false);
+
   // Step state
   const [paymentStep, setPaymentStep] = useState(false);
   const [completedStep, setCompletedStep] = useState(false);
-  const [pendingOrder, setPendingOrder] = useState<{ orderCode: string; total: number } | null>(null);
+  const [pendingOrder, setPendingOrder] = useState<PendingOrder | null>(null);
 
   // Backend cho phép simulate paid hay không (chỉ dev)
   const [allowSimulatePaid, setAllowSimulatePaid] = useState(false);
@@ -73,8 +85,27 @@ export default function Checkout() {
     () => Math.max(0, subtotal - couponDiscount - comboDiscount) + shippingFee,
     [subtotal, couponDiscount, comboDiscount, shippingFee],
   );
+  const estimatedWalletUse = useMemo(
+    () => useWallet ? Math.min(walletSummary?.availableBalance ?? 0, total) : 0,
+    [useWallet, walletSummary?.availableBalance, total],
+  );
+  const estimatedAmountDue = Math.max(0, total - estimatedWalletUse);
 
   // ==================== EFFECTS ====================
+
+  useEffect(() => {
+    if (!user) {
+      setWalletSummary(null);
+      setUseWallet(false);
+      return;
+    }
+    void walletApi.getSummary().then((result) => {
+      if (result.success && result.data) {
+        setWalletSummary(result.data);
+        if (result.data.availableBalance <= 0) setUseWallet(false);
+      }
+    });
+  }, [user]);
 
   // Load bank accounts từ admin settings
   useEffect(() => {
@@ -215,12 +246,25 @@ export default function Checkout() {
         shippingDistrict: addressForm.district,
         shippingWard: addressForm.ward,
         shippingStreet: addressForm.street,
+        useWallet,
       });
-      const data = response.data as { id?: number; orderCode?: string; total?: number };
+      const data = response.data as {
+        id?: number;
+        orderCode?: string;
+        total?: number;
+        walletUsed?: number;
+        amountDue?: number;
+        paidAt?: string | null;
+      };
 
-      const orderInfo = {
+      const orderTotal = Number(data.total ?? total);
+      const walletUsed = Number(data.walletUsed ?? 0);
+      const amountDue = Number(data.amountDue ?? Math.max(0, orderTotal - walletUsed));
+      const orderInfo: PendingOrder = {
         orderCode: data.orderCode || String(data.id || ''),
-        total: data.total || total,
+        orderTotal,
+        walletUsed,
+        amountDue,
       };
 
       // Lưu địa chỉ vào sổ nếu user check
@@ -236,13 +280,13 @@ export default function Checkout() {
         });
       }
 
-      // Backend là authority của giỏ. Chỉ đồng bộ lại state sau khi order
-      // transaction thành công; không xóa toàn bộ giỏ ở client.
+      // Backend là authority của giỏ và số dư ví.
       await refreshCart();
       setShowReview(false);
       setPendingOrder(orderInfo);
+      void walletApi.getSummary().then((result) => result.success && result.data && setWalletSummary(result.data));
 
-      if (paymentMethod === 'atm') {
+      if (paymentMethod === 'atm' && amountDue > 0 && !data.paidAt) {
         setPaymentStep(true);
       } else {
         setCompletedStep(true);
@@ -252,6 +296,7 @@ export default function Checkout() {
       const msg = err?.response?.data?.error || err?.response?.data?.message || 'Không thể đặt hàng. Vui lòng thử lại.';
       setError(msg);
       setShowReview(false);
+      void walletApi.getSummary().then((result) => result.success && result.data && setWalletSummary(result.data));
     } finally {
       setSubmitting(false);
     }
@@ -273,14 +318,14 @@ export default function Checkout() {
   }
 
   if (completedStep && pendingOrder) {
-    return <OrderCompleted orderCode={pendingOrder.orderCode} total={pendingOrder.total} paymentMethod={paymentMethod} />;
+    return <OrderCompleted orderCode={pendingOrder.orderCode} total={pendingOrder.orderTotal} paymentMethod={paymentMethod} />;
   }
 
   if (paymentStep && pendingOrder) {
     return (
       <PaymentStep
         orderCode={pendingOrder.orderCode}
-        total={pendingOrder.total}
+        total={pendingOrder.amountDue}
         bankAccounts={bankAccounts}
         allowSimulatePaid={allowSimulatePaid}
         onPaid={() => {
@@ -326,6 +371,34 @@ export default function Checkout() {
           />
 
           <PaymentMethodSelector value={paymentMethod} onChange={setPaymentMethod} />
+
+          {walletSummary && (
+            <div className="kk-wallet-checkout">
+              <label className="kk-wallet-checkout__toggle">
+                <input
+                  type="checkbox"
+                  checked={useWallet}
+                  onChange={(e) => setUseWallet(e.target.checked)}
+                  disabled={walletSummary.availableBalance <= 0}
+                />
+                <span>
+                  <strong>Dùng số dư Ví KaitoKid</strong><br />
+                  <span className="kk-wallet-muted">
+                    Khả dụng {walletSummary.availableBalance.toLocaleString('vi-VN')}đ · <Link to="/wallet">Quản lý ví</Link>
+                  </span>
+                </span>
+              </label>
+              {useWallet && (
+                <div className="kk-wallet-checkout__numbers">
+                  <span>Ví dự kiến dùng <strong>−{estimatedWalletUse.toLocaleString('vi-VN')}đ</strong></span>
+                  <span>Còn thanh toán <strong>{estimatedAmountDue.toLocaleString('vi-VN')}đ</strong></span>
+                </div>
+              )}
+              <p className="kk-wallet-muted" style={{ margin: '8px 0 0', fontSize: 12 }}>
+                Số tiền cuối cùng do backend khóa số dư và tính lại khi tạo đơn.
+              </p>
+            </div>
+          )}
         </div>
 
         {/* RIGHT */}

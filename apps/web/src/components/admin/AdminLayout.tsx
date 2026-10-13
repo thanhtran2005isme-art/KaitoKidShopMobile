@@ -140,18 +140,32 @@ export default function AdminLayout() {
 
   const isMobileViewport = () => typeof window !== 'undefined' && window.innerWidth <= 768;
 
-  // Menu hiển thị: chèn nhóm "Nhân sự" theo quyền (staff.view / roles.manage)
+  // Menu tài chính/nhân sự chỉ xuất hiện khi staff có đúng permission tương ứng.
   const visibleMenu = useMemo<MenuItem[]>(() => {
+    const items = [...menuItems];
+    const settingsIdx = items.findIndex((i) => i.path === '/admin/settings');
+    let insertIdx = settingsIdx === -1 ? items.length : settingsIdx;
+
+    if (hasPermission('wallet.view')) {
+      items.splice(insertIdx, 0, {
+        path: '/admin/wallet',
+        icon: 'fa-wallet',
+        label: 'Ví & rút tiền',
+      });
+      insertIdx += 1;
+    }
+
     const hrSubmenu: { path: string; label: string }[] = [];
     if (hasPermission('staff.view')) hrSubmenu.push({ path: '/admin/staff', label: 'Quản lý nhân viên' });
     if (hasPermission('roles.manage')) hrSubmenu.push({ path: '/admin/roles', label: 'Vai trò & quyền' });
+    if (hrSubmenu.length > 0) {
+      items.splice(insertIdx, 0, {
+        icon: 'fa-user-shield',
+        label: 'Nhân sự',
+        submenu: hrSubmenu,
+      });
+    }
 
-    if (hrSubmenu.length === 0) return menuItems;
-
-    const hrMenu: MenuItem = { icon: 'fa-user-shield', label: 'Nhân sự', submenu: hrSubmenu };
-    const items = [...menuItems];
-    const settingsIdx = items.findIndex((i) => i.path === '/admin/settings');
-    items.splice(settingsIdx === -1 ? items.length : settingsIdx, 0, hrMenu);
     return items;
   }, [hasPermission]);
 
@@ -273,7 +287,7 @@ export default function AdminLayout() {
       cancelled: 'Đã hủy',
     };
 
-    const routeResults: SearchResult[] = menuItems
+    const routeResults: SearchResult[] = visibleMenu
       .flatMap((item) => {
         if (item.path) {
           return [{
@@ -395,7 +409,7 @@ export default function AdminLayout() {
 
     return [...routeResults, ...orderResults, ...productResults, ...customerResults, ...keywordActions]
       .slice(0, 10);
-  }, [customers, orders, products, searchQuery]);
+  }, [customers, orders, products, searchQuery, visibleMenu]);
 
   const notifications = useMemo(() => {
     const settings = readAdminSettings();

@@ -48,25 +48,42 @@ npm --prefix apps\mobile install
 
 ## Database
 
-Fresh schema source:
+Fresh schema nền:
 
 ```text
 database/KaitoKid_MariaDB.sql
 ```
 
-Migration cho database đã tồn tại nằm trong:
+Sau khi import fresh schema nền, chạy migration Ví KaitoKid để đạt contract DB hiện hành:
+
+```text
+database/migrations/20261006_wallet_refund_withdrawal.sql
+```
+
+Database đã tồn tại cũng chạy migration trên theo cách in-place; không rebuild dữ liệu. Các migration khác nằm trong:
 
 ```text
 database/migrations/
 ```
 
-Database development hiện dùng tên `kaitokid`; health/audit hiện kỳ vọng 52 bảng theo contract hiện tại.
+Database development hiện dùng tên `kaitokid`; health/audit hiện kỳ vọng **55 bảng**. Ba bảng bổ sung của Ví KaitoKid là `ViDienTu`, `GiaoDichVi`, `YeuCauRutTien`.
 
 Không dùng `prisma migrate reset`, `prisma migrate dev` hoặc `prisma db push` trên database đang có dữ liệu. Khi cần đồng bộ Prisma với schema hiện hữu, dùng:
 
 ```bat
 npm --prefix apps\api run db:introspect
 ```
+
+## Ví KaitoKid và hậu mãi
+
+- Khách có thể nhận tiền hoàn vào Ví KaitoKid sau khi hàng hoàn thực tế được Admin nhận/kiểm.
+- Cửa sổ gửi yêu cầu hoàn hàng là **15 ngày kể từ lúc khách xác nhận đã nhận hàng**.
+- Checkout Web/Mobile chỉ gửi `useWallet`; backend tự quyết định `walletUsed` và `amountDue`.
+- payOS chỉ xử lý phần `amountDue` còn lại sau ví. Ví trả đủ thì không tạo payment link payOS.
+- Khách có thể yêu cầu rút số dư; tiền được chuyển từ khả dụng sang tạm giữ cho tới khi Admin hoàn tất hoặc từ chối.
+- Mọi biến động tiền đi qua ledger `GiaoDichVi`; không có UI sửa số dư thủ công.
+
+Chi tiết durable contract: `docs/decisions/D028-wallet-refund-withdrawal.md`.
 
 ## Chạy development trên Windows
 

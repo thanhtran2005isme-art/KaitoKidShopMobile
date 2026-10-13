@@ -129,11 +129,12 @@ test("carrier delivered does not complete commerce order before customer receipt
   assert.doesNotMatch(simulatorSource, /shippingStatus === "delivered"\) return "completed"/);
 });
 
-test("customer receipt is explicit and starts the seven-day return window", () => {
+test("customer receipt is explicit and starts the fifteen-day return window", () => {
   assert.match(ordersControllerSource, /@Post\(":id\/confirm-received"\)/);
   assert.match(ordersControllerSource, /@Post\(":id\/report-not-received"\)/);
   assert.match(ordersControllerSource, /@Post\(":id\/return-request"\)/);
-  assert.match(afterSalesSource, /7 \* 24 \* 60 \* 60 \* 1000/);
+  assert.match(afterSalesSource, /const RETURN_WINDOW_DAYS = 15/);
+  assert.match(afterSalesSource, /RETURN_WINDOW_DAYS \* 24 \* 60 \* 60 \* 1000/);
   assert.match(afterSalesSource, /TrangThaiVanChuyen = 'received_by_customer'/);
   assert.match(afterSalesSource, /NgayHoanThanh = \?/);
   assert.match(afterSalesSource, /TrangThaiVanChuyen = 'delivery_disputed'/);
@@ -155,8 +156,10 @@ test("return and refund projection use latest workflow markers", () => {
   assert.match(afterSalesSource, /return_received_quarantine/);
   assert.match(afterSalesSource, /latestReturnById/);
   assert.match(afterSalesSource, /returnStatus: currentReturnStatus/);
+  // refund_pending/manual vẫn được đọc để tương thích case legacy.
   assert.match(afterSalesSource, /refund_pending/);
   assert.match(afterSalesSource, /refund_completed_manual/);
+  assert.match(afterSalesSource, /refund_wallet_credited/);
   assert.match(afterSalesSource, /latestRefundById/);
   assert.match(afterSalesSource, /refundStatus: currentRefundStatus/);
   assert.doesNotMatch(afterSalesSource, /UPDATE DonHang[\s\S]*?SET TrangThai = 'return_requested'/);
@@ -198,9 +201,11 @@ test("Admin receive return separates sellable restock from quarantine", () => {
   assert.match(adminAfterSalesSource, /SET TrangThai = 'returned', TrangThaiVanChuyen = 'returned'/);
 });
 
-test("refund flow is explicit manual audit and never pretends to call a gateway", () => {
+test("refund flow credits wallet atomically; manual completion only remains for legacy pending cases", () => {
+  assert.match(adminAfterSalesSource, /refundOrderInTransaction/);
+  assert.match(adminAfterSalesSource, /refund_wallet_credited/);
+  assert.match(adminAfterSalesSource, /Chỉ giữ để xử lý các case legacy đã ở refund_pending/);
   assert.match(adminAfterSalesSource, /refund_pending/);
   assert.match(adminAfterSalesSource, /refund_completed_manual/);
-  assert.match(adminAfterSalesSource, /Admin xác nhận đã hoàn tiền thủ công/);
   assert.doesNotMatch(adminAfterSalesSource, /refundGateway|paymentGateway\.refund|vnpay.*refund/i);
 });

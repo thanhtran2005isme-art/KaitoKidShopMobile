@@ -25,6 +25,8 @@ export const RBAC_PERMISSIONS: readonly RbacPermissionDefinition[] = [
   { code: "orders.view", name: "Xem đơn hàng", group: "orders", description: "Xem danh sách đơn hàng" },
   { code: "orders.update_status", name: "Cập nhật trạng thái đơn", group: "orders", description: "Đổi trạng thái đơn hàng" },
   { code: "orders.cancel", name: "Hủy đơn hàng", group: "orders", description: "Hủy đơn hàng" },
+  { code: "wallet.view", name: "Xem ví và rút tiền", group: "wallet", description: "Xem số dư ví và yêu cầu rút tiền của khách" },
+  { code: "wallet.manage", name: "Xử lý rút tiền", group: "wallet", description: "Duyệt, từ chối và xác nhận chuyển khoản yêu cầu rút tiền" },
   { code: "customers.view", name: "Xem khách hàng", group: "customers", description: "Xem danh sách khách hàng" },
   { code: "customers.manage", name: "Quản lý khách hàng", group: "customers", description: "Khóa và mở khách hàng" },
   { code: "banners.manage", name: "Quản lý banner", group: "marketing", description: "Quản lý banner trang chủ" },

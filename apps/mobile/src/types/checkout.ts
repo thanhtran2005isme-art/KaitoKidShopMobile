@@ -64,15 +64,18 @@ export type PaymentBankAccount = {
 export type PaymentInstructions = {
   orderCode: string;
   total: number;
+  orderTotal?: number;
+  walletUsed?: number;
+  amountDue?: number;
   paymentExpiresAt?: string | null;
   secondsLeft: number;
-  provider?: 'payos' | 'legacy_bank' | string;
+  provider?: 'payos' | 'legacy_bank' | 'wallet' | string;
   paymentLinkId?: string | null;
   paymentStatus?: string | null;
   checkoutUrl?: string | null;
   qrCode?: string | null;
   qrMode?: 'payos_vietqr' | 'payos_checkout' | string;
-  transferContent: string;
+  transferContent?: string | null;
   bankAccount?: PaymentBankAccount | null;
   qrUrl?: string | null;
 };
@@ -82,10 +85,13 @@ export type PaymentStatus = {
   status: string;
   paidAt?: string | null;
   paymentMethod: string;
-  paymentProvider?: 'payos' | string | null;
+  paymentProvider?: 'payos' | 'wallet' | string | null;
   paymentExpiresAt?: string | null;
   secondsLeft: number;
   total: number;
+  orderTotal?: number;
+  walletUsed?: number;
+  amountDue?: number;
 };
 
 export type CreateOrderInput = {
@@ -105,6 +111,7 @@ export type CreateOrderInput = {
   shippingDistrict: string;
   shippingWard?: string;
   shippingStreet?: string;
+  useWallet?: boolean;
 };
 
 export type OrderItem = {
@@ -129,6 +136,8 @@ export type CreatedOrder = {
   shippingFee: number;
   discount: number;
   total: number;
+  walletUsed?: number;
+  amountDue?: number;
   couponCode?: string | null;
   paymentMethod: string;
   status: string;

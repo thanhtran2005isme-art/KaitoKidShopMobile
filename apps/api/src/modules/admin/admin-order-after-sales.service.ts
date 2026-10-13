@@ -3,6 +3,7 @@ import type { AuthenticatedUser } from "../../auth/authenticated-user.js";
 import { toNumber } from "../../common/db-value.js";
 import type { SqlClient } from "../../common/sql-client.js";
 import { PrismaService } from "../../database/prisma.service.js";
+import { WalletService } from "../wallet/wallet.service.js";
 import { insertRow } from "./admin-utils.js";
 
 const RETURN_MARKERS = [
@@ -12,7 +13,11 @@ const RETURN_MARKERS = [
   "return_received_restock",
   "return_received_quarantine",
 ] as const;
-const REFUND_MARKERS = ["refund_pending", "refund_completed_manual"] as const;
+const REFUND_MARKERS = [
+  "refund_pending",
+  "refund_completed_manual",
+  "refund_wallet_credited",
+] as const;
 const CASE_MARKERS = [
   "delivery_disputed",
   "received_by_customer",
@@ -33,6 +38,7 @@ type RefundStatus = "none" | "pending" | "completed";
 
 interface OrderRow {
   id: unknown;
+  userId: unknown;
   orderCode: string;
   orderStatus: string;
   shippingStatus: string | null;
@@ -90,7 +96,9 @@ function returnStatusFrom(marker?: string): ReturnStatus {
 
 function refundStatusFrom(marker?: string): RefundStatus {
   if (marker === "refund_pending") return "pending";
-  if (marker === "refund_completed_manual") return "completed";
+  if (marker === "refund_completed_manual" || marker === "refund_wallet_credited") {
+    return "completed";
+  }
   return "none";
 }
 
@@ -101,7 +109,10 @@ function latestOf(history: HistoryRow[], statuses: readonly string[]): HistoryRo
 
 @Injectable()
 export class AdminOrderAfterSalesService {
-  constructor(private readonly db: PrismaService) {}
+  constructor(
+    private readonly db: PrismaService,
+    private readonly wallet: WalletService,
+  ) {}
 
   async listCases() {
     const rows = await this.db.$queryRawUnsafe<Array<{ orderId: unknown }>>(
@@ -123,8 +134,8 @@ export class AdminOrderAfterSalesService {
 
   async snapshot(orderId: number) {
     const orders = await this.db.$queryRawUnsafe<OrderRow[]>(
-      `SELECT Id AS id, MaDonHang AS orderCode, TrangThai AS orderStatus,
-              TrangThaiVanChuyen AS shippingStatus,
+      `SELECT Id AS id, NguoiDungId AS userId, MaDonHang AS orderCode,
+              TrangThai AS orderStatus, TrangThaiVanChuyen AS shippingStatus,
               PhuongThucThanhToan AS paymentMethod,
               NgayThanhToan AS paidAt, TongTien AS total,
               TenNguoiNhan AS customerName
@@ -170,7 +181,7 @@ export class AdminOrderAfterSalesService {
             : null,
       refundStatus,
       refundReference:
-        latestRefund?.status === "refund_completed_manual"
+        latestRefund && ["refund_completed_manual", "refund_wallet_credited"].includes(latestRefund.status)
           ? latestRefund.description
           : null,
       latestEventAt: history.at(-1)?.at ?? null,
@@ -183,6 +194,7 @@ export class AdminOrderAfterSalesService {
       canRejectReturn: returnStatus === "requested",
       canReceiveReturn:
         returnStatus === "approved" && normalized(order.orderStatus) !== "returned",
+      // Chỉ dữ liệu legacy refund_pending mới còn nút hoàn thủ công.
       canMarkRefundCompleted:
         normalized(order.orderStatus) === "returned" && refundStatus === "pending",
       history,
@@ -374,14 +386,21 @@ export class AdminOrderAfterSalesService {
         now,
       );
 
-      const latestRefund = latestOf(history, REFUND_MARKERS);
-      if (latestRefund?.status !== "refund_completed_manual") {
+      const refundAmount = toNumber(order.total);
+      const credited = await this.wallet.refundOrderInTransaction(
+        tx,
+        toNumber(order.userId),
+        orderId,
+        order.orderCode,
+        refundAmount,
+      );
+      if (credited) {
         await this.appendHistory(
           tx,
           orderId,
-          "refund_pending",
-          `Chờ xử lý hoàn tiền cho đơn trả hàng, số tiền tối đa theo đơn: ${toNumber(order.total)}đ`,
-          "Hệ thống",
+          "refund_wallet_credited",
+          `Đã hoàn ${refundAmount.toLocaleString("vi-VN")}đ vào Ví KaitoKid của khách hàng`,
+          "Hệ thống KaitoKid",
           now,
         );
       }
@@ -390,6 +409,10 @@ export class AdminOrderAfterSalesService {
     return this.snapshot(orderId);
   }
 
+  /**
+   * Chỉ giữ để xử lý các case legacy đã ở refund_pending trước khi Ví KaitoKid
+   * được triển khai. Case hoàn hàng mới không đi qua endpoint này.
+   */
   async markRefundCompleted(
     user: AuthenticatedUser,
     orderId: number,
@@ -404,16 +427,16 @@ export class AdminOrderAfterSalesService {
       }
       const history = await this.caseHistory(tx, orderId);
       const latestRefund = latestOf(history, REFUND_MARKERS);
-      if (latestRefund?.status === "refund_completed_manual") return;
+      if (latestRefund?.status === "refund_completed_manual" || latestRefund?.status === "refund_wallet_credited") return;
       if (latestRefund?.status !== "refund_pending") {
-        throw new BadRequestException("Đơn chưa ở trạng thái chờ hoàn tiền.");
+        throw new BadRequestException("Đơn chưa ở trạng thái chờ hoàn tiền legacy.");
       }
 
       await this.appendHistory(
         tx,
         orderId,
         "refund_completed_manual",
-        `Admin xác nhận đã hoàn tiền thủ công. Tham chiếu: ${reference}`,
+        `Admin xác nhận đã hoàn tiền thủ công cho case legacy. Tham chiếu: ${reference}`,
         staffName(user),
         new Date(),
       );
@@ -424,8 +447,8 @@ export class AdminOrderAfterSalesService {
 
   private async lockOrder(tx: SqlClient, orderId: number): Promise<OrderRow> {
     const rows = await tx.$queryRawUnsafe<OrderRow[]>(
-      `SELECT Id AS id, MaDonHang AS orderCode, TrangThai AS orderStatus,
-              TrangThaiVanChuyen AS shippingStatus,
+      `SELECT Id AS id, NguoiDungId AS userId, MaDonHang AS orderCode,
+              TrangThai AS orderStatus, TrangThaiVanChuyen AS shippingStatus,
               PhuongThucThanhToan AS paymentMethod,
               NgayThanhToan AS paidAt, TongTien AS total,
               TenNguoiNhan AS customerName

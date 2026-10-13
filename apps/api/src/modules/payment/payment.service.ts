@@ -9,6 +9,7 @@ import {
 } from "../orders/order.helpers.js";
 import { OrderInventoryService } from "../orders/order-inventory.service.js";
 import { ShippingService } from "../shipping/shipping.service.js";
+import { WalletService } from "../wallet/wallet.service.js";
 import { PayOsService, type PayOsPayment } from "./payos.service.js";
 import {
   loadPaymentSettings,
@@ -47,6 +48,7 @@ export class PaymentService {
     private readonly coupons: CouponService,
     private readonly email: AuthEmailService,
     private readonly payos: PayOsService,
+    private readonly wallet: WalletService,
   ) {}
 
   async getConfig() {
@@ -79,6 +81,24 @@ export class PaymentService {
       );
     }
 
+    const amounts = await this.paymentAmounts(order);
+    if (amounts.amountDue <= 0) {
+      return {
+        orderCode: order.orderCode,
+        total: 0,
+        orderTotal: amounts.orderTotal,
+        walletUsed: amounts.walletUsed,
+        amountDue: 0,
+        paymentExpiresAt: null,
+        secondsLeft: 0,
+        provider: "wallet",
+        paymentStatus: "PAID",
+        transferContent: null,
+        bankAccount: null,
+        qrUrl: null,
+      };
+    }
+
     const settings = await loadPaymentSettings(this.prisma);
     if (settings.enablePayOs) {
       if (order.status === "cancelled") {
@@ -87,7 +107,7 @@ export class PaymentService {
 
       const payment = await this.payos.ensurePayment({
         orderCode: order.orderCode,
-        amount: toNumber(order.total),
+        amount: amounts.amountDue,
         customerName: order.customerName,
         customerEmail: order.customerEmail,
         paymentExpiresAt: order.paymentExpiresAt,
@@ -97,7 +117,10 @@ export class PaymentService {
 
       return {
         orderCode: order.orderCode,
-        total: toNumber(order.total),
+        total: amounts.amountDue,
+        orderTotal: amounts.orderTotal,
+        walletUsed: amounts.walletUsed,
+        amountDue: amounts.amountDue,
         paymentExpiresAt: order.paymentExpiresAt,
         secondsLeft: paymentSecondsLeft(order.paymentExpiresAt),
         provider: "payos",
@@ -122,7 +145,10 @@ export class PaymentService {
 
     return {
       orderCode: order.orderCode,
-      total: toNumber(order.total),
+      total: amounts.amountDue,
+      orderTotal: amounts.orderTotal,
+      walletUsed: amounts.walletUsed,
+      amountDue: amounts.amountDue,
       paymentExpiresAt: order.paymentExpiresAt,
       secondsLeft: paymentSecondsLeft(order.paymentExpiresAt),
       provider: "legacy_bank",
@@ -136,9 +162,6 @@ export class PaymentService {
     let current = await this.getOwnedOrder(userId, orderCode);
     if (!current) return null;
 
-    // Webhook là authority chính, nhưng local/dev có thể chưa public được
-    // localhost cho payOS. Trong lúc khách đang ở màn chờ thanh toán, polling
-    // chủ động đối soát provider để payment đã PAID không bị kẹt ở pending.
     if (
       current.paymentMethod.toUpperCase() === "ATM" &&
       this.payos.isConfigured() &&
@@ -146,12 +169,16 @@ export class PaymentService {
       !current.paidAt
     ) {
       try {
+        const amounts = await this.paymentAmounts(current);
+        if (amounts.amountDue <= 0) {
+          return this.statusDto(current);
+        }
         const provider = await this.findPayOsPayment(current.orderCode);
         if (provider?.status === "PAID") {
-          this.assertPayOsPaymentMatchesOrder(provider, current);
+          this.assertPayOsPaymentMatchesOrder(provider, amounts.amountDue);
           await this.confirmPaidByOrderCode(
             current.orderCode,
-            toNumber(current.total),
+            amounts.amountDue,
             "payos_reconcile",
           );
           current = await this.getOwnedOrder(userId, orderCode);
@@ -159,9 +186,6 @@ export class PaymentService {
           return this.statusDto(current);
         }
       } catch (error) {
-        // Provider outage/timeout không được làm endpoint status mất khả dụng.
-        // Nếu đã hết hạn, expireOwnedOrderIfNeeded bên dưới vẫn thực hiện
-        // provider-first reconciliation trước khi hoàn tồn kho/coupon.
         if (error instanceof BadRequestException) throw error;
       }
     }
@@ -172,7 +196,7 @@ export class PaymentService {
       await this.shipping.appendHistory(
         toNumber(expired.order.id),
         "cancelled",
-        "Hết hạn thanh toán — provider đã xác nhận chưa nhận tiền; sản phẩm đã được trả lại giỏ",
+        "Hết hạn thanh toán — provider đã xác nhận chưa nhận tiền; sản phẩm và số dư ví đã được hoàn lại",
         null,
       );
     }
@@ -183,8 +207,6 @@ export class PaymentService {
     const verified = await this.payos.verifyWebhook(payload);
     const kaitoKidOrderCode = this.payos.kaitoKidOrderCode(verified.orderCode);
 
-    // Sample webhook hoặc payment cũ dùng local AUTO_INCREMENT không thể map
-    // sang MaDonHang mới: ACK/ignore, tuyệt đối không đoán theo DonHang.Id.
     if (!kaitoKidOrderCode) {
       return {
         received: true,
@@ -210,9 +232,10 @@ export class PaymentService {
     if (verified.currency !== "VND") {
       throw new BadRequestException("Webhook payOS không dùng tiền tệ VND");
     }
-    if (Math.round(verified.amount) !== Math.round(toNumber(order.total))) {
+    const amounts = await this.paymentAmounts(order);
+    if (Math.round(verified.amount) !== Math.round(amounts.amountDue)) {
       throw new BadRequestException(
-        "Số tiền webhook payOS không khớp tổng tiền đơn hàng",
+        "Số tiền webhook payOS không khớp số tiền còn phải thanh toán sau Ví KaitoKid",
       );
     }
 
@@ -249,12 +272,15 @@ export class PaymentService {
       current.paymentMethod.toUpperCase() === "ATM" &&
       this.payos.isConfigured()
     ) {
-      const provider = await this.findPayOsPayment(current.orderCode);
+      const amounts = await this.paymentAmounts(current);
+      const provider = amounts.amountDue > 0
+        ? await this.findPayOsPayment(current.orderCode)
+        : null;
       if (provider?.status === "PAID") {
-        this.assertPayOsPaymentMatchesOrder(provider, current);
+        this.assertPayOsPaymentMatchesOrder(provider, amounts.amountDue);
         await this.confirmPaidByOrderCode(
           current.orderCode,
-          toNumber(current.total),
+          amounts.amountDue,
           "payos_reconcile",
         );
         throw new BadRequestException(
@@ -267,10 +293,10 @@ export class PaymentService {
           "Khach hang huy giao dich KaitoKid",
         );
         if (cancelled.status === "PAID") {
-          this.assertPayOsPaymentMatchesOrder(cancelled, current);
+          this.assertPayOsPaymentMatchesOrder(cancelled, amounts.amountDue);
           await this.confirmPaidByOrderCode(
             current.orderCode,
-            toNumber(current.total),
+            amounts.amountDue,
             "payos_reconcile",
           );
           throw new BadRequestException(
@@ -279,7 +305,7 @@ export class PaymentService {
         }
         if (cancelled.status !== "CANCELLED") {
           throw new BadRequestException(
-            "payOS chưa xác nhận hủy giao dịch; KaitoKid chưa hoàn tồn kho/coupon",
+            "payOS chưa xác nhận hủy giao dịch; KaitoKid chưa hoàn tồn kho/coupon/ví",
           );
         }
       } else if (provider && provider.status !== "CANCELLED") {
@@ -294,7 +320,7 @@ export class PaymentService {
     await this.shipping.appendHistory(
       result.id,
       "cancelled",
-      "Khách đã hủy giao dịch; sản phẩm đã được trả lại giỏ",
+      "Khách đã hủy giao dịch; sản phẩm và số dư Ví KaitoKid đã được hoàn lại",
       null,
     );
     return { message: "Đã hủy đơn hàng", orderCode };
@@ -337,7 +363,7 @@ export class PaymentService {
         await this.shipping.appendHistory(
           toNumber(result.order.id),
           "cancelled",
-          "Hết hạn thanh toán — sweeper đã đối soát provider, hủy đơn và trả sản phẩm lại giỏ",
+          "Hết hạn thanh toán — sweeper đã đối soát provider, hủy đơn và hoàn sản phẩm/số dư ví",
           null,
         );
       }
@@ -394,12 +420,17 @@ export class PaymentService {
       const order = rows[0];
       if (!order) return null;
 
+      const walletUsed = await this.wallet.walletUsedForOrderWithClient(
+        tx,
+        toNumber(order.id),
+      );
+      const amountDue = Math.max(0, toNumber(order.total) - walletUsed);
       if (
         expectedAmount !== null &&
-        Math.round(toNumber(order.total)) !== Math.round(expectedAmount)
+        Math.round(amountDue) !== Math.round(expectedAmount)
       ) {
         throw new BadRequestException(
-          "Số tiền xác nhận không khớp tổng tiền đơn hàng",
+          "Số tiền xác nhận không khớp số tiền còn phải thanh toán sau Ví KaitoKid",
         );
       }
       if (
@@ -425,14 +456,14 @@ export class PaymentService {
       await tx.$executeRawUnsafe(
         `UPDATE DonHang
          SET NgayThanhToan = ?, TrangThai = 'confirmed',
-             NgayCapNhat = ?
+             HetHanThanhToan = NULL, NgayCapNhat = ?
          WHERE Id = ?`,
         now,
         now,
         toNumber(order.id),
       );
       return {
-        order: { ...order, paidAt: now, status: "confirmed" },
+        order: { ...order, paidAt: now, status: "confirmed", paymentExpiresAt: null },
         alreadyPaid: false,
       };
     });
@@ -459,9 +490,9 @@ export class PaymentService {
   ): Promise<void> {
     const historyMessage =
       source === "payos_webhook"
-        ? "payOS webhook đã xác nhận giao dịch thành công"
+        ? "payOS webhook đã xác nhận phần tiền còn lại sau Ví KaitoKid"
         : source === "payos_reconcile"
-          ? "KaitoKid đối soát payOS và xác nhận giao dịch thành công"
+          ? "KaitoKid đối soát payOS và xác nhận phần tiền còn lại sau Ví KaitoKid"
           : source === "simulated"
             ? "Webhook thanh toán (mô phỏng) báo đã nhận tiền"
             : "Admin đã xác nhận thanh toán";
@@ -484,13 +515,14 @@ export class PaymentService {
       ).catch(() => undefined);
     }
 
+    const amounts = await this.paymentAmounts(order);
     void this.email.send(
       order.customerEmail,
       `[KaitoKid] Đã nhận thanh toán đơn ${order.orderCode}`,
       paymentReceivedHtml({
         customerName: order.customerName,
         orderCode: order.orderCode,
-        total: toNumber(order.total),
+        total: amounts.amountDue,
       }),
     ).catch(() => undefined);
   }
@@ -518,12 +550,15 @@ export class PaymentService {
       order.paymentMethod.toUpperCase() === "ATM" &&
       this.payos.isConfigured()
     ) {
-      const provider = await this.findPayOsPayment(order.orderCode);
+      const amounts = await this.paymentAmounts(order);
+      const provider = amounts.amountDue > 0
+        ? await this.findPayOsPayment(order.orderCode)
+        : null;
       if (provider?.status === "PAID") {
-        this.assertPayOsPaymentMatchesOrder(provider, order);
+        this.assertPayOsPaymentMatchesOrder(provider, amounts.amountDue);
         await this.confirmPaidByOrderCode(
           order.orderCode,
-          toNumber(order.total),
+          amounts.amountDue,
           "payos_reconcile",
         );
         return {
@@ -537,10 +572,10 @@ export class PaymentService {
           "Het han thanh toan KaitoKid",
         );
         if (cancelled.status === "PAID") {
-          this.assertPayOsPaymentMatchesOrder(cancelled, order);
+          this.assertPayOsPaymentMatchesOrder(cancelled, amounts.amountDue);
           await this.confirmPaidByOrderCode(
             order.orderCode,
-            toNumber(order.total),
+            amounts.amountDue,
             "payos_reconcile",
           );
           return {
@@ -590,6 +625,12 @@ export class PaymentService {
       const id = toNumber(order.id);
       await this.inventory.restoreStockAndCartInTransaction(tx, id, userId);
       await this.coupons.restoreUsageWithClient(tx, order.couponCode);
+      await this.wallet.restoreOrderDebitInTransaction(
+        tx,
+        userId,
+        id,
+        order.orderCode,
+      );
       await tx.$executeRawUnsafe(
         `UPDATE DonHang
          SET TrangThai = 'cancelled',
@@ -630,6 +671,12 @@ export class PaymentService {
       const id = toNumber(order.id);
       await this.inventory.restoreStockAndCartInTransaction(tx, id, userId);
       await this.coupons.restoreUsageWithClient(tx, order.couponCode);
+      await this.wallet.restoreOrderDebitInTransaction(
+        tx,
+        userId,
+        id,
+        order.orderCode,
+      );
       await tx.$executeRawUnsafe(
         `UPDATE DonHang
          SET TrangThai = 'cancelled',
@@ -656,17 +703,14 @@ export class PaymentService {
 
   private assertPayOsPaymentMatchesOrder(
     payment: PayOsPayment,
-    order: PaymentOrderRow,
+    expectedAmount: number,
   ): void {
-    if (
-      payment.currency &&
-      payment.currency.toUpperCase() !== "VND"
-    ) {
+    if (payment.currency && payment.currency.toUpperCase() !== "VND") {
       throw new BadRequestException("Trạng thái payOS không dùng tiền tệ VND");
     }
-    if (Math.round(payment.amount) !== Math.round(toNumber(order.total))) {
+    if (Math.round(payment.amount) !== Math.round(expectedAmount)) {
       throw new BadRequestException(
-        "Số tiền trạng thái payOS không khớp tổng tiền đơn hàng",
+        "Số tiền trạng thái payOS không khớp số tiền còn phải thanh toán sau Ví KaitoKid",
       );
     }
   }
@@ -703,6 +747,16 @@ export class PaymentService {
     return rows[0] ?? null;
   }
 
+  private async paymentAmounts(order: PaymentOrderRow) {
+    const orderTotal = toNumber(order.total);
+    const walletUsed = await this.wallet.walletUsedForOrder(toNumber(order.id));
+    return {
+      orderTotal,
+      walletUsed,
+      amountDue: Math.max(0, orderTotal - walletUsed),
+    };
+  }
+
   private payOsBankAccount(
     payment: PayOsPayment,
     legacyFallback?: PaymentBankAccount,
@@ -728,19 +782,25 @@ export class PaymentService {
     };
   }
 
-  private statusDto(order: PaymentOrderRow) {
+  private async statusDto(order: PaymentOrderRow) {
+    const amounts = await this.paymentAmounts(order);
     return {
       orderCode: order.orderCode,
       status: order.status,
       paidAt: order.paidAt,
       paymentMethod: order.paymentMethod,
       paymentProvider:
-        order.paymentMethod.toUpperCase() === "ATM" && this.payos.isConfigured()
-          ? "payos"
-          : null,
+        amounts.amountDue <= 0
+          ? "wallet"
+          : order.paymentMethod.toUpperCase() === "ATM" && this.payos.isConfigured()
+            ? "payos"
+            : null,
       paymentExpiresAt: order.paymentExpiresAt,
       secondsLeft: paymentSecondsLeft(order.paymentExpiresAt),
-      total: toNumber(order.total),
+      total: amounts.amountDue,
+      orderTotal: amounts.orderTotal,
+      walletUsed: amounts.walletUsed,
+      amountDue: amounts.amountDue,
     };
   }
 

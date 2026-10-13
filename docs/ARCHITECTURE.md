@@ -24,14 +24,14 @@ Legacy ASP.NET Core services đã retire. Không có gateway/service C# song son
 apps/api       NestJS + Prisma backend
 apps/mobile    Expo + React Native
 apps/web       React + TypeScript + Vite; customer + admin surfaces
-database       MariaDB fresh schema + migrations
+database       MariaDB fresh schema nền + migrations
 scripts        Windows launchers/runtime gates
 docs           durable project context
 ```
 
 ## Backend
 
-`apps/api` chạy mặc định ở port `5300` và chứa các module Auth, Staff/RBAC, catalog, cart/reservation, checkout/order, coupon, payment, shipping, account, addresses, wishlist, reviews, notifications, referral, search/recommendation, chat/realtime, admin/CMS/inventory/stock receipts và media/static.
+`apps/api` chạy mặc định ở port `5300` và chứa các module Auth, Staff/RBAC, catalog, cart/reservation, checkout/order, coupon, payment, shipping, wallet/withdrawal, account, addresses, wishlist, reviews, notifications, referral, search/recommendation, chat/realtime, admin/CMS/inventory/stock receipts và media/static.
 
 Realtime chat dùng Socket.IO trên cùng origin với path:
 
@@ -51,19 +51,67 @@ Node là owner duy nhất của background workers. Các worker quan trọng v�
 
 Runtime database là MariaDB/MySQL-compatible, database `kaitokid`.
 
-Fresh schema source:
+Fresh schema nền:
 
 ```text
 database/KaitoKid_MariaDB.sql
 ```
 
-Migrations cho database tồn tại:
+Contract hiện hành cần chạy thêm wallet migration cả với fresh import và DB đã tồn tại:
+
+```text
+database/migrations/20261006_wallet_refund_withdrawal.sql
+```
+
+Sau bước này database có **55 base tables**. Ba bảng tài chính mới:
+
+- `ViDienTu`
+- `GiaoDichVi`
+- `YeuCauRutTien`
+
+Các migration khác nằm trong:
 
 ```text
 database/migrations/
 ```
 
-Prisma được dùng để kết nối/introspect nhưng migration retirement không dùng Prisma Migrate để rewrite database hiện hữu. Trên DB có dữ liệu, không chạy `prisma migrate reset`, `prisma migrate dev` hoặc `prisma db push`.
+Prisma được dùng để kết nối/introspect nhưng không dùng Prisma Migrate để rewrite database hiện hữu. Trên DB có dữ liệu, không chạy `prisma migrate reset`, `prisma migrate dev` hoặc `prisma db push`.
+
+## Wallet / money ledger boundary
+
+D028 đặt wallet dưới backend authority:
+
+```text
+Refund return ───────┐
+                     ▼
+                 GiaoDichVi  <── append-only audit/idempotency
+                     │
+                     ▼
+                  ViDienTu
+               available / held
+                     │
+           ┌─────────┴─────────┐
+           ▼                   ▼
+      Order payment       Withdrawal hold
+           │                   │
+           ▼                   ▼
+     cancel reversal      approve/reject/complete
+```
+
+Quy tắc:
+
+- `ViDienTu` là balance snapshot để khóa/đọc nhanh; `GiaoDichVi` là audit ledger của mọi biến động.
+- Mọi mutation tiền chạy trong transaction và khóa wallet row.
+- Idempotency ledger dùng `(NguoiDungId, Loai, ThamChieuLoai, ThamChieuId)`.
+- Client không gửi số tiền muốn dùng từ ví; chỉ gửi `useWallet`.
+- `DonHang.TongTien` luôn giữ full order total.
+- `walletUsed = min(available, TongTien)`.
+- `amountDue = TongTien - walletUsed` là phần tiền external payment/COD còn lại.
+- Projection `walletUsed` đọc **net ledger**: `order_payment - order_payment_reversal`.
+- Cancel/expiry phải ghi reversal đúng một lần trong cùng local transaction restore commerce state.
+- Return refund chỉ credit ví sau khi Admin đã nhận/kiểm hàng thật và chọn restock/quarantine.
+- Withdrawal tách `available` và `held` để số tiền đang xử lý không bị chi/rút lần hai.
+- Không có endpoint/UI sửa balance tùy ý.
 
 ## Client backend resolution
 
@@ -98,30 +146,41 @@ Node phục vụ upload/public assets và mount shared `apps/web/public`. Fallba
 Online payment hiện hành trên PR #75 là payOS:
 
 - secrets chỉ ở Node: `PAYOS_CLIENT_ID`, `PAYOS_API_KEY`, `PAYOS_CHECKSUM_KEY`;
-- `DonHang.Id` là integer `orderCode` gửi sang payOS; `MaDonHang` là display code;
+- provider order code được suy ra reversible từ `MaDonHang`, không dùng `DonHang.Id` làm provider authority;
 - QR/payment link được backend tạo/khôi phục và trả qua owner-scoped payment instructions;
 - `POST /api/payment/payos/webhook` là public provider callback nhưng bắt buộc verify checksum + amount + currency + order mapping;
-- `NgayThanhToan`/`confirmed` chỉ được set qua verified provider/reconcile path hoặc admin/dev compatibility path hiện có;
-- Web/Mobile poll payment status khoảng 3 giây khi pending để refresh UI; polling không phải payment authority và không thay webhook verification;
-- cancel/expiry của online payment phải provider-first rồi mới commerce-second;
+- khi đơn dùng ví một phần, payOS create/get/reconcile/webhook chỉ được đối soát đúng `amountDue`, không phải `TongTien`;
+- khi ví trả đủ (`amountDue=0`), backend xác nhận paid/confirmed và không tạo payOS payment;
+- `NgayThanhToan`/`confirmed` chỉ được set qua wallet-full transaction, verified provider/reconcile path hoặc admin/dev compatibility path hiện có;
+- Web/Mobile poll payment status khi pending để refresh UI; polling không phải payment authority;
+- cancel/expiry của online payment phải provider-first rồi mới commerce-second; local cancel/expiry đồng thời restore phần wallet debit nếu có;
 - online shipment chỉ được tạo sau khi paid;
 - runtime online payment chỉ bật khi đủ payOS credentials và `payosEnabled` không bị đặt `false`;
-- `bankEnabled`, `enableBankTransfer`, `bankAccounts`/VietQR legacy không còn quyền kích hoạt ATM cho đơn mới; chúng chỉ được giữ để không phá dữ liệu/config legacy trong migration window.
+- `bankEnabled`, `enableBankTransfer`, `bankAccounts`/VietQR legacy không còn quyền kích hoạt ATM cho đơn mới; chỉ giữ compatibility dữ liệu/config.
 
 DB compatibility code vẫn dùng `PhuongThucThanhToan='ATM'` cho online payment trong PR #75. Đổi enum/schema, nếu cần, là migration riêng.
 
+## Return / refund boundary
+
+- Carrier `delivered` chỉ là trạng thái vận chuyển; không tự tạo customer receipt authority.
+- Customer `confirm-received` ghi marker `received_by_customer`, `NgayHoanThanh` và bắt đầu return window **15 ngày**.
+- Admin approve/reject return là audit/state decision, chưa đụng inventory hoặc tiền.
+- Khi hàng hoàn thực tế quay về, Admin chọn `restock` hoặc `quarantine`.
+- Trong cùng transaction nhận hàng hoàn: update inventory/sold counters, chuyển order `returned`, ghi return marker và `refund_credit` toàn bộ `TongTien` vào wallet đúng một lần.
+- `refund_pending/refund_completed_manual` chỉ còn compatibility cho case legacy.
+
 ## Source-of-truth business boundaries
 
-- Pricing, coupon, combo, shipping fee, payment method và order totals: backend authoritative.
+- Pricing, coupon, combo, shipping fee, payment method, wallet usage và order totals: backend authoritative.
 - Cart reservation: product + exact variant khi có.
 - Partial checkout: chỉ selected `CartItemIds`; unselected cart items giữ reservation.
 - Order tracking/cancel/reorder: owner-only và server-authoritative.
-- Review: exact completed order + purchased variant.
-- Delete account: release cart reservation trước khi xóa/anonymize dữ liệu.
+- Review: exact completed order + purchased variant + `received_by_customer` authority.
+- Delete account: release cart reservation trước khi anonymize; cấm đóng account nếu wallet còn available/held hoặc withdrawal pending/approved.
 - Registration: `PendingRegistration` -> verify email -> `NguoiDung`.
 - Google/social: backend validates provider credential before issuing KaitoKid JWT.
-- Admin/RBAC: JWT + staff permission guards.
-- Payment/order/inventory terminal transitions phải giữ idempotency/concurrency invariants đã được runtime race gate kiểm tra.
+- Admin/RBAC: JWT + staff permission guards; money operations dùng `wallet.view`/`wallet.manage`.
+- Payment/order/inventory/wallet terminal transitions phải giữ idempotency/concurrency invariants.
 
 ## Development launch flow
 
@@ -144,7 +203,8 @@ Expo Mobile :8081
 
 ## Source-of-truth rules
 
-- Current code/configuration: Git `main`
+- Current merged code/configuration: Git `main`
+- Stacked WIP behavior: explicit feature branch/PR only; không tự nâng thành `main` truth
 - Current operational state: `docs/AI_HANDOFF.md`
 - Stable architecture: this file
 - Durable decisions: `docs/DECISIONS.md` + `docs/decisions/`

@@ -1,0 +1,235 @@
+.kk-wallet-page {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 28px 20px 64px;
+  color: #111827;
+}
+
+.kk-wallet-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 24px;
+}
+
+.kk-wallet-header h1,
+.kk-wallet-section h2 {
+  margin: 0;
+  color: #111827;
+}
+
+.kk-wallet-header p,
+.kk-wallet-muted {
+  color: #6b7280;
+}
+
+.kk-wallet-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 24px;
+}
+
+.kk-wallet-card,
+.kk-wallet-section {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+}
+
+.kk-wallet-card {
+  padding: 18px;
+}
+
+.kk-wallet-card__label {
+  display: block;
+  color: #6b7280;
+  font-size: 13px;
+  margin-bottom: 8px;
+}
+
+.kk-wallet-card__value {
+  font-size: 24px;
+  font-weight: 800;
+}
+
+.kk-wallet-section {
+  padding: 20px;
+  margin-top: 18px;
+}
+
+.kk-wallet-section__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.kk-wallet-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.kk-wallet-field {
+  display: grid;
+  gap: 7px;
+}
+
+.kk-wallet-field--wide {
+  grid-column: 1 / -1;
+}
+
+.kk-wallet-field label {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.kk-wallet-field input,
+.kk-wallet-field textarea,
+.kk-wallet-filter {
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid #d1d5db;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font: inherit;
+  color: #111827;
+  background: #fff;
+  box-sizing: border-box;
+}
+
+.kk-wallet-field textarea {
+  min-height: 88px;
+  resize: vertical;
+}
+
+.kk-wallet-field input:focus,
+.kk-wallet-field textarea:focus,
+.kk-wallet-filter:focus {
+  outline: 2px solid #111111;
+  outline-offset: 2px;
+}
+
+.kk-wallet-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.kk-wallet-btn {
+  min-height: 44px;
+  padding: 10px 16px;
+  border-radius: 10px;
+  border: 1px solid #111111;
+  background: #111111;
+  color: #fff;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.kk-wallet-btn:hover:not(:disabled) { background: #000; }
+.kk-wallet-btn:focus-visible { outline: 3px solid #f97316; outline-offset: 2px; }
+.kk-wallet-btn:disabled { opacity: .55; cursor: not-allowed; }
+
+.kk-wallet-btn--secondary {
+  background: #fff;
+  color: #111827;
+  border-color: #d1d5db;
+}
+
+.kk-wallet-btn--danger {
+  background: #fff;
+  color: #dc2626;
+  border-color: #fecaca;
+}
+
+.kk-wallet-table-wrap {
+  overflow-x: auto;
+}
+
+.kk-wallet-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 720px;
+}
+
+.kk-wallet-table th,
+.kk-wallet-table td {
+  padding: 12px 10px;
+  border-bottom: 1px solid #f1f5f9;
+  text-align: left;
+  vertical-align: top;
+  font-size: 13px;
+}
+
+.kk-wallet-table th {
+  color: #6b7280;
+  font-weight: 700;
+}
+
+.kk-wallet-status {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 4px 9px;
+  border-radius: 999px;
+  border: 1px solid #e5e7eb;
+  background: #f9fafb;
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.kk-wallet-error,
+.kk-wallet-success,
+.kk-wallet-empty {
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin: 12px 0;
+  font-size: 14px;
+}
+
+.kk-wallet-error { background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; }
+.kk-wallet-success { background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; }
+.kk-wallet-empty { background: #f8fafc; color: #64748b; border: 1px dashed #cbd5e1; }
+
+.kk-wallet-checkout {
+  padding: 14px 16px;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  background: #fff;
+  margin-top: 16px;
+}
+
+.kk-wallet-checkout__toggle {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  cursor: pointer;
+}
+
+.kk-wallet-checkout__toggle input {
+  width: 18px;
+  height: 18px;
+  margin-top: 2px;
+  accent-color: #111111;
+}
+
+.kk-wallet-checkout__numbers {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 10px;
+  font-size: 13px;
+}
+
+@media (max-width: 760px) {
+  .kk-wallet-grid { grid-template-columns: 1fr; }
+  .kk-wallet-form { grid-template-columns: 1fr; }
+  .kk-wallet-field--wide { grid-column: auto; }
+  .kk-wallet-header { flex-direction: column; }
+  .kk-wallet-page { padding-inline: 16px; }
+}
