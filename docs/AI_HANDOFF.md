@@ -37,7 +37,7 @@ Legacy ASP.NET Core `backend/` đã retire trong retirement change. SQL/schema a
 - REST/Auth/Admin/Customer/media: same origin
 - Socket.IO path: `/chatHub`
 - MariaDB: `kaitokid`
-- Expected current base-table contract: 55 tables on wallet integration branch after applying wallet migration; main remains 52 until PR #78 merges
+- Expected main schema contract: 56 base tables after applying wallet (3) and return-shipment (1) migrations
 - Secrets: `apps/api/.env` (gitignored)
 - Template: `apps/api/.env.example`
 - Local CORS cho phép loopback `localhost`/`127.0.0.1` dùng port dev động khi cùng scheme đã được allow; không mở rộng sang origin/LAN tùy ý.
@@ -144,7 +144,7 @@ Sau đó smoke Web customer + Admin + Mobile bằng **Node-only**. Không khởi
 6. One task/fix/phase = one aggregate commit by default; AI commit descriptions in Vietnamese.
 7. Khi một fix làm thay đổi architecture, operations hoặc durable behavior, cập nhật docs liên quan trong cùng task/PR; cosmetic-only fix không cần tạo quyết định mới.
 
-## PR #75 — Lalamove/payOS đang nghiệm thu trước merge
+## PR #75 — Lalamove/payOS (đã merge main 2026-10-13)
 
 - Branch `feat/admin-lalamove-carrier` chứa carrier lifecycle Lalamove quote/re-quote → Place Order → tracking/webhook/cancel, xác nhận khách thực nhận và hậu mãi theo D025/D026.
 - Online payment của branch dùng SDK `@payos/node`; signed public webhook `POST /api/payment/payos/webhook`, provider reconciliation và race-safe paid/expiry/cancel theo D027.
@@ -153,17 +153,26 @@ Sau đó smoke Web customer + Admin + Mobile bằng **Node-only**. Không khởi
 - Browser return, client polling hoặc QR không có quyền đánh dấu paid. Chỉ webhook đã xác minh/reconcile từ provider được xác nhận thanh toán. Chỉ tạo vận đơn online sau paid.
 - Mobile có Expo USB/ADB launcher hardening, địa chỉ cascade tỉnh/huyện/xã, và màn payment payOS; order detail dùng Modal để xác nhận nhận/chưa nhận hàng trên Expo Web.
 - Merge gate còn yêu cầu E2E HTTPS webhook + Lalamove sandbox + paid/cancel/expiry race với DB thật: `docs/runbooks/PAYOS_PAYMENT_E2E.md`, `docs/runbooks/LALAMOVE_SANDBOX_E2E.md`.
-- Những hành vi trên chỉ thuộc nhánh PR #75 khi chưa merge. `main` vẫn là runtime source of truth.
+- PR #75 đã merge vào `main`; các yêu cầu nghiệm thu được ghi là lịch sử gate trước merge.
 
-## PR #78 — Ví KaitoKid / hoàn tiền / rút tiền (đang nghiệm thu)
+## PR #78 — Ví KaitoKid / hoàn tiền / rút tiền (đã merge main 2026-10-13)
 
-- Stacked trên PR #75; không coi wallet, return 15 ngày hay payOS amountDue mới là chức năng của main trước khi merge.
+- PR #78 đã merge sau PR #75; wallet, return 15 ngày và payOS amountDue là source trên main.
 - MariaDB: migration `database/migrations/20261006_wallet_refund_withdrawal.sql`; contract nhánh wallet 55 base tables so với 52 trên main.
 - `ViDienTu` có available/held balance; `GiaoDichVi` là append-only idempotent ledger; `YeuCauRutTien` có workflow approve/reject/complete và RBAC.
 - Checkout: client chỉ gửi `useWallet`, backend quyết định `walletUsed=min(available,TongTien)`, `amountDue=TongTien-walletUsed`, payOS chỉ thu `amountDue`.
 - Cancel/expiry đảo phần ví đã debit đúng một lần sau khi provider xác nhận chưa paid; không hoàn tiền/stock nếu provider có thể đã paid.
 - Customer confirm-received mới bắt đầu cửa sổ return 15 ngày; chỉ credit toàn bộ order total vào ví đúng một lần khi Admin thực nhận hàng hoàn và chọn restock/quarantine. Quarantine không cộng tồn bán được.
 - Không xóa account khi còn số dư hoặc withdrawal pending/approved.
-- Chỉ nhập PR #78 sau khi PR #75 đủ live E2E và DB wallet migration + refund/withdrawal/partial payment race gates được nghiệm thu.
+- PR #78 đã merge. Khi triển khai mới cần kiểm tra migration cùng runtime gate phù hợp.
 
 - Online payment trên PR #75 dùng payOS SDK chính thức (`@payos/node`), tức official payOS SDK; browser return và client polling không có quyền đánh dấu paid.
+
+
+## D029 — Vận đơn hoàn và chặn hoàn ví trước khi hãng giao thành công
+
+- Màn Admin `AdminAfterSalesPanel` phải chọn hãng có lifecycle return thật (hiện chỉ Lalamove), đặt vận đơn khách → shop và kiểm tra trạng thái GET provider.
+- Bảng mới `VanDonHoanHang` tách độc lập `DonHang.MaVanDon`; chạy migration `database/migrations/20261013_return_shipment_lifecycle.sql` trước khi restart Node API, DB contract 56/56.
+- Chỉ khi hãng xác nhận `COMPLETED` thì `canReceiveReturn=true` và backend `/receive` mới cho nhập/quarantine + credit Ví KaitoKid đúng một lần.
+- No auto-retry Place Order không rõ kết quả; manual carrier reconciliation bắt buộc.
+- Live sandbox MariaDB/HTTPS return flow chưa được nghiệm thu trong môi trường này; xem `docs/decisions/D029-return-shipment-carrier-gated-refund.md`.

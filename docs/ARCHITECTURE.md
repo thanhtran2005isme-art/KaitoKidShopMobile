@@ -63,7 +63,7 @@ Contract hiện hành cần chạy thêm wallet migration cả với fresh impor
 database/migrations/20261006_wallet_refund_withdrawal.sql
 ```
 
-Sau bước này database có **55 base tables**. Ba bảng tài chính mới:
+Sau wallet migration có **55 base tables**. Từ D029 cần thêm `database/migrations/20261013_return_shipment_lifecycle.sql` để có **56 base tables** và lưu vận đơn hoàn tách khỏi vận đơn giao gốc. Ba bảng tài chính mới:
 
 - `ViDienTu`
 - `GiaoDichVi`
@@ -76,6 +76,10 @@ database/migrations/
 ```
 
 Prisma được dùng để kết nối/introspect nhưng không dùng Prisma Migrate để rewrite database hiện hữu. Trên DB có dữ liệu, không chạy `prisma migrate reset`, `prisma migrate dev` hoặc `prisma db push`.
+
+## Return shipment boundary (D029)
+
+Vận đơn giao gốc ở DonHang không bị đảo chiều/ghi đè. Vận đơn hoàn nằm ở `VanDonHoanHang`, người gửi là khách (địa chỉ giao ban đầu), người nhận là shop (Admin Shipping). Chỉ hãng có API Place Order/GET provider hiện được phép chọn — Lalamove; GHN/GHTK chưa được bật cho return. Kết quả `COMPLETED` từ hãng được xác minh server-side và persist trước khi Admin nhận/kiểm hàng. Endpoint receive phải kiểm tra trạng thái này trong transaction trước khi cập nhật tồn kho và credit ví; quarantine không tăng tồn bán được.
 
 ## Wallet / money ledger boundary
 

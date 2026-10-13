@@ -2,13 +2,25 @@ import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import AdminIcon from '../components/admin/AdminIcon';
 import { orderApi } from '../services/api/orderApi';
-import type { AdminAfterSalesCase } from '../services/api/orderApi';
+import type { AdminAfterSalesCase, AdminReturnCarrier } from '../services/api/orderApi';
 import { formatCurrency, formatDate } from '../utils/format';
 import '../styles/admin/admin-orders-after-sales.css';
 
 interface Props {
   orderId: number;
   onChanged?: () => Promise<void> | void;
+}
+
+function returnShipmentLabel(status: string) {
+  switch (status) {
+    case 'placing': return 'Đang đặt vận đơn';
+    case 'unknown': return 'Chưa rõ kết quả đặt vận đơn — cần đối soát';
+    case 'failed': return 'Vận đơn thất bại — cần xử lý';
+    case 'placed': return 'Đã đặt vận đơn — chờ tài xế';
+    case 'in_transit': return 'Đang đưa hàng về shop';
+    case 'delivered': return 'Lalamove đã xác nhận giao hoàn thành công';
+    default: return status;
+  }
 }
 
 function returnLabel(status: AdminAfterSalesCase['returnStatus']) {
@@ -33,6 +45,9 @@ export default function AdminAfterSalesPanel({ orderId, onChanged }: Props) {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
   const [decisionNote, setDecisionNote] = useState('');
+  const [carriers, setCarriers] = useState<AdminReturnCarrier[]>([]);
+  const [provider, setProvider] = useState('lalamove');
+  const [carrierError, setCarrierError] = useState('');
   const [inspectionNote, setInspectionNote] = useState('');
   const [disposition, setDisposition] = useState<'restock' | 'quarantine'>('quarantine');
   const [refundReference, setRefundReference] = useState('');
@@ -52,6 +67,9 @@ export default function AdminAfterSalesPanel({ orderId, onChanged }: Props) {
 
   useEffect(() => {
     void load();
+    void orderApi.getReturnCarriers()
+      .then((items) => { setCarriers(items); setCarrierError(''); })
+      .catch(() => { setCarriers([]); setCarrierError('Không tải được hãng vận chuyển hoàn.'); });
   }, [orderId]);
 
   const refreshAll = async (next: AdminAfterSalesCase) => {
@@ -99,6 +117,40 @@ export default function AdminAfterSalesPanel({ orderId, onChanged }: Props) {
     } catch (error) {
       console.error(error);
       toast.error('Không thể ghi nhận hàng hoàn');
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const dispatchShipment = async () => {
+    if (!data || busy || !carriers.find((item) => item.code === provider)?.enabled) return;
+    if (!window.confirm('Đặt vận đơn Lalamove lấy hàng tại địa chỉ của khách và giao về shop?')) return;
+    setBusy('dispatch');
+    try {
+      const next = await orderApi.dispatchReturnShipment(orderId, provider);
+      await refreshAll(next);
+      toast.success('Đã đặt vận đơn hoàn; chờ Lalamove giao hàng về shop');
+    } catch (error) {
+      console.error(error);
+      toast.error('Đặt vận đơn hoàn chưa thành công hoặc cần đối soát. Không tự đặt lại.');
+      await load();
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const syncShipment = async () => {
+    if (!data || busy) return;
+    setBusy('sync');
+    try {
+      const next = await orderApi.syncReturnShipment(orderId);
+      await refreshAll(next);
+      toast.success(next.returnShipment?.status === 'delivered'
+        ? 'Hãng đã xác nhận giao hàng hoàn thành công'
+        : 'Đã đồng bộ trạng thái vận đơn hoàn');
+    } catch (error) {
+      console.error(error);
+      toast.error('Không xác minh được với hãng vận chuyển. Chưa thể nhận hàng hoàn.');
     } finally {
       setBusy(null);
     }
@@ -186,7 +238,53 @@ export default function AdminAfterSalesPanel({ orderId, onChanged }: Props) {
         </div>
       )}
 
-      {data.canReceiveReturn && (
+      {data.returnStatus === 'approved' && !data.returnShipment && (
+          <div className="after-sales-action-card">
+            <div className="after-sales-field-label">Chọn đơn vị vận chuyển hoàn hàng</div>
+            <p className="after-sales-help">Chiều hoàn hàng: lấy tại địa chỉ khách, giao đến kho/shop. Chỉ hãng có tích hợp xác minh giao thành công mới được chọn.</p>
+            {carrierError && <p role="alert">{carrierError}</p>}
+            <select value={provider} onChange={(event) => setProvider(event.target.value)} aria-label="Đơn vị vận chuyển hoàn">
+              {carriers.map((item) => (
+                <option key={item.code} value={item.code} disabled={!item.enabled}>
+                  {item.name} {item.enabled ? '' : '— chưa hỗ trợ'}
+                </option>
+              ))}
+            </select>
+            {carriers.find((item) => item.code === provider)?.note && (
+              <p className="after-sales-help">{carriers.find((item) => item.code === provider)?.note}</p>
+            )}
+            <button type="button" className="after-sales-button primary"
+              disabled={busy !== null || !carriers.find((item) => item.code === provider)?.enabled}
+              onClick={() => void dispatchShipment()}>
+              <AdminIcon name="fa-truck" /> Đặt vận đơn hoàn
+            </button>
+          </div>
+        )}
+
+        {data.returnShipment && (
+          <div className="after-sales-action-card">
+            <div className="after-sales-field-label">Vận chuyển hàng hoàn · {data.returnShipment.provider.toUpperCase()}</div>
+            <p><strong>{returnShipmentLabel(data.returnShipment.status)}</strong></p>
+            <p className="after-sales-help">Lấy từ: {data.returnShipment.senderName} · {data.returnShipment.pickupAddress}</p>
+            <p className="after-sales-help">Giao về: {data.returnShipment.receiverName} · {data.returnShipment.dropoffAddress}</p>
+            {data.returnShipment.externalId && <p>Mã vận đơn hoàn: <strong>{data.returnShipment.externalId}</strong></p>}
+            {data.returnShipment.trackingUrl && (
+              <a href={data.returnShipment.trackingUrl} target="_blank" rel="noopener noreferrer">Theo dõi vận đơn hoàn</a>
+            )}
+            {data.returnShipment.errorMessage && <p role="alert">{data.returnShipment.errorMessage}</p>}
+            {['placed', 'in_transit'].includes(data.returnShipment.status) && (
+              <button type="button" className="after-sales-button primary"
+                disabled={busy !== null} onClick={() => void syncShipment()}>
+                <AdminIcon name="fa-rotate" /> Kiểm tra trạng thái từ Lalamove
+              </button>
+            )}
+            {data.returnShipment.status === 'delivered' && (
+              <p className="after-sales-help">Đã có xác nhận hãng. Admin phải kiểm tra hàng thực tế trước khi hoàn tiền và nhập kho.</p>
+            )}
+          </div>
+        )}
+
+        {data.canReceiveReturn && (
         <div className="after-sales-action-card">
           <div className="after-sales-field-label">Kết quả kiểm hàng thực tế</div>
           <div className="after-sales-choice-grid">
@@ -223,7 +321,7 @@ export default function AdminAfterSalesPanel({ orderId, onChanged }: Props) {
         <div className="after-sales-action-card refund">
           <div className="after-sales-field-label">Hoàn tiền thủ công</div>
           <p className="after-sales-help">
-            Hệ thống chưa có API refund gateway cho flow này. Chỉ xác nhận sau khi tiền đã được hoàn thực tế.
+            Chỉ áp dụng cho yêu cầu hoàn tiền thủ công từ dữ liệu cũ. Đơn mới hoàn vào Ví KaitoKid sau khi hãng xác nhận giao hoàn và Admin kiểm hàng.
           </p>
           <input
             maxLength={300}

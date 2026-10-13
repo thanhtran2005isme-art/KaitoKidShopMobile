@@ -33,6 +33,31 @@ export interface AdminAfterSalesHistoryItem {
   at: string;
 }
 
+export type AdminReturnCarrier = {
+  code: string;
+  name: string;
+  enabled: boolean;
+  note: string;
+};
+
+export type ReturnShipmentDTO = {
+  id: number;
+  orderId: number;
+  provider: string;
+  externalId: string | null;
+  status: 'placing' | 'unknown' | 'failed' | 'placed' | 'in_transit' | 'delivered';
+  senderName: string;
+  senderPhone: string;
+  pickupAddress: string;
+  receiverName: string;
+  receiverPhone: string;
+  dropoffAddress: string;
+  trackingUrl: string | null;
+  fee: number | null;
+  deliveredAt: string | null;
+  errorMessage: string | null;
+};
+
 export interface AdminAfterSalesCase {
   orderId: number;
   orderCode: string;
@@ -45,6 +70,7 @@ export interface AdminAfterSalesCase {
   deliveryIssueOpen: boolean;
   returnStatus: AdminReturnStatus;
   returnReason?: string | null;
+  returnShipment?: ReturnShipmentDTO | null;
   decisionNote?: string | null;
   disposition?: 'restock' | 'quarantine' | null;
   refundStatus: AdminRefundStatus;
@@ -72,6 +98,26 @@ export const orderApi = {
   async updateOrderStatus(id: string, data: UpdateOrderStatusDTO): Promise<OrderDTO> {
     const response = await adminApiClient.put<OrderDTO>(`/api/admin/orders/${id}/status`, data);
     return response.data;
+  },
+
+  async getReturnCarriers(): Promise<AdminReturnCarrier[]> {
+    const { data } = await adminApiClient.get<AdminReturnCarrier[]>('/api/admin/order-after-sales/return-providers');
+    return data;
+  },
+
+  async dispatchReturnShipment(id: number, provider: string): Promise<AdminAfterSalesCase> {
+    const { data } = await adminApiClient.post<AdminAfterSalesCase>(
+      `/api/admin/order-after-sales/${id}/return-shipment`,
+      { provider },
+    );
+    return data;
+  },
+
+  async syncReturnShipment(id: number): Promise<AdminAfterSalesCase> {
+    const { data } = await adminApiClient.post<AdminAfterSalesCase>(
+      `/api/admin/order-after-sales/${id}/return-shipment/sync`,
+    );
+    return data;
   },
 
   async getAfterSalesCases(): Promise<AdminAfterSalesCase[]> {

@@ -38,6 +38,7 @@ import {
 } from "./admin-operations.controller.js";
 import { AdminOrderAfterSalesController } from "./admin-order-after-sales.controller.js";
 import { AdminOrderAfterSalesService } from "./admin-order-after-sales.service.js";
+import { ReturnShipmentService } from "./return-shipment.service.js";
 import { AdminOrderStatusBoundaryInterceptor } from "./admin-order-status-boundary.interceptor.js";
 import { AdminPaymentController } from "./admin-payment.controller.js";
 import { AdminStaffGuard } from "./admin-staff.guard.js";
@@ -75,6 +76,7 @@ import { AdminVietQrService } from "./admin-vietqr.service.js";
   providers: [
     AdminStaffGuard,
     AdminOrderAfterSalesService,
+    ReturnShipmentService,
     AdminVietQrService,
     {
       provide: APP_INTERCEPTOR,
