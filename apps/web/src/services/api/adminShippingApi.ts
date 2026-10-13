@@ -15,6 +15,7 @@ export interface ShippingConfig {
   mockEnabled: boolean;
   ghnEnabled: boolean;
   ghtkEnabled: boolean;
+  lalamoveEnabled: boolean;
 
   ghnBaseUrl?: string;
   ghnToken?: string;
@@ -27,6 +28,12 @@ export interface ShippingConfig {
   ghtkToken?: string;
   ghtkPickProvince?: string;
   ghtkPickDistrict?: string;
+
+  lalamoveBaseUrl?: string;
+  lalamoveMarket?: string;
+  lalamoveServiceType?: string;
+  lalamoveApiKeyConfigured?: boolean;
+  lalamoveApiSecretConfigured?: boolean;
 
   pickupAddress?: string;
   pickupName?: string;
@@ -90,6 +97,8 @@ export interface GhnDistrictItem {
   ProvinceID: number;
 }
 
+export type AdminShippingProvider = 'mock' | 'ghn' | 'ghtk' | 'lalamove';
+
 export const adminShippingApi = {
   async getConfig(): Promise<ApiResponse<ShippingConfig>> {
     try {
@@ -105,7 +114,7 @@ export const adminShippingApi = {
     } catch (e) { return { success: false, error: getErrorMessage(e) }; }
   },
 
-  async test(provider: 'mock' | 'ghn' | 'ghtk'): Promise<ApiResponse<ShippingTestResult>> {
+  async test(provider: AdminShippingProvider): Promise<ApiResponse<ShippingTestResult>> {
     try {
       const res = await apiClient.post<ShippingTestResult>(`/api/admin/shipping/test/${provider}`);
       return { success: true, data: res.data };

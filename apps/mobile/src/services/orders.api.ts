@@ -1,6 +1,7 @@
 import { apiRequest } from '@/services/api-client';
 import type {
   CustomerOrder,
+  OrderAfterSalesResult,
   ReorderResult,
   ShippingTracking,
 } from '@/types/orders';
@@ -30,6 +31,37 @@ export const ordersApi = {
       method: 'PUT',
       headers: authHeaders(token),
     });
+  },
+
+  confirmReceived(token: string, orderId: number) {
+    return apiRequest<OrderAfterSalesResult>(
+      '/api/orders/' + orderId + '/confirm-received',
+      {
+        method: 'POST',
+        headers: authHeaders(token),
+      },
+    );
+  },
+
+  reportNotReceived(token: string, orderId: number) {
+    return apiRequest<OrderAfterSalesResult>(
+      '/api/orders/' + orderId + '/report-not-received',
+      {
+        method: 'POST',
+        headers: authHeaders(token),
+      },
+    );
+  },
+
+  requestReturn(token: string, orderId: number, reason: string) {
+    return apiRequest<OrderAfterSalesResult>(
+      '/api/orders/' + orderId + '/return-request',
+      {
+        method: 'POST',
+        headers: authHeaders(token, true),
+        body: JSON.stringify({ reason }),
+      },
+    );
   },
 
   reorder(token: string, orderId: number) {

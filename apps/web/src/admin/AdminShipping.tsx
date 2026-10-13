@@ -22,12 +22,26 @@ const STATUS_LABEL: Record<string, string> = {
   delivered: 'Đã giao',
   cancelled: 'Đã hủy',
   order_placed: 'Đã đặt hàng',
+  assigning_driver: 'Đang tìm tài xế',
+  on_going: 'Tài xế đã nhận đơn',
+  picked_up: 'Đã lấy hàng',
+  completed: 'Giao thành công',
+  rejected: 'Tài xế từ chối',
+  expired: 'Hết thời gian ghép tài xế',
+  ASSIGNING_DRIVER: 'Đang tìm tài xế',
+  ON_GOING: 'Tài xế đã nhận đơn',
+  PICKED_UP: 'Đã lấy hàng',
+  COMPLETED: 'Giao thành công',
+  REJECTED: 'Tài xế từ chối',
+  EXPIRED: 'Hết thời gian ghép tài xế',
 };
 
 const PROVIDER_LABEL: Record<string, string> = {
   mock: 'KaitoKid Mock',
   ghn: 'Giao Hàng Nhanh',
   ghtk: 'Giao Hàng Tiết Kiệm',
+  lalamove: 'Lalamove',
+  LALAMOVE: 'Lalamove',
 };
 
 export default function AdminShipping() {
@@ -78,9 +92,6 @@ export default function AdminShipping() {
   );
 }
 
-// ----------------------------------------------------------
-// TAB 1: CẤU HÌNH
-// ----------------------------------------------------------
 function ConfigTab() {
   const [config, setConfig] = useState<AdminShippingConfig | null>(null);
   const [loading, setLoading] = useState(true);
@@ -147,7 +158,7 @@ function ConfigTab() {
     }
   };
 
-  const test = async (provider: 'mock' | 'ghn' | 'ghtk') => {
+  const test = async (provider: 'mock' | 'ghn' | 'ghtk' | 'lalamove') => {
     setTesting(provider);
     const r = await adminShippingApi.test(provider);
     setTesting(null);
@@ -181,7 +192,6 @@ function ConfigTab() {
 
   return (
     <div style={{ display: 'grid', gap: 20 }}>
-      {/* Provider toggles */}
       <Card title="Đơn vị vận chuyển" icon="fa-toggle-on">
         <ProviderRow
           name="KaitoKid Mock"
@@ -210,9 +220,17 @@ function ConfigTab() {
           testing={testing === 'ghtk'}
           result={testResult.ghtk}
         />
+        <ProviderRow
+          name="Lalamove"
+          desc="Sandbox/Production Lalamove. Test xác thực HMAC và danh sách khu vực theo market."
+          enabled={config.lalamoveEnabled}
+          onChange={(v) => update({ lalamoveEnabled: v })}
+          onTest={() => test('lalamove')}
+          testing={testing === 'lalamove'}
+          result={testResult.lalamove}
+        />
       </Card>
 
-      {/* GHN config */}
       <Card title="Cấu hình GHN" icon="fa-shipping-fast">
         <Row>
           <Field label="Base URL" hint="dev-online-gateway.ghn.vn = sandbox; online-gateway.ghn.vn = production">
@@ -302,7 +320,6 @@ function ConfigTab() {
         </div>
       </Card>
 
-      {/* GHTK config */}
       <Card title="Cấu hình GHTK" icon="fa-truck-loading">
         <Row>
           <Field label="Base URL">
@@ -342,11 +359,48 @@ function ConfigTab() {
         </Row>
       </Card>
 
-      {/* Cơ sở KaitoKid (tự giao) */}
+      <Card title="Cấu hình Lalamove" icon="fa-motorcycle">
+        <Row>
+          <Field label="Base URL" hint="Sandbox: https://rest.sandbox.lalamove.com — Production: https://rest.lalamove.com">
+            <input
+              value={config.lalamoveBaseUrl || ''}
+              onChange={(e) => update({ lalamoveBaseUrl: e.target.value })}
+              placeholder="https://rest.sandbox.lalamove.com"
+              style={inputStyle}
+            />
+          </Field>
+          <Field label="Market" hint="Việt Nam dùng mã VN">
+            <input
+              value={config.lalamoveMarket || 'VN'}
+              onChange={(e) => update({ lalamoveMarket: e.target.value.toUpperCase() })}
+              placeholder="VN"
+              maxLength={2}
+              style={inputStyle}
+            />
+          </Field>
+          <Field label="Service Type" hint="Sandbox Việt Nam thường dùng MOTORCYCLE cho đơn nhỏ">
+            <input
+              value={config.lalamoveServiceType || 'MOTORCYCLE'}
+              onChange={(e) => update({ lalamoveServiceType: e.target.value.toUpperCase() })}
+              placeholder="MOTORCYCLE"
+              style={inputStyle}
+            />
+          </Field>
+        </Row>
+        <div style={{ padding: 12, background: '#f8fafc', borderRadius: 6, fontSize: 13, color: '#475569' }}>
+          <div style={{ fontWeight: 600, color: '#0f172a', marginBottom: 6 }}>Credentials backend</div>
+          <div>API Key: {config.lalamoveApiKeyConfigured ? '✓ Đã cấu hình' : '✗ Chưa cấu hình'}</div>
+          <div>API Secret: {config.lalamoveApiSecretConfigured ? '✓ Đã cấu hình' : '✗ Chưa cấu hình'}</div>
+          <div style={{ marginTop: 6 }}>
+            Lalamove không yêu cầu Shop ID. Khai báo <code>LALAMOVE_API_KEY</code> và <code>LALAMOVE_API_SECRET</code> trong <code>apps/api/.env</code>; Admin không đọc hoặc hiển thị secret.
+          </div>
+        </div>
+      </Card>
+
       <Card title="Cơ sở KaitoKid (tự giao nội bộ)" icon="fa-store">
         <p style={{ fontSize: 13, color: '#64748b', marginTop: 0, marginBottom: 12 }}>
           Khi khách đặt hàng ở tỉnh nào nằm trong danh sách dưới, KaitoKid sẽ tự giao.
-          Khách ở tỉnh ngoài chỉ thấy tùy chọn GHN/GHTK.
+          Khách ở tỉnh ngoài có thể dùng GHN/GHTK/Lalamove khi nhà vận chuyển tương ứng được bật.
         </p>
 
         <div style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
@@ -433,8 +487,10 @@ function ConfigTab() {
         </button>
       </Card>
 
-      {/* Pickup chung */}
       <Card title="Địa chỉ kho lấy hàng & Mặc định" icon="fa-map-marker-alt">
+        <p style={{ marginTop: 0, color: '#64748b', fontSize: 12 }}>
+          Với Lalamove, nên nhập địa chỉ kho đầy đủ gồm số nhà, phường/xã, quận/huyện và tỉnh/thành để Sandbox định vị chính xác.
+        </p>
         <Row>
           <Field label="Tên kho">
             <input value={config.pickupName || ''} onChange={(e) => update({ pickupName: e.target.value })} style={inputStyle} placeholder="Kho KaitoKid HN" />
@@ -452,8 +508,8 @@ function ConfigTab() {
           </Field>
         </Row>
         <Row>
-          <Field label="Địa chỉ chi tiết kho">
-            <input value={config.pickupAddress || ''} onChange={(e) => update({ pickupAddress: e.target.value })} style={inputStyle} placeholder="Số 1, đường ABC, phường XYZ..." />
+          <Field label="Địa chỉ đầy đủ kho lấy hàng">
+            <input value={config.pickupAddress || ''} onChange={(e) => update({ pickupAddress: e.target.value })} style={inputStyle} placeholder="Số nhà, phường/xã, quận/huyện, tỉnh/thành" />
           </Field>
         </Row>
       </Card>
@@ -524,9 +580,6 @@ function ProviderRow({
   );
 }
 
-// ----------------------------------------------------------
-// TAB 2: LỊCH SỬ
-// ----------------------------------------------------------
 function HistoryTab() {
   const [items, setItems] = useState<AdminShippingHistoryItem[]>([]);
   const [total, setTotal] = useState(0);
@@ -562,6 +615,7 @@ function HistoryTab() {
           <option value="mock">KaitoKid Mock</option>
           <option value="ghn">GHN</option>
           <option value="ghtk">GHTK</option>
+          <option value="lalamove">Lalamove</option>
         </select>
         <select value={filter.status} onChange={(e) => setFilter((f) => ({ ...f, status: e.target.value, page: 1 }))} style={inputStyle}>
           <option value="">Tất cả trạng thái</option>
@@ -571,6 +625,10 @@ function HistoryTab() {
           <option value="delivering">Đang giao</option>
           <option value="delivered">Đã giao</option>
           <option value="cancelled">Đã hủy</option>
+          <option value="ASSIGNING_DRIVER">Lalamove: Đang tìm tài xế</option>
+          <option value="ON_GOING">Lalamove: Tài xế đã nhận</option>
+          <option value="PICKED_UP">Lalamove: Đã lấy hàng</option>
+          <option value="COMPLETED">Lalamove: Giao thành công</option>
         </select>
         <button onClick={load} style={primaryBtn}>
           <i className="fa fa-search" style={{ marginRight: 6 }}></i> Tìm
@@ -639,9 +697,6 @@ function HistoryTab() {
   );
 }
 
-// ----------------------------------------------------------
-// TAB 3: TỔNG QUAN
-// ----------------------------------------------------------
 function OverviewTab() {
   const [data, setData] = useState<AdminShippingOverview | null>(null);
   const [loading, setLoading] = useState(true);
@@ -705,9 +760,6 @@ function OverviewTab() {
   );
 }
 
-// ----------------------------------------------------------
-// HELPERS
-// ----------------------------------------------------------
 function Card({ title, icon, children }: { title: string; icon: string; children: React.ReactNode }) {
   return (
     <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 10, padding: 20 }}>
@@ -786,6 +838,12 @@ function statusBadge(status: string): React.CSSProperties {
     delivered: { bg: '#dcfce7', fg: '#166534' },
     cancelled: { bg: '#fee2e2', fg: '#991b1b' },
     order_placed: { bg: '#f1f5f9', fg: '#475569' },
+    ASSIGNING_DRIVER: { bg: '#fef3c7', fg: '#92400e' },
+    ON_GOING: { bg: '#dbeafe', fg: '#1e40af' },
+    PICKED_UP: { bg: '#e0e7ff', fg: '#4338ca' },
+    COMPLETED: { bg: '#dcfce7', fg: '#166534' },
+    REJECTED: { bg: '#fee2e2', fg: '#991b1b' },
+    EXPIRED: { bg: '#f1f5f9', fg: '#475569' },
   };
   const c = palette[status] || { bg: '#f1f5f9', fg: '#475569' };
   return {

@@ -32,8 +32,11 @@ if not defined SHIPPING_SIMULATOR_ENABLED set "SHIPPING_SIMULATOR_ENABLED=true"
 if not defined IMAGE_INDEXER_ENABLED set "IMAGE_INDEXER_ENABLED=false"
 
 pushd "%API%"
-if not exist "node_modules\.bin\nest.cmd" (
-  echo [SETUP] Dang cai Node API dependencies...
+set "NEED_INSTALL=0"
+if not exist "node_modules\.bin\nest.cmd" set "NEED_INSTALL=1"
+if not exist "node_modules\@nestjs\swagger\package.json" set "NEED_INSTALL=1"
+if "%NEED_INSTALL%"=="1" (
+  echo [SETUP] Dang cai/cap nhat Node API dependencies...
   call npm install
   if errorlevel 1 goto :error
 )

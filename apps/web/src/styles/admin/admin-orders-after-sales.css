@@ -1,0 +1,289 @@
+.after-sales-workspace {
+  margin-top: 18px;
+  padding: 18px;
+  border: 1px solid #e5e7eb;
+  border-radius: 18px;
+  background: #ffffff;
+}
+
+.after-sales-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+
+.after-sales-heading h4 {
+  margin: 4px 0 0;
+  color: #111827;
+  font-size: 18px;
+}
+
+.after-sales-attention {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 10px;
+  border-radius: 999px;
+  background: #fff7ed;
+  color: #9a3412;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.after-sales-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.after-sales-summary {
+  min-height: 84px;
+  padding: 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  background: #f9fafb;
+}
+
+.after-sales-summary span,
+.after-sales-note-card span,
+.after-sales-field-label {
+  display: block;
+  color: #6b7280;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.after-sales-summary strong {
+  display: block;
+  margin-top: 6px;
+  color: #111827;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.after-sales-summary.warning {
+  border-color: #fed7aa;
+  background: #fff7ed;
+}
+
+.after-sales-summary.danger {
+  border-color: #fecaca;
+  background: #fef2f2;
+}
+
+.after-sales-note-card,
+.after-sales-action-card,
+.after-sales-timeline,
+.after-sales-money-note {
+  margin-top: 12px;
+  padding: 14px;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  background: #ffffff;
+}
+
+.after-sales-note-card p,
+.after-sales-help,
+.after-sales-event p,
+.after-sales-money-note {
+  margin: 6px 0 0;
+  color: #4b5563;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.after-sales-action-card label {
+  display: block;
+  margin-bottom: 7px;
+  color: #374151;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.after-sales-action-card textarea,
+.after-sales-action-card input {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid #d1d5db;
+  border-radius: 12px;
+  background: #ffffff;
+  color: #111827;
+  font: inherit;
+  font-size: 13px;
+  outline: none;
+}
+
+.after-sales-action-card textarea {
+  min-height: 92px;
+  padding: 10px 12px;
+  resize: vertical;
+}
+
+.after-sales-action-card input {
+  min-height: 44px;
+  padding: 0 12px;
+}
+
+.after-sales-action-card textarea:focus,
+.after-sales-action-card input:focus,
+.after-sales-choice:focus-visible,
+.after-sales-button:focus-visible {
+  border-color: #7c3aed;
+  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.14);
+}
+
+.after-sales-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+  margin-top: 10px;
+}
+
+.after-sales-button {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 14px;
+  border: 1px solid #d1d5db;
+  border-radius: 12px;
+  background: #ffffff;
+  color: #111827;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.after-sales-button:hover:not(:disabled) {
+  border-color: #9ca3af;
+  background: #f9fafb;
+}
+
+.after-sales-button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.after-sales-button.primary,
+.after-sales-button.approve {
+  border-color: #7c3aed;
+  background: #7c3aed;
+  color: #ffffff;
+}
+
+.after-sales-button.reject {
+  border-color: #fecaca;
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
+.after-sales-choice-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 8px 0 10px;
+}
+
+.after-sales-choice {
+  min-height: 76px;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 14px;
+  background: #ffffff;
+  color: #111827;
+  text-align: left;
+  cursor: pointer;
+}
+
+.after-sales-choice.active {
+  border-color: #7c3aed;
+  background: #f5f3ff;
+}
+
+.after-sales-choice span {
+  display: grid;
+  gap: 3px;
+}
+
+.after-sales-choice small {
+  color: #6b7280;
+  line-height: 1.4;
+}
+
+.after-sales-action-card.refund {
+  border-color: #ddd6fe;
+  background: #faf5ff;
+}
+
+.after-sales-timeline h5 {
+  margin: 0 0 12px;
+  color: #111827;
+  font-size: 14px;
+}
+
+.after-sales-event {
+  position: relative;
+  display: grid;
+  grid-template-columns: 14px 1fr;
+  gap: 9px;
+  padding: 0 0 14px;
+}
+
+.after-sales-event:last-child {
+  padding-bottom: 0;
+}
+
+.after-sales-event-dot {
+  width: 9px;
+  height: 9px;
+  margin-top: 4px;
+  border-radius: 999px;
+  background: #7c3aed;
+}
+
+.after-sales-event strong {
+  color: #111827;
+  font-size: 12px;
+}
+
+.after-sales-event small {
+  display: block;
+  margin-top: 4px;
+  color: #6b7280;
+  font-size: 11px;
+}
+
+.after-sales-money-note {
+  background: #f9fafb;
+}
+
+.after-sales-loading {
+  margin-top: 16px;
+  padding: 14px;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  color: #6b7280;
+  text-align: center;
+}
+
+@media (max-width: 760px) {
+  .after-sales-summary-grid,
+  .after-sales-choice-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .after-sales-heading {
+    flex-direction: column;
+  }
+
+  .after-sales-actions,
+  .after-sales-button {
+    width: 100%;
+  }
+}

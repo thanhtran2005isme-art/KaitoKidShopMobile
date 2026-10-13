@@ -96,15 +96,22 @@ export class ReviewsService {
 
     return this.prisma.$transaction(async (tx) => {
       const orders = await tx.$queryRawUnsafe<Array<{ id: unknown }>>(
-        `SELECT Id AS id
-         FROM DonHang
-         WHERE Id = ? AND NguoiDungId = ? AND TrangThai = 'completed'
+        `SELECT d.Id AS id
+         FROM DonHang d
+         WHERE d.Id = ? AND d.NguoiDungId = ?
+           AND d.TrangThai = 'completed'
+           AND d.NgayHoanThanh IS NOT NULL
+           AND EXISTS (
+             SELECT 1 FROM LichSuTrangThaiVanChuyen h
+             WHERE h.DonHangId = d.Id
+               AND h.TrangThai = 'received_by_customer'
+           )
          LIMIT 1`,
         orderId,
         userId,
       );
       if (!orders[0]) {
-        throw new BadRequestException("Đơn hàng không tồn tại, không thuộc tài khoản này hoặc chưa hoàn tất.");
+        throw new BadRequestException("Đơn hàng không tồn tại, không thuộc tài khoản này hoặc khách chưa xác nhận đã nhận hàng.");
       }
 
       const productItems = await tx.$queryRawUnsafe<Array<{ size: string; color: string }>>(

@@ -1,5 +1,6 @@
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import * as WebBrowser from 'expo-web-browser';
 import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -39,6 +40,13 @@ function messageFrom(error: unknown, fallback: string) {
   return error instanceof Error && error.message ? error.message : fallback;
 }
 
+function imageUri(value?: string | null) {
+  const raw = value?.trim() ?? '';
+  if (!raw) return '';
+  if (raw.startsWith('data:')) return raw;
+  return resolveMediaUrl(raw);
+}
+
 export default function CheckoutPaymentScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ orderCode?: string | string[] }>();
@@ -51,8 +59,7 @@ export default function CheckoutPaymentScreen() {
   const orderCode = routeOrderCode || pendingOrder?.orderCode || '';
 
   const [config, setConfig] = useState<PaymentConfig | null>(null);
-  const [instructions, setInstructions] =
-    useState<PaymentInstructions | null>(null);
+  const [instructions, setInstructions] = useState<PaymentInstructions | null>(null);
   const [status, setStatus] = useState<PaymentStatus | null>(null);
   const [secondsLeft, setSecondsLeft] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -60,13 +67,30 @@ export default function CheckoutPaymentScreen() {
   const [actionBusy, setActionBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const paid = Boolean(status?.paidAt);
+  const cancelled = status?.status === 'cancelled';
   const terminal = useMemo(
-    () =>
-      status?.status === 'cancelled' ||
-      Boolean(status?.paidAt) ||
-      (status != null && secondsLeft <= 0),
-    [secondsLeft, status?.paidAt, status?.status],
+    () => cancelled || paid || (status != null && secondsLeft <= 0),
+    [cancelled, paid, secondsLeft, status],
   );
+  const isPayOs =
+    instructions?.provider === 'payos' ||
+    status?.paymentProvider === 'payos' ||
+    config?.paymentProvider === 'payos' ||
+    config?.payOsConfigured === true;
+
+  async function syncPaymentStatus(activeToken: string, activeOrderCode: string) {
+    const next = await checkoutApi.getPaymentStatus(activeToken, activeOrderCode);
+    setStatus(next);
+    setSecondsLeft(Math.max(0, next.secondsLeft));
+    if (next.paidAt) {
+      router.replace({
+        pathname: '/order-success/[orderCode]',
+        params: { orderCode: activeOrderCode },
+      });
+    }
+    return next;
+  }
 
   useEffect(() => {
     if (!token || !orderCode) {
@@ -81,7 +105,6 @@ export default function CheckoutPaymentScreen() {
     async function load() {
       setLoading(true);
       setError(null);
-
       try {
         const [configResult, instructionsResult, statusResult] =
           await Promise.all([
@@ -89,7 +112,6 @@ export default function CheckoutPaymentScreen() {
             checkoutApi.getPaymentInstructions(activeToken, activeOrderCode),
             checkoutApi.getPaymentStatus(activeToken, activeOrderCode),
           ]);
-
         if (!active) return;
 
         setConfig(configResult);
@@ -113,7 +135,7 @@ export default function CheckoutPaymentScreen() {
         setError(
           messageFrom(
             loadError,
-            'Không thể tải thông tin chuyển khoản.',
+            'Không thể tải thông tin thanh toán.',
           ),
         );
       } finally {
@@ -122,28 +144,32 @@ export default function CheckoutPaymentScreen() {
     }
 
     void load();
-
     return () => {
       active = false;
     };
   }, [orderCode, retryKey, router, token]);
 
+  // Webhook payOS là authority. Polling này chỉ đồng bộ UI Mobile với DB sau
+  // khi backend đã verify webhook; Mobile không đọc SMS/số dư ngân hàng.
   useEffect(() => {
-    if (!token || !orderCode || loading) return;
-    if (status?.status === 'cancelled' || status?.paidAt) return;
+    if (!token || !orderCode || loading || terminal) return;
 
     const activeToken = token;
     const activeOrderCode = orderCode;
     let active = true;
+    let inFlight = false;
 
     async function poll() {
+      if (inFlight) return;
+      inFlight = true;
       try {
-        const next = await checkoutApi.getPaymentStatus(activeToken, activeOrderCode);
+        const next = await checkoutApi.getPaymentStatus(
+          activeToken,
+          activeOrderCode,
+        );
         if (!active) return;
-
         setStatus(next);
         setSecondsLeft(Math.max(0, next.secondsLeft));
-
         if (next.paidAt) {
           router.replace({
             pathname: '/order-success/[orderCode]',
@@ -151,102 +177,67 @@ export default function CheckoutPaymentScreen() {
           });
         }
       } catch {
-        // Giữ UI hiện tại; request kế tiếp sẽ thử lại.
+        // Webhook vẫn là source of truth; tick sau sẽ thử đồng bộ lại.
+      } finally {
+        inFlight = false;
       }
     }
 
-    const interval = setInterval(() => {
-      void poll();
-    }, 5000);
-
+    const interval = setInterval(() => void poll(), 3000);
     return () => {
       active = false;
       clearInterval(interval);
     };
-  }, [
-    loading,
-    orderCode,
-    router,
-    status?.paidAt,
-    status?.status,
-    token,
-  ]);
+  }, [loading, orderCode, router, terminal, token]);
 
   useEffect(() => {
     if (loading || terminal || secondsLeft <= 0) return;
-
-    const timer = setInterval(() => {
-      setSecondsLeft((current) => Math.max(0, current - 1));
-    }, 1000);
-
+    const timer = setInterval(
+      () => setSecondsLeft((current) => Math.max(0, current - 1)),
+      1000,
+    );
     return () => clearInterval(timer);
-  }, [loading, terminal]);
+  }, [loading, secondsLeft, terminal]);
 
-  const refreshStatus = async () => {
+  async function refreshStatus() {
     if (!token || !orderCode || actionBusy) return;
-
     setActionBusy(true);
     setError(null);
     try {
-      const next = await checkoutApi.getPaymentStatus(token, orderCode);
-      setStatus(next);
-      setSecondsLeft(Math.max(0, next.secondsLeft));
-      if (next.paidAt) {
-        router.replace({
-          pathname: '/order-success/[orderCode]',
-          params: { orderCode },
-        });
-      }
+      await syncPaymentStatus(token, orderCode);
     } catch (refreshError) {
+      setError(messageFrom(refreshError, 'Không thể kiểm tra trạng thái thanh toán.'));
+    } finally {
+      setActionBusy(false);
+    }
+  }
+
+  async function cancelPayment() {
+    if (!token || !orderCode || actionBusy) return;
+    setActionBusy(true);
+    setError(null);
+    try {
+      await checkoutApi.cancelPayment(token, orderCode);
+      await syncPaymentStatus(token, orderCode);
+    } catch (cancelError) {
       setError(
         messageFrom(
-          refreshError,
-          'Không thể cập nhật trạng thái thanh toán.',
+          cancelError,
+          'Không thể hủy giao dịch. Hệ thống chưa thay đổi tồn kho/coupon.',
         ),
       );
     } finally {
       setActionBusy(false);
     }
-  };
+  }
 
-  const cancel = async () => {
+  async function simulatePaid() {
     if (!token || !orderCode || actionBusy) return;
-
-    setActionBusy(true);
-    setError(null);
-    try {
-      await checkoutApi.cancelPayment(token, orderCode);
-      const next = await checkoutApi.getPaymentStatus(token, orderCode);
-      setStatus(next);
-      setSecondsLeft(0);
-    } catch (cancelError) {
-      setError(
-        messageFrom(cancelError, 'Không thể hủy giao dịch.'),
-      );
-    } finally {
-      setActionBusy(false);
-    }
-  };
-
-  const simulatePaid = async () => {
-    if (!token || !orderCode || actionBusy || !config?.allowSimulatePaid) {
-      return;
-    }
-
     setActionBusy(true);
     setError(null);
     try {
       await checkoutApi.simulatePaid(token, orderCode);
-      const next = await checkoutApi.getPaymentStatus(token, orderCode);
-      setStatus(next);
-      setSecondsLeft(Math.max(0, next.secondsLeft));
-
-      if (next.paidAt) {
-        router.replace({
-          pathname: '/order-success/[orderCode]',
-          params: { orderCode },
-        });
-      }
+      await syncPaymentStatus(token, orderCode);
     } catch (simulateError) {
       setError(
         messageFrom(
@@ -257,7 +248,22 @@ export default function CheckoutPaymentScreen() {
     } finally {
       setActionBusy(false);
     }
-  };
+  }
+
+  async function openPayOs() {
+    const url = instructions?.checkoutUrl?.trim();
+    if (!url || !token || !orderCode || actionBusy) return;
+    setActionBusy(true);
+    setError(null);
+    try {
+      await WebBrowser.openBrowserAsync(url);
+      await syncPaymentStatus(token, orderCode);
+    } catch (browserError) {
+      setError(messageFrom(browserError, 'Không thể mở trang thanh toán payOS.'));
+    } finally {
+      setActionBusy(false);
+    }
+  }
 
   if (!token) {
     return (
@@ -265,6 +271,8 @@ export default function CheckoutPaymentScreen() {
         <View style={styles.centerState}>
           <Text style={styles.stateTitle}>Cần đăng nhập để xem thanh toán</Text>
           <Pressable
+            accessibilityLabel="Đăng nhập để tiếp tục thanh toán"
+            accessibilityRole="button"
             onPress={() =>
               router.replace({
                 pathname: '/auth/login',
@@ -301,9 +309,9 @@ export default function CheckoutPaymentScreen() {
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.centerState}>
           <ActivityIndicator color={BRAND_COLORS.primary} size="large" />
-          <Text style={styles.stateTitle}>Đang tải thanh toán</Text>
+          <Text style={styles.stateTitle}>Đang tạo thanh toán payOS</Text>
           <Text style={styles.stateText}>
-            KaitoKid đang lấy hướng dẫn chuyển khoản từ backend.
+            Backend đang tạo hoặc khôi phục payment link của đơn hàng.
           </Text>
         </View>
       </SafeAreaView>
@@ -318,6 +326,7 @@ export default function CheckoutPaymentScreen() {
           <Text style={styles.stateText}>{error}</Text>
           <Pressable
             accessibilityLabel="Thử tải lại thông tin thanh toán"
+            accessibilityRole="button"
             onPress={() => setRetryKey((value) => value + 1)}
             style={styles.primaryButton}>
             <Text style={styles.primaryButtonText}>Thử lại</Text>
@@ -327,11 +336,14 @@ export default function CheckoutPaymentScreen() {
     );
   }
 
-  const cancelled =
-    status?.status === 'cancelled' ||
-    (status != null && secondsLeft <= 0);
+  const qrUrl = imageUri(instructions?.qrUrl);
+  const expired = status != null && secondsLeft <= 0;
   const bank = instructions?.bankAccount;
-  const qrUrl = resolveMediaUrl(instructions?.qrUrl);
+  const showBankAccount = Boolean(
+    bank?.accountNumber &&
+      bank.accountNumber !== 'Thanh toán trên payOS' &&
+      bank.accountHolder,
+  );
 
   return (
     <SafeAreaView edges={['top']} style={styles.safeArea}>
@@ -341,12 +353,12 @@ export default function CheckoutPaymentScreen() {
         <View style={styles.header}>
           <Text style={styles.eyebrow}>THANH TOÁN ĐƠN {orderCode}</Text>
           <Text style={styles.title}>
-            {instructions?.qrUrl
-              ? 'Chuyển khoản / VietQR'
-              : 'Chuyển khoản ngân hàng'}
+            {isPayOs ? 'Thanh toán qua payOS' : 'Chuyển khoản ngân hàng'}
           </Text>
           <Text style={styles.subtitle}>
-            Hệ thống sẽ tự cập nhật khi backend xác nhận thanh toán.
+            {isPayOs
+              ? 'Quét QR hoặc mở payOS. Khi ngân hàng ghi nhận tiền, webhook payOS sẽ xác nhận với KaitoKid và màn hình tự chuyển sang thành công.'
+              : 'Hệ thống sẽ tự cập nhật khi backend xác nhận thanh toán.'}
           </Text>
         </View>
 
@@ -358,16 +370,16 @@ export default function CheckoutPaymentScreen() {
           </View>
         ) : null}
 
-        {cancelled ? (
+        {cancelled || expired ? (
           <View style={styles.cancelledCard}>
-            <Text style={styles.cancelledTitle}>
-              Giao dịch không còn hiệu lực
-            </Text>
+            <Text style={styles.cancelledTitle}>Giao dịch không còn hiệu lực</Text>
             <Text style={styles.cancelledText}>
-              Đơn đã bị hủy hoặc hết thời gian thanh toán. Tồn kho của đơn sẽ
-              được backend xử lý theo trạng thái đơn.
+              Đơn đã hủy hoặc hết thời gian thanh toán. Backend chỉ hoàn tồn
+              kho/coupon sau khi đã đối soát payOS chưa nhận tiền.
             </Text>
             <Pressable
+              accessibilityLabel="Tiếp tục mua sắm"
+              accessibilityRole="button"
               onPress={() => router.replace('/')}
               style={styles.darkButton}>
               <Text style={styles.darkButtonText}>Tiếp tục mua sắm</Text>
@@ -381,90 +393,92 @@ export default function CheckoutPaymentScreen() {
                 secondsLeft <= 60 && styles.countdownUrgent,
               ]}>
               <View style={styles.countdownCopy}>
-                <Text style={styles.countdownLabel}>
-                  Thời gian thanh toán còn lại
-                </Text>
+                <Text style={styles.countdownLabel}>Thời gian thanh toán còn lại</Text>
                 <Text style={styles.countdownHint}>
-                  Đơn sẽ tự hủy nếu hết hạn mà chưa được xác nhận.
+                  payOS webhook là nguồn xác nhận thanh toán chính thức.
                 </Text>
               </View>
-              <Text style={styles.countdown}>
-                {timeText(secondsLeft)}
-              </Text>
+              <Text style={styles.countdown}>{timeText(secondsLeft)}</Text>
             </View>
 
-            {bank && instructions ? (
-              <>
-                <View style={styles.bankCard}>
-                  <Text style={styles.sectionEyebrow}>
-                    THÔNG TIN CHUYỂN KHOẢN
-                  </Text>
-
-                  <InfoRow
-                    label="Số tiền"
-                    value={money(instructions.total)}
-                    emphasis
-                  />
-                  <InfoRow label="Ngân hàng" value={bank.bankName} />
+            <View style={styles.summaryCard}>
+              <Text style={styles.sectionEyebrow}>THÔNG TIN THANH TOÁN</Text>
+              <InfoRow label="Đơn hàng" value={orderCode} />
+              <InfoRow
+                label="Số tiền"
+                value={money(instructions?.total ?? status?.total ?? 0)}
+                emphasis
+              />
+              {instructions?.transferContent ? (
+                <InfoRow
+                  label="Nội dung"
+                  value={instructions.transferContent}
+                  selectable
+                />
+              ) : null}
+              {showBankAccount && bank ? (
+                <>
+                  <InfoRow label="Kênh nhận" value={bank.bankName} />
                   <InfoRow
                     label="Số tài khoản"
                     value={bank.accountNumber}
                     selectable
                   />
-                  <InfoRow
-                    label="Chủ tài khoản"
-                    value={bank.accountHolder}
-                  />
-                  {bank.branch ? (
-                    <InfoRow label="Chi nhánh" value={bank.branch} />
-                  ) : null}
-                  <InfoRow
-                    label="Nội dung chuyển khoản"
-                    value={instructions.transferContent}
-                    selectable
-                    emphasis
-                  />
+                  <InfoRow label="Chủ tài khoản" value={bank.accountHolder} />
+                </>
+              ) : null}
+            </View>
 
-                  <Text style={styles.bankNote}>
-                    Chuyển đúng số tiền và nội dung để hệ thống đối soát đơn
-                    chính xác.
-                  </Text>
+            {qrUrl ? (
+              <View style={styles.qrCard}>
+                <Text style={styles.sectionEyebrow}>PAYOS QR</Text>
+                <Text style={styles.qrTitle}>Quét QR để thanh toán</Text>
+                <View style={styles.qrFrame}>
+                  <Image
+                    accessibilityLabel={'Mã QR payOS cho đơn ' + orderCode}
+                    contentFit="contain"
+                    source={{ uri: qrUrl }}
+                    style={styles.qrImage}
+                  />
                 </View>
-
-                {qrUrl ? (
-                  <View style={styles.qrCard}>
-                    <Text style={styles.sectionEyebrow}>VIETQR</Text>
-                    <Text style={styles.qrTitle}>
-                      Quét mã bằng ứng dụng ngân hàng
-                    </Text>
-                    <View style={styles.qrFrame}>
-                      <Image
-                        accessibilityLabel={
-                          'Mã VietQR cho đơn ' + orderCode
-                        }
-                        contentFit="contain"
-                        source={{ uri: qrUrl }}
-                        style={styles.qrImage}
-                      />
-                    </View>
-                    <Text style={styles.qrHint}>
-                      Nếu QR không tải được, bạn vẫn có thể chuyển khoản thủ
-                      công bằng thông tin phía trên.
-                    </Text>
-                  </View>
-                ) : null}
-              </>
-            ) : (
-              <View style={styles.errorCard}>
-                <Text style={styles.errorText}>
-                  Backend chưa trả về tài khoản nhận chuyển khoản.
+                <Text style={styles.qrHint}>
+                  {instructions?.qrMode === 'payos_checkout'
+                    ? 'Payment link đã tồn tại; QR này mở payOS Hosted Checkout để tiếp tục thanh toán.'
+                    : 'QR do payOS cấp cho đúng số tiền của đơn. Không cần bấm “đã thanh toán”; app sẽ tự nhận trạng thái sau webhook.'}
                 </Text>
               </View>
-            )}
+            ) : null}
+
+            {isPayOs && instructions?.checkoutUrl ? (
+              <Pressable
+                accessibilityLabel="Mở trang thanh toán payOS"
+                accessibilityRole="button"
+                disabled={actionBusy}
+                onPress={() => void openPayOs()}
+                style={({ pressed }) => [
+                  styles.payOsButton,
+                  pressed && styles.pressed,
+                  actionBusy && styles.disabled,
+                ]}>
+                <Text style={styles.payOsButtonText}>Mở trang thanh toán payOS</Text>
+              </Pressable>
+            ) : null}
+
+            <View style={styles.liveCard}>
+              <View style={styles.liveDot} />
+              <View style={styles.liveCopy}>
+                <Text style={styles.liveTitle}>Đang chờ payOS xác nhận</Text>
+                <Text style={styles.liveText}>
+                  Mobile đồng bộ trạng thái với backend mỗi 3 giây. App không đọc
+                  SMS hoặc số dư tài khoản ngân hàng.
+                </Text>
+              </View>
+            </View>
 
             <View style={styles.actions}>
               <Pressable
                 accessibilityLabel="Kiểm tra lại trạng thái thanh toán"
+                accessibilityRole="button"
                 disabled={actionBusy}
                 onPress={() => void refreshStatus()}
                 style={({ pressed }) => [
@@ -480,6 +494,7 @@ export default function CheckoutPaymentScreen() {
               {config?.allowSimulatePaid ? (
                 <Pressable
                   accessibilityLabel="Mô phỏng đã thanh toán trong môi trường phát triển"
+                  accessibilityRole="button"
                   disabled={actionBusy}
                   onPress={() => void simulatePaid()}
                   style={({ pressed }) => [
@@ -487,24 +502,21 @@ export default function CheckoutPaymentScreen() {
                     pressed && styles.pressed,
                     actionBusy && styles.disabled,
                   ]}>
-                  <Text style={styles.devButtonText}>
-                    Mô phỏng đã thanh toán (DEV)
-                  </Text>
+                  <Text style={styles.devButtonText}>Mô phỏng paid (DEV)</Text>
                 </Pressable>
               ) : null}
 
               <Pressable
-                accessibilityLabel="Hủy giao dịch chuyển khoản"
+                accessibilityLabel="Hủy giao dịch thanh toán"
+                accessibilityRole="button"
                 disabled={actionBusy}
-                onPress={() => void cancel()}
+                onPress={() => void cancelPayment()}
                 style={({ pressed }) => [
                   styles.cancelButton,
                   pressed && styles.pressed,
                   actionBusy && styles.disabled,
                 ]}>
-                <Text style={styles.cancelButtonText}>
-                  Hủy giao dịch
-                </Text>
+                <Text style={styles.cancelButtonText}>Hủy giao dịch</Text>
               </Pressable>
             </View>
           </>
@@ -540,14 +552,8 @@ function InfoRow({
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: BRAND_COLORS.canvas,
-  },
-  cardPaymentSafeArea: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
-  },
+  safeArea: { flex: 1, backgroundColor: BRAND_COLORS.canvas },
+  cardPaymentSafeArea: { flex: 1, backgroundColor: '#FFFFFF' },
   cardPaymentContent: {
     flexGrow: 1,
     width: '100%',
@@ -564,251 +570,164 @@ const styles = StyleSheet.create({
     paddingTop: 14,
     gap: 15,
   },
-  header: { gap: 3 },
+  header: { gap: 5 },
   eyebrow: {
     color: BRAND_COLORS.primary,
-    fontSize: 8,
+    fontSize: 9,
     fontWeight: '900',
     letterSpacing: 1,
   },
-  title: {
-    color: BRAND_COLORS.ink,
-    fontSize: 25,
-    fontWeight: '900',
-  },
-  subtitle: {
-    color: BRAND_COLORS.muted,
-    fontSize: 9,
-    lineHeight: 14,
-  },
-  countdownCard: {
-    minHeight: 82,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#FED7AA',
-    backgroundColor: '#FFF7ED',
-    padding: 14,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  countdownUrgent: {
-    borderColor: '#FECACA',
-    backgroundColor: '#FEF2F2',
-  },
-  countdownCopy: { flex: 1, gap: 3 },
-  countdownLabel: {
-    color: BRAND_COLORS.ink,
-    fontSize: 11,
-    fontWeight: '900',
-  },
-  countdownHint: {
-    color: '#7C2D12',
-    fontSize: 8,
-    lineHeight: 13,
-  },
-  countdown: {
-    color: BRAND_COLORS.accent,
-    fontSize: 24,
-    fontWeight: '900',
-    fontVariant: ['tabular-nums'],
-  },
-  bankCard: {
-    borderRadius: 22,
-    borderWidth: 1,
-    borderColor: BRAND_COLORS.line,
-    backgroundColor: BRAND_COLORS.surface,
-    padding: 15,
-    gap: 5,
-  },
-  sectionEyebrow: {
-    color: BRAND_COLORS.primary,
-    fontSize: 8,
-    fontWeight: '900',
-    letterSpacing: 1,
-    marginBottom: 4,
-  },
-  infoRow: {
-    minHeight: 48,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: BRAND_COLORS.line,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  infoLabel: {
-    width: 118,
-    color: BRAND_COLORS.muted,
-    fontSize: 9,
-    fontWeight: '700',
-  },
-  infoValue: {
-    flex: 1,
-    color: BRAND_COLORS.ink,
-    fontSize: 10,
-    fontWeight: '900',
-    textAlign: 'right',
-  },
-  infoValueEmphasis: {
-    color: BRAND_COLORS.primary,
-    fontSize: 12,
-  },
-  bankNote: {
-    color: '#4B5563',
-    fontSize: 8,
-    lineHeight: 13,
-    paddingTop: 8,
-  },
-  qrCard: {
-    borderRadius: 22,
-    borderWidth: 1,
-    borderColor: BRAND_COLORS.line,
-    backgroundColor: BRAND_COLORS.surface,
-    padding: 16,
-    alignItems: 'center',
-    gap: 8,
-  },
-  qrTitle: {
-    color: BRAND_COLORS.ink,
-    fontSize: 15,
-    fontWeight: '900',
-    textAlign: 'center',
-  },
-  qrFrame: {
-    width: 252,
-    height: 252,
-    maxWidth: '100%',
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: BRAND_COLORS.line,
-    backgroundColor: '#FFFFFF',
-    padding: 10,
-  },
-  qrImage: {
-    width: '100%',
-    height: '100%',
-  },
-  qrHint: {
-    maxWidth: 340,
-    color: BRAND_COLORS.muted,
-    fontSize: 8,
-    lineHeight: 13,
-    textAlign: 'center',
-  },
-  actions: { gap: 8 },
-  primaryButton: {
-    minHeight: 52,
-    borderRadius: 16,
-    backgroundColor: BRAND_COLORS.primary,
-    paddingHorizontal: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  primaryButtonText: {
-    color: '#FFFFFF',
-    fontSize: 10,
-    fontWeight: '900',
-  },
-  devButton: {
-    minHeight: 48,
-    borderRadius: 15,
-    borderWidth: 1,
-    borderColor: '#D1D5DB',
-    backgroundColor: '#F9FAFB',
-    paddingHorizontal: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  devButtonText: {
-    color: BRAND_COLORS.primaryDark,
-    fontSize: 9,
-    fontWeight: '900',
-  },
-  cancelButton: {
-    minHeight: 48,
-    borderRadius: 15,
-    borderWidth: 1,
-    borderColor: '#FECACA',
-    backgroundColor: '#FEF2F2',
-    paddingHorizontal: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  cancelButtonText: {
-    color: BRAND_COLORS.danger,
-    fontSize: 9,
-    fontWeight: '900',
-  },
-  cancelledCard: {
-    minHeight: 220,
-    borderRadius: 22,
-    borderWidth: 1,
-    borderColor: '#FECACA',
-    backgroundColor: '#FEF2F2',
-    padding: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 10,
-  },
-  cancelledTitle: {
-    color: '#991B1B',
-    fontSize: 18,
-    fontWeight: '900',
-    textAlign: 'center',
-  },
-  cancelledText: {
-    color: '#B91C1C',
-    fontSize: 9,
-    lineHeight: 15,
-    textAlign: 'center',
-    maxWidth: 360,
-  },
-  darkButton: {
-    minHeight: 48,
-    borderRadius: 15,
-    backgroundColor: BRAND_COLORS.ink,
-    paddingHorizontal: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  darkButtonText: {
-    color: '#FFFFFF',
-    fontSize: 10,
-    fontWeight: '900',
-  },
-  errorCard: {
-    borderRadius: 15,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: '#FECACA',
-    backgroundColor: '#FEF2F2',
-    padding: 11,
-  },
-  errorText: {
-    color: '#B91C1C',
-    fontSize: 9,
-    lineHeight: 14,
-    fontWeight: '700',
-  },
+  title: { color: BRAND_COLORS.ink, fontSize: 25, fontWeight: '900' },
+  subtitle: { color: '#666666', fontSize: 13, lineHeight: 20 },
   centerState: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 30,
+    gap: 12,
+    padding: 24,
+  },
+  stateTitle: { color: BRAND_COLORS.ink, fontSize: 19, fontWeight: '800' },
+  stateText: { color: '#666666', fontSize: 13, lineHeight: 20, textAlign: 'center' },
+  countdownCard: {
+    borderWidth: 1,
+    borderColor: '#DDDDDD',
+    borderRadius: 16,
+    padding: 16,
+    backgroundColor: '#FFFFFF',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+  },
+  countdownUrgent: { borderColor: '#111111' },
+  countdownCopy: { flex: 1, gap: 3 },
+  countdownLabel: { color: '#111111', fontWeight: '800', fontSize: 13 },
+  countdownHint: { color: '#777777', fontSize: 11, lineHeight: 17 },
+  countdown: { color: '#111111', fontSize: 24, fontWeight: '900', fontVariant: ['tabular-nums'] },
+  summaryCard: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E2E2',
+    borderRadius: 16,
+    padding: 16,
+    gap: 4,
+  },
+  sectionEyebrow: {
+    color: '#666666',
+    fontSize: 9,
+    fontWeight: '900',
+    letterSpacing: 1,
+    marginBottom: 8,
+  },
+  infoRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: 14,
+    paddingVertical: 9,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#E7E7E7',
+  },
+  infoLabel: { color: '#777777', fontSize: 12, flexShrink: 0 },
+  infoValue: { color: '#111111', fontSize: 13, fontWeight: '700', textAlign: 'right', flex: 1 },
+  infoValueEmphasis: { fontSize: 18, fontWeight: '900' },
+  qrCard: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E2E2',
+    borderRadius: 16,
+    padding: 18,
+    alignItems: 'center',
+  },
+  qrTitle: { color: '#111111', fontSize: 18, fontWeight: '900', marginBottom: 14 },
+  qrFrame: {
+    width: 276,
+    height: 276,
+    maxWidth: '100%',
+    padding: 10,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+  },
+  qrImage: { width: '100%', height: '100%' },
+  qrHint: { color: '#666666', fontSize: 12, lineHeight: 18, textAlign: 'center', marginTop: 14 },
+  liveCard: {
+    flexDirection: 'row',
+    gap: 10,
+    alignItems: 'flex-start',
+    backgroundColor: '#F6F6F6',
+    borderRadius: 14,
+    padding: 14,
+  },
+  liveDot: { width: 9, height: 9, borderRadius: 5, backgroundColor: '#111111', marginTop: 4 },
+  liveCopy: { flex: 1, gap: 3 },
+  liveTitle: { color: '#111111', fontSize: 12, fontWeight: '800' },
+  liveText: { color: '#666666', fontSize: 11, lineHeight: 17 },
+  actions: { gap: 10 },
+  primaryButton: {
+    minHeight: 48,
+    borderRadius: 12,
+    backgroundColor: '#111111',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 18,
+  },
+  primaryButtonText: { color: '#FFFFFF', fontSize: 13, fontWeight: '900' },
+  payOsButton: {
+    minHeight: 50,
+    borderRadius: 12,
+    backgroundColor: '#111111',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 18,
+  },
+  payOsButtonText: { color: '#FFFFFF', fontSize: 14, fontWeight: '900' },
+  devButton: {
+    minHeight: 46,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#999999',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  devButtonText: { color: '#333333', fontSize: 12, fontWeight: '800' },
+  cancelButton: {
+    minHeight: 46,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#D3D3D3',
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cancelButtonText: { color: '#555555', fontSize: 12, fontWeight: '800' },
+  errorCard: {
+    borderRadius: 12,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#B8B8B8',
+    backgroundColor: '#F8F8F8',
+  },
+  errorText: { color: '#222222', fontSize: 12, lineHeight: 18 },
+  cancelledCard: {
+    borderWidth: 1,
+    borderColor: '#CCCCCC',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 18,
     gap: 10,
   },
-  stateTitle: {
-    color: BRAND_COLORS.ink,
-    fontSize: 19,
-    fontWeight: '900',
-    textAlign: 'center',
+  cancelledTitle: { color: '#111111', fontSize: 18, fontWeight: '900' },
+  cancelledText: { color: '#666666', fontSize: 12, lineHeight: 19 },
+  darkButton: {
+    minHeight: 46,
+    borderRadius: 11,
+    backgroundColor: '#111111',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  stateText: {
-    color: BRAND_COLORS.muted,
-    fontSize: 9,
-    lineHeight: 14,
-    textAlign: 'center',
-  },
-  pressed: { opacity: 0.8 },
+  darkButtonText: { color: '#FFFFFF', fontWeight: '900' },
+  pressed: { opacity: 0.76 },
   disabled: { opacity: 0.5 },
   bottomSpace: { height: 28 },
 });

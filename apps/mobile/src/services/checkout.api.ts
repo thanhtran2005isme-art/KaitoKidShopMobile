@@ -20,6 +20,17 @@ function authHeaders(token: string, json = false): HeadersInit {
   };
 }
 
+const PAYOS_RETRY_DELAYS_MS = [5_000, 10_000, 20_000] as const;
+
+function sleep(delayMs: number) {
+  return new Promise<void>((resolve) => setTimeout(resolve, delayMs));
+}
+
+function isRetryablePayOsThrottle(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error ?? '');
+  return /\b429\b|\b503\b|giới hạn tần suất|too many requests/i.test(message);
+}
+
 export const checkoutApi = {
   getAddresses(token: string) {
     return apiRequest<CheckoutAddress[]>('/api/addresses', {
@@ -105,11 +116,22 @@ export const checkoutApi = {
     return apiRequest<PaymentConfig>('/api/payment/config');
   },
 
-  getPaymentInstructions(token: string, orderCode: string) {
-    return apiRequest<PaymentInstructions>(
-      '/api/payment/instructions/' + encodeURIComponent(orderCode),
-      { headers: authHeaders(token) },
-    );
+  async getPaymentInstructions(token: string, orderCode: string) {
+    let lastError: unknown = new Error('Không thể tải thông tin thanh toán.');
+    for (let attempt = 0; attempt <= PAYOS_RETRY_DELAYS_MS.length; attempt += 1) {
+      try {
+        return await apiRequest<PaymentInstructions>(
+          '/api/payment/instructions/' + encodeURIComponent(orderCode),
+          { headers: authHeaders(token) },
+        );
+      } catch (error) {
+        lastError = error;
+        const delay = PAYOS_RETRY_DELAYS_MS[attempt];
+        if (delay === undefined || !isRetryablePayOsThrottle(error)) throw error;
+        await sleep(delay);
+      }
+    }
+    throw lastError;
   },
 
   getPaymentStatus(token: string, orderCode: string) {

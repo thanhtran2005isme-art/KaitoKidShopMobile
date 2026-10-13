@@ -1,7 +1,8 @@
 import { useRouter } from 'expo-router';
-import { memo, useCallback, useEffect, useMemo, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  AppState,
   FlatList,
   Pressable,
   RefreshControl,
@@ -23,8 +24,27 @@ import {
   ORDER_FILTERS,
 } from '@/utils/order-status';
 
+const LALAMOVE_POLL_MS = 10_000;
+const LALAMOVE_TERMINAL_SHIPPING_STATUSES = new Set([
+  'delivered',
+  'completed',
+  'received_by_customer',
+  'delivery_disputed',
+  'returned',
+  'carrier_cancelled',
+  'cancelled',
+  'failed',
+]);
+
 function messageFrom(error: unknown, fallback: string) {
   return error instanceof Error && error.message ? error.message : fallback;
+}
+
+function shouldPollLalamove(order: CustomerOrder) {
+  if ((order.shippingProvider || '').toLowerCase() !== 'lalamove') return false;
+  if (!order.trackingCode) return false;
+  if (['cancelled', 'completed', 'returned'].includes((order.status || '').toLowerCase())) return false;
+  return !LALAMOVE_TERMINAL_SHIPPING_STATUSES.has((order.shippingStatus || '').toLowerCase());
 }
 
 function OrderSeparator() {
@@ -89,6 +109,7 @@ export default function OrdersScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const livePollInFlight = useRef(false);
 
   const loadOrders = useCallback(
     async (mode: 'initial' | 'refresh' = 'initial') => {
@@ -120,6 +141,43 @@ export default function OrdersScreen() {
   useEffect(() => {
     if (!authLoading) void loadOrders('initial');
   }, [authLoading, loadOrders]);
+
+  const liveLalamoveOrders = useMemo(
+    () => orders.filter(shouldPollLalamove),
+    [orders],
+  );
+
+  useEffect(() => {
+    if (!token || liveLalamoveOrders.length === 0) return;
+
+    let disposed = false;
+    const syncLiveLalamove = async () => {
+      if (disposed || livePollInFlight.current || AppState.currentState !== 'active') return;
+      livePollInFlight.current = true;
+      try {
+        await Promise.allSettled(
+          liveLalamoveOrders.map((order) => ordersApi.getTracking(token, order.orderCode)),
+        );
+        if (disposed) return;
+        const nextOrders = await ordersApi.getOrders(token);
+        if (!disposed) setOrders(nextOrders);
+      } catch {
+        // Webhook remains the primary source; polling is only a foreground fallback.
+      } finally {
+        livePollInFlight.current = false;
+      }
+    };
+
+    const interval = setInterval(() => void syncLiveLalamove(), LALAMOVE_POLL_MS);
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') void syncLiveLalamove();
+    });
+    return () => {
+      disposed = true;
+      clearInterval(interval);
+      subscription.remove();
+    };
+  }, [liveLalamoveOrders, token]);
 
   const filteredOrders = useMemo(
     () => orders.filter((order) => matchesOrderFilter(order, filter)),

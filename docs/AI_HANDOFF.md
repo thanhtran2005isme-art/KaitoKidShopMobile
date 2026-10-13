@@ -143,3 +143,16 @@ Sau đó smoke Web customer + Admin + Mobile bằng **Node-only**. Không khởi
 5. Do not infer a C# fallback from old migration docs; `apps/api` is the current backend source of truth.
 6. One task/fix/phase = one aggregate commit by default; AI commit descriptions in Vietnamese.
 7. Khi một fix làm thay đổi architecture, operations hoặc durable behavior, cập nhật docs liên quan trong cùng task/PR; cosmetic-only fix không cần tạo quyết định mới.
+
+## PR #75 — Lalamove/payOS đang nghiệm thu trước merge
+
+- Branch `feat/admin-lalamove-carrier` chứa carrier lifecycle Lalamove quote/re-quote → Place Order → tracking/webhook/cancel, xác nhận khách thực nhận và hậu mãi theo D025/D026.
+- Online payment của branch dùng SDK `@payos/node`; signed public webhook `POST /api/payment/payos/webhook`, provider reconciliation và race-safe paid/expiry/cancel theo D027.
+- payOS numeric orderCode phải được ánh xạ có thể đảo ngược từ `DonHang.MaDonHang` dạng `KK-YYYYMMDD-XXXXXX`; không tái sử dụng `DonHang.Id` làm orderCode khi DB được reset/reseed.
+- Secrets PAYOS_CLIENT_ID/PAYOS_API_KEY/PAYOS_CHECKSUM_KEY chỉ trong cấu hình backend/deployment, không commit.
+- Browser return, client polling hoặc QR không có quyền đánh dấu paid. Chỉ webhook đã xác minh/reconcile từ provider được xác nhận thanh toán. Chỉ tạo vận đơn online sau paid.
+- Mobile có Expo USB/ADB launcher hardening, địa chỉ cascade tỉnh/huyện/xã, và màn payment payOS; order detail dùng Modal để xác nhận nhận/chưa nhận hàng trên Expo Web.
+- Merge gate còn yêu cầu E2E HTTPS webhook + Lalamove sandbox + paid/cancel/expiry race với DB thật: `docs/runbooks/PAYOS_PAYMENT_E2E.md`, `docs/runbooks/LALAMOVE_SANDBOX_E2E.md`.
+- Những hành vi trên chỉ thuộc nhánh PR #75 khi chưa merge. `main` vẫn là runtime source of truth.
+
+- Online payment trên PR #75 dùng payOS SDK chính thức (`@payos/node`), tức official payOS SDK; browser return và client polling không có quyền đánh dấu paid.

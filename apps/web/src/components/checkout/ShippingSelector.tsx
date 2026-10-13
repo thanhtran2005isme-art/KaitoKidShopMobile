@@ -1,16 +1,26 @@
-// Chọn đơn vị vận chuyển: KaitoKid Mock / GHN / GHTK / Tất cả
+// Chọn đơn vị vận chuyển: KaitoKid Mock / GHN / GHTK / Lalamove / Tất cả
 
 import { formatCurrency } from '../../utils/format';
 import type { ShippingQuoteOption } from '../../services/api';
 
+type ProviderCode = 'mock' | 'ghn' | 'ghtk' | 'lalamove' | 'all';
+
 interface Props {
-  provider: 'mock' | 'ghn' | 'ghtk' | 'all';
-  onProviderChange: (p: 'mock' | 'ghn' | 'ghtk' | 'all') => void;
+  provider: ProviderCode;
+  onProviderChange: (p: ProviderCode) => void;
   options: ShippingQuoteOption[];
   selected: ShippingQuoteOption | null;
   onSelect: (opt: ShippingQuoteOption) => void;
   hasAddress: boolean;
   loading: boolean;
+}
+
+function providerLabel(provider: ProviderCode) {
+  if (provider === 'all') return 'Tất cả';
+  if (provider === 'mock') return 'KaitoKid Mock';
+  if (provider === 'ghn') return 'GHN';
+  if (provider === 'ghtk') return 'GHTK';
+  return 'Lalamove';
 }
 
 export default function ShippingSelector({
@@ -22,14 +32,14 @@ export default function ShippingSelector({
       <h3 className="ivy-section-title">Đơn vị vận chuyển</h3>
       <div className="ivy-payment-box">
         <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
-          {(['all', 'mock', 'ghn', 'ghtk'] as const).map((p) => (
+          {(['all', 'mock', 'ghn', 'ghtk', 'lalamove'] as const).map((p) => (
             <button
               key={p}
               type="button"
               onClick={() => onProviderChange(p)}
               className={`ivy-shipping-tab${provider === p ? ' active' : ''}`}
             >
-              {p === 'all' ? 'Tất cả' : p === 'mock' ? 'KaitoKid Mock' : p === 'ghn' ? 'GHN' : 'GHTK'}
+              {providerLabel(p)}
             </button>
           ))}
         </div>
@@ -54,8 +64,9 @@ export default function ShippingSelector({
                   <strong>{opt.serviceName}</strong> · <span className="ivy-fee-amount">{formatCurrency(opt.fee)}</span>
                 </span>
                 <small>
-                  {opt.provider === 'ghn' ? 'Giao Hàng Nhanh (giá thật)'
-                    : opt.provider === 'ghtk' ? 'Giao Hàng Tiết Kiệm (giá thật)'
+                  {opt.provider === 'ghn' ? 'Giao Hàng Nhanh (giá API)'
+                    : opt.provider === 'ghtk' ? 'Giao Hàng Tiết Kiệm (giá API)'
+                    : opt.provider === 'lalamove' ? 'Lalamove (giá API)'
                     : opt.provider === 'mock' ? 'Mô phỏng nội bộ'
                     : opt.provider}
                   {' · '}Dự kiến {opt.leadTimeHours}h

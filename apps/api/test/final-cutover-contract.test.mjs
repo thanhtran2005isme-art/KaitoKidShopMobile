@@ -82,7 +82,13 @@ test("launchers không còn dotnet/C# runtime và Node owns critical workers", (
 
   assert.doesNotMatch(joined, /dotnet/i);
   assert.doesNotMatch(joined, /5053|5265|5089|5155/);
-  assert.match(mobile, /adb reverse tcp:5300 tcp:5300/);
+  assert.match(mobile, /reverse tcp:8081 tcp:8081/);
+  assert.match(mobile, /reverse tcp:5300 tcp:5300/);
+  assert.match(mobile, /C:\\platform-tools\\adb\.exe/);
+  assert.match(mobile, /ANDROID_SDK_ROOT/);
+  assert.match(mobile, /ANDROID_HOME/);
+  assert.match(mobile, /ADB unauthorized/);
+  assert.match(mobile, /EXPO_HOST_FLAG=--localhost/);
   assert.match(api, /BACKGROUND_WORKER_OWNER=node/);
   assert.match(api, /CART_SWEEPER_ENABLED=true/);
   assert.match(api, /PAYMENT_SWEEPER_ENABLED=true/);

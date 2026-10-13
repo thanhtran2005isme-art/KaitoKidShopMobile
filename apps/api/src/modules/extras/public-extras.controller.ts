@@ -283,33 +283,20 @@ export class ProductExtrasController {
     if (!sessionId) throw new BadRequestException();
     const now = new Date();
 
-    await this.prisma.$transaction(async (tx) => {
-      const rows = await tx.$queryRawUnsafe<Array<{ id: unknown }>>(
-        `SELECT Id AS id FROM PhienXemSanPham
-         WHERE SanPhamId=? AND SessionId=?
-         ORDER BY Id DESC LIMIT 1
-         FOR UPDATE`,
-        productId,
-        sessionId,
-      );
-      if (rows[0]) {
-        await tx.$executeRawUnsafe(
-          "UPDATE PhienXemSanPham SET LastSeenAt=? WHERE Id=?",
-          now,
-          toNumber(rows[0].id),
-        );
-      } else {
-        await tx.$executeRawUnsafe(
-          `INSERT INTO PhienXemSanPham
-             (SanPhamId, SessionId, Ip, LastSeenAt)
-           VALUES (?, ?, ?, ?)`,
-          productId,
-          sessionId,
-          req.ip ?? req.socket?.remoteAddress ?? null,
-          now,
-        );
-      }
-    });
+    // Atomic upsert thay cho SELECT-then-INSERT. React dev/StrictMode hoặc hai
+    // tab có thể gửi heartbeat đồng thời cho cùng (SanPhamId, SessionId); unique
+    // key IX_PhienXem_SP_Session biến request lặp thành UPDATE thay vì lỗi 500.
+    await this.prisma.$executeRawUnsafe(
+      `INSERT INTO PhienXemSanPham
+         (SanPhamId, SessionId, Ip, LastSeenAt)
+       VALUES (?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE
+         Ip = VALUES(Ip), LastSeenAt = VALUES(LastSeenAt)`,
+      productId,
+      sessionId,
+      req.ip ?? req.socket?.remoteAddress ?? null,
+      now,
+    );
 
     const count = await this.prisma.$queryRawUnsafe<Array<{ count: unknown }>>(
       `SELECT COUNT(*) AS count

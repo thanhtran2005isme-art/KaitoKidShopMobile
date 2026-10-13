@@ -32,7 +32,7 @@ export const SHIPPING_SIMULATION_FLOW: Readonly<Record<string, ShippingSimulatio
   },
   delivering: {
     next: "delivered",
-    description: "Giao hàng thành công",
+    description: "Đơn vị vận chuyển báo giao thành công; chờ khách xác nhận đã nhận hàng",
     location: "Địa chỉ khách",
   },
 };
@@ -51,8 +51,9 @@ function orderStatusForShippingStep(
   if (shippingStatus === "picking" || shippingStatus === "picked") {
     return "confirmed";
   }
-  if (shippingStatus === "delivering") return "shipping";
-  if (shippingStatus === "delivered") return "completed";
+  if (shippingStatus === "delivering" || shippingStatus === "delivered") {
+    return "shipping";
+  }
   return currentOrderStatus;
 }
 
@@ -142,7 +143,8 @@ export class ShippingStatusSimulatorService
       `SELECT Id AS id
        FROM DonHang
        WHERE TrangThaiVanChuyen IN ('ready_to_pick','picking','picked','delivering')
-         AND TrangThai <> 'cancelled'`,
+         AND TrangThai <> 'cancelled'
+         AND LOWER(COALESCE(NhaVanChuyen,'mock')) <> 'lalamove'`,
     );
     if (!rows.length) return 0;
 
@@ -158,6 +160,7 @@ export class ShippingStatusSimulatorService
                   COALESCE(NgayCapNhat, NgayTao) AS lastTime
            FROM DonHang
            WHERE Id = ? AND TrangThai <> 'cancelled'
+             AND LOWER(COALESCE(NhaVanChuyen,'mock')) <> 'lalamove'
            LIMIT 1
            FOR UPDATE`,
           toNumber(candidate.id),
@@ -197,7 +200,6 @@ export class ShippingStatusSimulatorService
         return 1;
       });
     }
-
     return advanced;
   }
 }

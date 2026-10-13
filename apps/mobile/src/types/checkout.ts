@@ -48,6 +48,8 @@ export type PaymentConfig = {
   supportedMethods: string[];
   bankTransferConfigured: boolean;
   vietQrConfigured: boolean;
+  payOsConfigured?: boolean;
+  paymentProvider?: 'payos' | 'legacy_bank' | null;
 };
 
 export type PaymentBankAccount = {
@@ -64,6 +66,12 @@ export type PaymentInstructions = {
   total: number;
   paymentExpiresAt?: string | null;
   secondsLeft: number;
+  provider?: 'payos' | 'legacy_bank' | string;
+  paymentLinkId?: string | null;
+  paymentStatus?: string | null;
+  checkoutUrl?: string | null;
+  qrCode?: string | null;
+  qrMode?: 'payos_vietqr' | 'payos_checkout' | string;
   transferContent: string;
   bankAccount?: PaymentBankAccount | null;
   qrUrl?: string | null;
@@ -74,6 +82,7 @@ export type PaymentStatus = {
   status: string;
   paidAt?: string | null;
   paymentMethod: string;
+  paymentProvider?: 'payos' | string | null;
   paymentExpiresAt?: string | null;
   secondsLeft: number;
   total: number;

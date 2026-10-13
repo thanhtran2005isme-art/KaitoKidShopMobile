@@ -1,10 +1,14 @@
 export interface BankAccountConfig {
   id: number;
   bankName: string;
+  bankBin?: string;
+  bankCode?: string;
+  bankLogo?: string;
   accountNumber: string;
   accountHolder: string;
+  verifiedAt?: string;
   branch: string;
-  qrImage?: string; // URL ảnh QR hoặc base64
+  qrImage?: string; // URL ảnh QR hoặc base64 dự phòng
 }
 
 export type EmailActivityType =
@@ -108,19 +112,27 @@ function parseStorageValue<T>(storageKey: string, fallback: T): T {
 function createDefaultBankAccount(): BankAccountConfig {
   return {
     id: Date.now(),
-    bankName: 'Vietcombank',
-    accountNumber: '1234567890',
-    accountHolder: 'KAITO KID SHOP',
-    branch: 'Chi nhanh TP.HCM',
+    bankName: '',
+    bankBin: '',
+    bankCode: '',
+    bankLogo: '',
+    accountNumber: '',
+    accountHolder: '',
+    verifiedAt: undefined,
+    branch: '',
   };
 }
 
 function normalizeBankAccount(rawAccount: Partial<BankAccountConfig>, fallbackId: number): BankAccountConfig {
   return {
     id: asNumber(rawAccount.id, fallbackId),
-    bankName: asString(rawAccount.bankName, 'Vietcombank'),
+    bankName: asString(rawAccount.bankName),
+    bankBin: asString(rawAccount.bankBin) || undefined,
+    bankCode: asString(rawAccount.bankCode) || undefined,
+    bankLogo: asString(rawAccount.bankLogo) || undefined,
     accountNumber: asString(rawAccount.accountNumber),
     accountHolder: asString(rawAccount.accountHolder),
+    verifiedAt: asString(rawAccount.verifiedAt) || undefined,
     branch: asString(rawAccount.branch),
     qrImage: asString(rawAccount.qrImage) || undefined,
   };
@@ -134,7 +146,7 @@ export const defaultAdminSettings: AdminSettingsConfig = {
   storeAddress: '123 Duong ABC, Quan XYZ, TP.HCM',
   codEnabled: true,
   codFee: 0,
-  bankEnabled: true,
+  bankEnabled: false,
   bankAccounts: [createDefaultBankAccount()],
   smtpHost: 'smtp.gmail.com',
   smtpPort: 587,

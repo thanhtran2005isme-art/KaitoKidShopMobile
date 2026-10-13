@@ -12,6 +12,7 @@ export interface PaymentBankAccount {
 export interface PaymentSettings {
   enableCod: boolean;
   enableBank: boolean;
+  enablePayOs: boolean;
   bankAccounts: PaymentBankAccount[];
 }
 
@@ -58,6 +59,25 @@ function readBool(
   return fallback;
 }
 
+function readBoolAliases(
+  map: Map<string, string>,
+  codes: string[],
+  fallback: boolean,
+): boolean {
+  for (const code of codes) {
+    if (map.has(code)) return readBool(map, code, fallback);
+  }
+  return fallback;
+}
+
+function payOsConfigured(): boolean {
+  return Boolean(
+    process.env.PAYOS_CLIENT_ID?.trim() &&
+    process.env.PAYOS_API_KEY?.trim() &&
+    process.env.PAYOS_CHECKSUM_KEY?.trim(),
+  );
+}
+
 export async function loadPaymentSettings(
   client: SqlClient,
 ): Promise<PaymentSettings> {
@@ -68,6 +88,8 @@ export async function loadPaymentSettings(
   );
   const map = new Map(rows.map((row) => [row.code, row.value]));
 
+  // Dữ liệu tài khoản ngân hàng cũ vẫn được đọc để phục vụ đơn/config legacy
+  // trong migration window. Nó không còn quyền kích hoạt online payment mới.
   const accounts: PaymentBankAccount[] = [];
   const json = map.get("bankAccounts");
   if (json?.trim()) {
@@ -89,7 +111,7 @@ export async function loadPaymentSettings(
         }
       }
     } catch {
-      // Fallback các key payment cũ.
+      // Fallback các key payment cũ bên dưới.
     }
   }
 
@@ -109,11 +131,18 @@ export async function loadPaymentSettings(
     }
   }
 
+  const configuredPayOs = payOsConfigured();
+
+  // Cutover D027: bankEnabled/enableBankTransfer/VietQR legacy không còn được
+  // phép bật ATM cho đơn mới. payOS tự bật khi đủ backend credentials, trừ khi
+  // operator chủ động đặt payosEnabled=false trong payment settings.
+  const onlineEnabled = readBool(map, "payosEnabled", configuredPayOs);
+
   return {
-    enableCod: readBool(map, "enableCOD", true),
-    enableBank:
-      readBool(map, "enableBankTransfer", accounts.length > 0) &&
-      accounts.length > 0,
+    enableCod: readBoolAliases(map, ["codEnabled", "enableCOD"], true),
+    // Giữ tên enableBank để OrdersService legacy không phải đổi DB contract ATM.
+    enableBank: onlineEnabled && configuredPayOs,
+    enablePayOs: onlineEnabled && configuredPayOs,
     bankAccounts: accounts,
   };
 }

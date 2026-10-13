@@ -12,10 +12,22 @@ const API_BASE_URL = (
 ).trim().replace(/\/+$/, '');
 
 const STAFF_ACCESS_TOKEN_KEY = 'staff_access_token';
+const STAFF_REFRESH_TOKEN_KEY = 'staff_refresh_token';
 
 function isStaffRequest(url?: string): boolean {
   if (!url) return false;
   return url.includes('/api/admin') || url.includes('/api/auth/staff');
+}
+
+function expireStaffSession(url?: string): void {
+  if (url?.includes('/api/auth/staff/login')) return;
+
+  localStorage.removeItem(STAFF_ACCESS_TOKEN_KEY);
+  localStorage.removeItem(STAFF_REFRESH_TOKEN_KEY);
+
+  if (window.location.pathname !== '/admin/login') {
+    window.location.replace('/admin/login?reason=session-expired');
+  }
 }
 
 const apiClient: AxiosInstance = axios.create({
@@ -41,7 +53,12 @@ adminApiClient.interceptors.request.use(
 
 adminApiClient.interceptors.response.use(
   (response) => response,
-  async (error: AxiosError) => Promise.reject(error),
+  async (error: AxiosError) => {
+    if (error.response?.status === 401) {
+      expireStaffSession(error.config?.url);
+    }
+    return Promise.reject(error);
+  },
 );
 
 apiClient.interceptors.request.use(
@@ -74,7 +91,12 @@ apiClient.interceptors.response.use(
   async (error: AxiosError) => {
     const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
 
-    if (isStaffRequest(originalRequest.url)) return Promise.reject(error);
+    if (isStaffRequest(originalRequest.url)) {
+      if (error.response?.status === 401) {
+        expireStaffSession(originalRequest.url);
+      }
+      return Promise.reject(error);
+    }
 
     const isAuthPage = window.location.pathname === '/login' || window.location.pathname === '/register';
     const isAuthRequest = originalRequest.url?.includes('/api/auth/login') ||

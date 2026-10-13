@@ -1,6 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { settingsApi, type SettingDTO, type UpsertSettingDTO } from '../services/api';
+import {
+  settingsApi,
+  type SettingDTO,
+  type UpsertSettingDTO,
+  type VietQrBankDTO,
+} from '../services/api';
 import {
   defaultAdminSettings,
   pushEmailActivity,
@@ -16,6 +21,8 @@ import AdminIcon from '../components/admin/AdminIcon';
 
 type TabType = 'general' | 'payment' | 'email' | 'notifications' | 'security' | 'chatbot';
 
+type BankLookupStatus = 'idle' | 'loading' | 'verified' | 'error';
+
 interface FlashMessage {
   type: 'success' | 'error' | 'info';
   text: string;
@@ -25,6 +32,11 @@ interface PasswordFormState {
   currentPassword: string;
   nextPassword: string;
   confirmPassword: string;
+}
+
+interface BankLookupState {
+  status: BankLookupStatus;
+  message: string;
 }
 
 const tabs: Array<{ id: TabType; icon: string; label: string; hint: string; eyebrow: string }> = [
@@ -93,6 +105,18 @@ function getFlashIcon(type: FlashMessage['type']) {
   return 'fa-info-circle';
 }
 
+function normalizeBankLabel(value: string) {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '');
+}
+
+function isValidBankAccountNumber(value: string) {
+  return /^\d{6,19}$/.test(value);
+}
+
 export default function AdminSettings() {
   const [activeTab, setActiveTab] = useState<TabType>('general');
   const [settings, setSettings] = useState<AdminSettingsConfig>(() => defaultAdminSettings);
@@ -100,6 +124,12 @@ export default function AdminSettings() {
   const [passwordForm, setPasswordForm] = useState<PasswordFormState>(emptyPasswordForm);
   const [emailActivities, setEmailActivities] = useState<EmailActivityRecord[]>(() => readEmailActivities().slice(0, 6));
   const [securityActivities, setSecurityActivities] = useState<SecurityActivityRecord[]>(() => readSecurityActivities().slice(0, 6));
+  const [vietQrBanks, setVietQrBanks] = useState<VietQrBankDTO[]>([]);
+  const [bankCatalogRequested, setBankCatalogRequested] = useState(false);
+  const [bankCatalogLoading, setBankCatalogLoading] = useState(false);
+  const [bankCatalogError, setBankCatalogError] = useState('');
+  const [bankLookupStates, setBankLookupStates] = useState<Record<number, BankLookupState>>({});
+  const [paymentSaving, setPaymentSaving] = useState(false);
 
   // Load settings from backend on mount
   useEffect(() => {
@@ -128,6 +158,52 @@ export default function AdminSettings() {
     void loadSettings();
   }, []);
 
+  // Chỉ tải catalog ngân hàng khi Admin mở tab Payment. Danh sách authoritative
+  // đến từ VietQR qua backend; không hard-code tên/mã ngân hàng trong UI.
+  useEffect(() => {
+    if (activeTab !== 'payment' || bankCatalogRequested) return;
+    setBankCatalogRequested(true);
+    setBankCatalogLoading(true);
+    setBankCatalogError('');
+
+    const loadBanks = async () => {
+      const result = await settingsApi.getPaymentBanks();
+      if (!result.success || !result.data) {
+        setBankCatalogError(result.error || 'Không tải được danh sách ngân hàng VietQR.');
+        setBankCatalogLoading(false);
+        return;
+      }
+
+      const supported = result.data.filter((bank) => bank.transferSupported && bank.lookupSupported);
+      setVietQrBanks(supported);
+      setSettings((currentSettings) => ({
+        ...currentSettings,
+        bankAccounts: currentSettings.bankAccounts.map((account) => {
+          if (account.bankBin) return account;
+          const currentName = normalizeBankLabel(account.bankName || '');
+          if (!currentName) return account;
+          const match = supported.find((bank) =>
+            [bank.shortName, bank.code, bank.name].some(
+              (candidate) => normalizeBankLabel(candidate) === currentName,
+            ),
+          );
+          if (!match) return account;
+          return {
+            ...account,
+            bankName: match.shortName,
+            bankBin: match.bin,
+            bankCode: match.code,
+            bankLogo: match.logo,
+            verifiedAt: undefined,
+          };
+        }),
+      }));
+      setBankCatalogLoading(false);
+    };
+
+    void loadBanks();
+  }, [activeTab, bankCatalogRequested]);
+
   const enabledPaymentMethods = Number(settings.codEnabled) + Number(settings.bankEnabled);
   const enabledNotificationCount =
     Number(settings.notifyNewOrder) +
@@ -145,7 +221,14 @@ export default function AdminSettings() {
       settings.storeAddress.trim().length > 0,
       settings.smtpHost.trim().length > 0,
       settings.testRecipient.trim().length > 0,
-      settings.bankAccounts.some((bankAccount) => bankAccount.bankName && bankAccount.accountNumber && bankAccount.accountHolder),
+      settings.bankAccounts.some((bankAccount) =>
+        Boolean(
+          bankAccount.bankBin &&
+          bankAccount.accountNumber &&
+          bankAccount.accountHolder &&
+          bankAccount.verifiedAt,
+        ),
+      ),
     ];
 
     return Math.round((checks.filter(Boolean).length / checks.length) * 100);
@@ -199,12 +282,18 @@ export default function AdminSettings() {
     return 'security';
   };
 
-  const persistSettings = async (nextSettings: AdminSettingsConfig, successText: string) => {
+  const persistSettings = async (
+    nextSettings: AdminSettingsConfig,
+    successText: string,
+    group?: string,
+  ) => {
     setSettings(nextSettings);
 
-    // Convert settings to key-value pairs for backend
+    // Chỉ lưu đúng nhóm đang thao tác. Payment không thể bị ghi ngầm khi
+    // Admin đang bấm lưu General/Email/Security.
     const payload: UpsertSettingDTO[] = Object.entries(nextSettings)
       .filter(([key]) => key !== 'updatedAt')
+      .filter(([key]) => !group || getSettingGroup(key) === group)
       .map(([key, value]) => ({
         maCauHinh: key,
         giaTri: typeof value === 'object' ? JSON.stringify(value) : String(value),
@@ -214,38 +303,148 @@ export default function AdminSettings() {
     const result = await settingsApi.upsert(payload);
     if (result.success) {
       showMessage('success', successText);
-    } else {
-      showMessage('error', result.error || 'Lỗi lưu cài đặt.');
+      return true;
     }
+
+    showMessage('error', result.error || 'Lỗi lưu cài đặt.');
+    return false;
   };
 
   const updateField = <Key extends keyof AdminSettingsConfig>(field: Key, value: AdminSettingsConfig[Key]) => {
     setSettings((currentSettings) => ({ ...currentSettings, [field]: value }));
   };
 
-  const updateBankAccount = (bankId: number, field: keyof BankAccountConfig, value: string | number) => {
+  const patchBankAccount = (bankId: number, patch: Partial<BankAccountConfig>) => {
     setSettings((currentSettings) => ({
       ...currentSettings,
       bankAccounts: currentSettings.bankAccounts.map((bankAccount) =>
-        bankAccount.id === bankId ? { ...bankAccount, [field]: value } : bankAccount,
+        bankAccount.id === bankId ? { ...bankAccount, ...patch } : bankAccount,
       ),
     }));
   };
 
+  const updateBankAccount = (bankId: number, field: keyof BankAccountConfig, value: string | number) => {
+    patchBankAccount(bankId, { [field]: value } as Partial<BankAccountConfig>);
+  };
+
+  const resetBankLookupState = (bankId: number) => {
+    setBankLookupStates((current) => ({
+      ...current,
+      [bankId]: { status: 'idle', message: 'Chưa xác minh tài khoản.' },
+    }));
+  };
+
+  const selectBank = (bankId: number, bankBin: string) => {
+    const bank = vietQrBanks.find((item) => item.bin === bankBin);
+    if (!bank) {
+      patchBankAccount(bankId, {
+        bankName: '',
+        bankBin: '',
+        bankCode: '',
+        bankLogo: '',
+        accountHolder: '',
+        verifiedAt: undefined,
+      });
+      resetBankLookupState(bankId);
+      return;
+    }
+
+    patchBankAccount(bankId, {
+      bankName: bank.shortName,
+      bankBin: bank.bin,
+      bankCode: bank.code,
+      bankLogo: bank.logo,
+      accountHolder: '',
+      verifiedAt: undefined,
+    });
+    resetBankLookupState(bankId);
+  };
+
+  const changeBankAccountNumber = (bankId: number, rawValue: string) => {
+    const accountNumber = rawValue.replace(/\D/g, '').slice(0, 19);
+    patchBankAccount(bankId, {
+      accountNumber,
+      accountHolder: '',
+      verifiedAt: undefined,
+    });
+    resetBankLookupState(bankId);
+  };
+
+  const verifyBankAccount = async (bankId: number) => {
+    const account = settings.bankAccounts.find((item) => item.id === bankId);
+    if (!account?.bankBin) {
+      setBankLookupStates((current) => ({
+        ...current,
+        [bankId]: { status: 'error', message: 'Vui lòng chọn ngân hàng từ danh sách.' },
+      }));
+      return null;
+    }
+    if (!isValidBankAccountNumber(account.accountNumber)) {
+      setBankLookupStates((current) => ({
+        ...current,
+        [bankId]: { status: 'error', message: 'Số tài khoản phải gồm 6–19 chữ số.' },
+      }));
+      return null;
+    }
+
+    setBankLookupStates((current) => ({
+      ...current,
+      [bankId]: { status: 'loading', message: 'Đang xác minh với VietQR...' },
+    }));
+
+    const result = await settingsApi.lookupBankAccount(account.bankBin, account.accountNumber);
+    if (!result.success || !result.data) {
+      patchBankAccount(bankId, { accountHolder: '', verifiedAt: undefined });
+      setBankLookupStates((current) => ({
+        ...current,
+        [bankId]: {
+          status: 'error',
+          message: result.error || 'Không xác minh được số tài khoản.',
+        },
+      }));
+      return null;
+    }
+
+    const verified: BankAccountConfig = {
+      ...account,
+      bankName: result.data.bank.shortName,
+      bankBin: result.data.bank.bin,
+      bankCode: result.data.bank.code,
+      bankLogo: result.data.bank.logo,
+      accountNumber: result.data.accountNumber,
+      accountHolder: result.data.accountName,
+      verifiedAt: new Date().toISOString(),
+    };
+    patchBankAccount(bankId, verified);
+    setBankLookupStates((current) => ({
+      ...current,
+      [bankId]: {
+        status: 'verified',
+        message: `Đã xác minh: ${result.data.accountName}`,
+      },
+    }));
+    return verified;
+  };
+
   const addBankAccount = () => {
+    const id = Date.now();
     setSettings((currentSettings) => ({
       ...currentSettings,
       bankAccounts: [
         ...currentSettings.bankAccounts,
         {
-          id: Date.now(),
-          bankName: 'Vietcombank',
+          id,
+          bankName: '',
+          bankBin: '',
+          bankCode: '',
+          bankLogo: '',
           accountNumber: '',
-          accountHolder: currentSettings.storeName || defaultAdminSettings.storeName,
+          accountHolder: '',
           branch: '',
         },
       ],
     }));
+    resetBankLookupState(id);
   };
 
   const removeBankAccount = (bankId: number) => {
@@ -256,10 +455,95 @@ export default function AdminSettings() {
           ? currentSettings.bankAccounts.filter((bankAccount) => bankAccount.id !== bankId)
           : currentSettings.bankAccounts,
     }));
+    setBankLookupStates((current) => {
+      const next = { ...current };
+      delete next[bankId];
+      return next;
+    });
   };
 
-  const handleSaveSection = (sectionLabel: string) => {
-    persistSettings(settings, `Đã lưu cài đặt ${sectionLabel}.`);
+  const handleSaveSection = (group: string, sectionLabel: string) => {
+    void persistSettings(settings, `Đã lưu cài đặt ${sectionLabel}.`, group);
+  };
+
+  const handleSavePayment = async () => {
+    if (paymentSaving) return;
+
+    if (!settings.bankEnabled) {
+      setPaymentSaving(true);
+      await persistSettings(settings, 'Đã lưu cài đặt thanh toán.', 'payment');
+      setPaymentSaving(false);
+      return;
+    }
+
+    if (settings.bankAccounts.length === 0) {
+      showMessage('error', 'Cần ít nhất một tài khoản ngân hàng khi bật chuyển khoản.');
+      return;
+    }
+
+    setPaymentSaving(true);
+    const verifiedAccounts: BankAccountConfig[] = [];
+
+    for (const account of settings.bankAccounts) {
+      if (!account.bankBin) {
+        setBankLookupStates((current) => ({
+          ...current,
+          [account.id]: { status: 'error', message: 'Vui lòng chọn ngân hàng từ danh sách.' },
+        }));
+        showMessage('error', 'Có tài khoản chưa chọn ngân hàng chuẩn VietQR.');
+        setPaymentSaving(false);
+        return;
+      }
+      if (!isValidBankAccountNumber(account.accountNumber)) {
+        setBankLookupStates((current) => ({
+          ...current,
+          [account.id]: { status: 'error', message: 'Số tài khoản phải gồm 6–19 chữ số.' },
+        }));
+        showMessage('error', 'Có số tài khoản không hợp lệ.');
+        setPaymentSaving(false);
+        return;
+      }
+
+      setBankLookupStates((current) => ({
+        ...current,
+        [account.id]: { status: 'loading', message: 'Đang xác minh với VietQR...' },
+      }));
+      const result = await settingsApi.lookupBankAccount(account.bankBin, account.accountNumber);
+      if (!result.success || !result.data) {
+        setBankLookupStates((current) => ({
+          ...current,
+          [account.id]: {
+            status: 'error',
+            message: result.error || 'Không xác minh được số tài khoản.',
+          },
+        }));
+        showMessage('error', result.error || `Không xác minh được tài khoản ${account.accountNumber}.`);
+        setPaymentSaving(false);
+        return;
+      }
+
+      verifiedAccounts.push({
+        ...account,
+        bankName: result.data.bank.shortName,
+        bankBin: result.data.bank.bin,
+        bankCode: result.data.bank.code,
+        bankLogo: result.data.bank.logo,
+        accountNumber: result.data.accountNumber,
+        accountHolder: result.data.accountName,
+        verifiedAt: new Date().toISOString(),
+      });
+      setBankLookupStates((current) => ({
+        ...current,
+        [account.id]: {
+          status: 'verified',
+          message: `Đã xác minh: ${result.data.accountName}`,
+        },
+      }));
+    }
+
+    const nextSettings = { ...settings, bankAccounts: verifiedAccounts };
+    await persistSettings(nextSettings, 'Đã xác minh và lưu cài đặt thanh toán.', 'payment');
+    setPaymentSaving(false);
   };
 
   const handleBankQrUpload = (bankId: number, file: File) => {
@@ -306,7 +590,7 @@ export default function AdminSettings() {
       createdAt: now,
     });
 
-    persistSettings(
+    void persistSettings(
       {
         ...settings,
         lastEmailTestAt: now,
@@ -316,6 +600,7 @@ export default function AdminSettings() {
       status === 'success'
         ? 'Đã chạy email test và lưu kết quả kiểm tra.'
         : 'Đã ghi nhận lỗi cấu hình email. Kiểm tra lại SMTP để tiếp tục.',
+      'email',
     );
 
     refreshMetaPanels();
@@ -540,7 +825,7 @@ export default function AdminSettings() {
                   <label className="settings-field"><span>Số điện thoại</span><input type="text" value={settings.storePhone} onChange={(event) => updateField('storePhone', event.target.value)} /></label>
                   <label className="settings-field settings-span-2"><span>Địa chỉ cửa hàng</span><textarea rows={4} value={settings.storeAddress} onChange={(event) => updateField('storeAddress', event.target.value)} /></label>
                 </div>
-                <div className="settings-form-actions"><button type="button" className="settings-primary-btn" onClick={() => handleSaveSection('thông tin cửa hàng')}><AdminIcon name="fa-save" /><span>Lưu thông tin</span></button></div>
+                <div className="settings-form-actions"><button type="button" className="settings-primary-btn" onClick={() => handleSaveSection('general', 'thông tin cửa hàng')}><AdminIcon name="fa-save" /><span>Lưu thông tin</span></button></div>
               </section>
               <aside className="settings-insight-panel">
                 <div className="settings-panel-head"><div><span className="settings-overline">Live impact</span><h3>Nơi dữ liệu đang được dùng</h3></div></div>
@@ -565,7 +850,7 @@ export default function AdminSettings() {
                   <div className="settings-toggle-head">
                     <div>
                       <h4>Chuyển khoản ngân hàng</h4>
-                      <p>Khi bật, checkout sẽ hiển thị danh sách tài khoản bên dưới.</p>
+                      <p>Ngân hàng và chủ tài khoản phải được xác minh qua VietQR trước khi lưu.</p>
                     </div>
                     <label className="settings-switch">
                       <input type="checkbox" checked={settings.bankEnabled} onChange={(event) => updateField('bankEnabled', event.target.checked)} />
@@ -574,101 +859,210 @@ export default function AdminSettings() {
                   </div>
                   {settings.bankEnabled && (
                     <div className="settings-bank-stack">
-                      {settings.bankAccounts.map((bankAccount, index) => (
-                        <article key={bankAccount.id} className="settings-bank-card">
-                          <div className="settings-bank-head">
-                            <div>
-                              <span className="settings-overline">Bank slot {index + 1}</span>
-                              <h5>Tài khoản nhận tiền</h5>
+                      {bankCatalogError && (
+                        <div className="settings-bank-catalog-error">
+                          <AdminIcon name="fa-exclamation-circle" />
+                          <span>{bankCatalogError}</span>
+                          <button
+                            type="button"
+                            className="settings-secondary-btn"
+                            onClick={() => {
+                              setBankCatalogRequested(false);
+                              setBankCatalogError('');
+                            }}
+                          >
+                            Tải lại
+                          </button>
+                        </div>
+                      )}
+
+                      {settings.bankAccounts.map((bankAccount, index) => {
+                        const lookupState = bankLookupStates[bankAccount.id];
+                        const isVerified = Boolean(bankAccount.verifiedAt && bankAccount.accountHolder);
+                        return (
+                          <article key={bankAccount.id} className="settings-bank-card">
+                            <div className="settings-bank-head">
+                              <div>
+                                <span className="settings-overline">Bank slot {index + 1}</span>
+                                <h5>Tài khoản nhận tiền</h5>
+                              </div>
+                              {settings.bankAccounts.length > 1 && (
+                                <button type="button" className="settings-ghost-danger" onClick={() => removeBankAccount(bankAccount.id)}>
+                                  <AdminIcon name="fa-trash" /><span>Xóa</span>
+                                </button>
+                              )}
                             </div>
-                            {settings.bankAccounts.length > 1 && (
-                              <button type="button" className="settings-ghost-danger" onClick={() => removeBankAccount(bankAccount.id)}>
-                                <AdminIcon name="fa-trash" /><span>Xóa</span>
+
+                            <div className="settings-form-grid">
+                              <label className="settings-field settings-span-2">
+                                <span>Ngân hàng</span>
+                                <div className="settings-bank-select-row">
+                                  {bankAccount.bankLogo ? (
+                                    <img className="settings-bank-logo" src={bankAccount.bankLogo} alt="" />
+                                  ) : null}
+                                  <select
+                                    value={bankAccount.bankBin || ''}
+                                    disabled={bankCatalogLoading || vietQrBanks.length === 0}
+                                    onChange={(event) => selectBank(bankAccount.id, event.target.value)}
+                                  >
+                                    <option value="">
+                                      {bankCatalogLoading ? 'Đang tải danh sách ngân hàng...' : 'Chọn ngân hàng'}
+                                    </option>
+                                    {vietQrBanks.map((bank) => (
+                                      <option key={bank.bin} value={bank.bin}>
+                                        {bank.shortName} — {bank.name}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </div>
+                                <small>Danh sách lấy từ VietQR; chỉ hiện ngân hàng hỗ trợ chuyển khoản và tra cứu tên tài khoản.</small>
+                              </label>
+
+                              <label className="settings-field">
+                                <span>Số tài khoản</span>
+                                <input
+                                  type="text"
+                                  inputMode="numeric"
+                                  autoComplete="off"
+                                  maxLength={19}
+                                  placeholder="Chỉ nhập chữ số"
+                                  value={bankAccount.accountNumber}
+                                  onChange={(event) => changeBankAccountNumber(bankAccount.id, event.target.value)}
+                                  onBlur={() => {
+                                    if (bankAccount.bankBin && isValidBankAccountNumber(bankAccount.accountNumber)) {
+                                      void verifyBankAccount(bankAccount.id);
+                                    }
+                                  }}
+                                />
+                                <small>Rời ô sau khi nhập đủ số để hệ thống tự xác minh.</small>
+                              </label>
+
+                              <label className="settings-field">
+                                <span>Chủ tài khoản</span>
+                                <input
+                                  type="text"
+                                  readOnly
+                                  placeholder="Tự động sau khi xác minh STK"
+                                  value={bankAccount.accountHolder}
+                                />
+                                <small>Không cho nhập tay để tránh cấu hình sai người thụ hưởng.</small>
+                              </label>
+
+                              <label className="settings-field settings-span-2">
+                                <span>Chi nhánh (không bắt buộc)</span>
+                                <input type="text" value={bankAccount.branch} onChange={(event) => updateBankAccount(bankAccount.id, 'branch', event.target.value)} />
+                              </label>
+                            </div>
+
+                            <div className="settings-bank-verify-row">
+                              <div
+                                className={`settings-bank-status is-${lookupState?.status || (isVerified ? 'verified' : 'idle')}`}
+                                role="status"
+                              >
+                                <AdminIcon
+                                  name={
+                                    lookupState?.status === 'loading'
+                                      ? 'fa-spinner'
+                                      : lookupState?.status === 'error'
+                                        ? 'fa-exclamation-circle'
+                                        : isVerified || lookupState?.status === 'verified'
+                                          ? 'fa-check-circle'
+                                          : 'fa-info-circle'
+                                  }
+                                />
+                                <span>
+                                  {lookupState?.message ||
+                                    (isVerified
+                                      ? `Đã xác minh ${formatDateTime(bankAccount.verifiedAt)}`
+                                      : 'Chưa xác minh. Tài khoản cũ cần xác minh lại trước khi lưu.')}
+                                </span>
+                              </div>
+                              <button
+                                type="button"
+                                className="settings-secondary-btn"
+                                disabled={lookupState?.status === 'loading' || !bankAccount.bankBin || !isValidBankAccountNumber(bankAccount.accountNumber)}
+                                onClick={() => void verifyBankAccount(bankAccount.id)}
+                              >
+                                <AdminIcon name="fa-shield-alt" />
+                                <span>{lookupState?.status === 'loading' ? 'Đang xác minh...' : 'Xác minh tài khoản'}</span>
                               </button>
-                            )}
-                          </div>
-                          <div className="settings-form-grid">
-                            <label className="settings-field">
-                              <span>Tên ngân hàng</span>
-                              <input type="text" value={bankAccount.bankName} onChange={(event) => updateBankAccount(bankAccount.id, 'bankName', event.target.value)} />
-                            </label>
-                            <label className="settings-field">
-                              <span>Chi nhánh</span>
-                              <input type="text" value={bankAccount.branch} onChange={(event) => updateBankAccount(bankAccount.id, 'branch', event.target.value)} />
-                            </label>
-                            <label className="settings-field">
-                              <span>Số tài khoản</span>
-                              <input type="text" value={bankAccount.accountNumber} onChange={(event) => updateBankAccount(bankAccount.id, 'accountNumber', event.target.value)} />
-                            </label>
-                            <label className="settings-field">
-                              <span>Chủ tài khoản</span>
-                              <input type="text" value={bankAccount.accountHolder} onChange={(event) => updateBankAccount(bankAccount.id, 'accountHolder', event.target.value)} />
-                            </label>
-                          </div>
-                          <div style={{ marginTop: '16px', padding: '14px', borderRadius: '12px', background: '#f8fafc', border: '1px solid #e2e8f0' }}>
-                            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '14px', flexWrap: 'wrap' }}>
-                              <div style={{ flex: '0 0 auto' }}>
-                                {bankAccount.qrImage ? (
-                                  <div style={{ position: 'relative', width: '140px', height: '140px', borderRadius: '12px', overflow: 'hidden', border: '1px solid #cbd5e1', background: '#fff' }}>
-                                    <img src={bankAccount.qrImage} alt="QR" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
-                                    <button
-                                      type="button"
-                                      onClick={() => removeBankQr(bankAccount.id)}
-                                      style={{ position: 'absolute', top: '4px', right: '4px', width: '24px', height: '24px', border: 'none', borderRadius: '50%', background: '#dc2626', color: '#fff', cursor: 'pointer', fontSize: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                                      title="Xóa QR"
-                                    >
-                                      ×
-                                    </button>
-                                  </div>
-                                ) : (
-                                  <label style={{ width: '140px', height: '140px', borderRadius: '12px', border: '2px dashed #c7d2fe', background: '#f5f3ff', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#4338ca', fontSize: '12px', fontWeight: 600 }}>
-                                    <AdminIcon name="fa-qrcode" />
-                                    <span style={{ marginTop: '6px' }}>Tải QR lên</span>
+                            </div>
+
+                            <div style={{ marginTop: '16px', padding: '14px', borderRadius: '12px', background: '#f8fafc', border: '1px solid #e2e8f0' }}>
+                              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '14px', flexWrap: 'wrap' }}>
+                                <div style={{ flex: '0 0 auto' }}>
+                                  {bankAccount.qrImage ? (
+                                    <div style={{ position: 'relative', width: '140px', height: '140px', borderRadius: '12px', overflow: 'hidden', border: '1px solid #cbd5e1', background: '#fff' }}>
+                                      <img src={bankAccount.qrImage} alt="QR dự phòng" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                                      <button
+                                        type="button"
+                                        onClick={() => removeBankQr(bankAccount.id)}
+                                        style={{ position: 'absolute', top: '4px', right: '4px', width: '24px', height: '24px', border: 'none', borderRadius: '50%', background: '#dc2626', color: '#fff', cursor: 'pointer', fontSize: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                                        title="Xóa QR dự phòng"
+                                      >
+                                        ×
+                                      </button>
+                                    </div>
+                                  ) : (
+                                    <label style={{ width: '140px', height: '140px', borderRadius: '12px', border: '2px dashed #c7d2fe', background: '#f5f3ff', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#4338ca', fontSize: '12px', fontWeight: 600 }}>
+                                      <AdminIcon name="fa-qrcode" />
+                                      <span style={{ marginTop: '6px' }}>Tải QR dự phòng</span>
+                                      <input
+                                        type="file"
+                                        accept="image/*"
+                                        style={{ display: 'none' }}
+                                        onChange={(event) => {
+                                          const file = event.target.files?.[0];
+                                          if (file) handleBankQrUpload(bankAccount.id, file);
+                                          event.target.value = '';
+                                        }}
+                                      />
+                                    </label>
+                                  )}
+                                </div>
+                                <div style={{ flex: 1, minWidth: '200px' }}>
+                                  <label className="settings-field" style={{ marginBottom: '8px' }}>
+                                    <span>Hoặc dán URL ảnh QR dự phòng</span>
                                     <input
-                                      type="file"
-                                      accept="image/*"
-                                      style={{ display: 'none' }}
-                                      onChange={(event) => {
-                                        const file = event.target.files?.[0];
-                                        if (file) handleBankQrUpload(bankAccount.id, file);
-                                        event.target.value = '';
-                                      }}
+                                      type="text"
+                                      placeholder="https://... hoặc data:image/..."
+                                      value={bankAccount.qrImage || ''}
+                                      onChange={(event) => updateBankAccount(bankAccount.id, 'qrImage', event.target.value)}
                                     />
                                   </label>
-                                )}
-                              </div>
-                              <div style={{ flex: 1, minWidth: '200px' }}>
-                                <label className="settings-field" style={{ marginBottom: '8px' }}>
-                                  <span>Hoặc dán URL ảnh QR</span>
-                                  <input
-                                    type="text"
-                                    placeholder="https://... hoặc data:image/..."
-                                    value={bankAccount.qrImage || ''}
-                                    onChange={(event) => updateBankAccount(bankAccount.id, 'qrImage', event.target.value)}
-                                  />
-                                </label>
-                                <small style={{ color: '#64748b', fontSize: '12px', lineHeight: 1.5 }}>
-                                  QR sẽ hiển thị ở trang checkout khi khách chọn chuyển khoản. Hỗ trợ JPG/PNG, tối đa 2MB.
-                                </small>
+                                  <small style={{ color: '#64748b', fontSize: '12px', lineHeight: 1.5 }}>
+                                    Checkout luôn ưu tiên VietQR động theo đúng đơn hàng. Ảnh này chỉ dùng khi VietQR động không tải được. Hỗ trợ JPG/PNG, tối đa 2MB.
+                                  </small>
+                                </div>
                               </div>
                             </div>
-                          </div>
-                        </article>
-                      ))}
+                          </article>
+                        );
+                      })}
                       <button type="button" className="settings-secondary-btn" onClick={addBankAccount}>
                         <AdminIcon name="fa-plus" /><span>Thêm tài khoản</span>
                       </button>
                     </div>
                   )}
                 </article>
-                <div className="settings-form-actions"><button type="button" className="settings-primary-btn" onClick={() => handleSaveSection('thanh toán')}><AdminIcon name="fa-save" /><span>Lưu thanh toán</span></button></div>
+                <div className="settings-form-actions">
+                  <button
+                    type="button"
+                    className="settings-primary-btn"
+                    disabled={paymentSaving}
+                    onClick={() => void handleSavePayment()}
+                  >
+                    <AdminIcon name={paymentSaving ? 'fa-spinner' : 'fa-save'} />
+                    <span>{paymentSaving ? 'Đang xác minh & lưu...' : 'Xác minh & lưu thanh toán'}</span>
+                  </button>
+                </div>
               </section>
               <aside className="settings-insight-panel">
                 <div className="settings-panel-head"><div><span className="settings-overline">Checkout preview</span><h3>Tình trạng hiển thị ở checkout</h3></div></div>
                 <div className="settings-preview-stack">
                   <div className="settings-preview-row"><span>Phương thức đang mở</span><strong>{enabledPaymentMethods > 0 ? `${enabledPaymentMethods} phương thức` : 'Chưa có'}</strong></div>
                   <div className="settings-preview-row"><span>Phụ phí COD</span><strong>{settings.codEnabled ? `${settings.codFee}%` : 'Đang tắt'}</strong></div>
-                  <div className="settings-preview-row"><span>Tài khoản ngân hàng</span><strong>{settings.bankEnabled ? `${settings.bankAccounts.length} tài khoản` : 'Đang tắt'}</strong></div>
+                  <div className="settings-preview-row"><span>Tài khoản ngân hàng</span><strong>{settings.bankEnabled ? `${settings.bankAccounts.filter((account) => account.verifiedAt).length}/${settings.bankAccounts.length} đã xác minh` : 'Đang tắt'}</strong></div>
                 </div>
               </aside>
             </div>
@@ -690,7 +1084,7 @@ export default function AdminSettings() {
                   <label className="settings-check-tile"><div className="settings-check-meta"><strong>Gửi thông báo đang giao</strong><p>Phù hợp khi đội vận hành cập nhật trạng thái giao hàng.</p></div><input type="checkbox" checked={settings.emailShipping} onChange={(event) => updateField('emailShipping', event.target.checked)} /></label>
                   <label className="settings-check-tile"><div className="settings-check-meta"><strong>Gửi xác nhận đã giao</strong><p>Khép vòng trải nghiệm sau khi khách nhận hàng.</p></div><input type="checkbox" checked={settings.emailDelivered} onChange={(event) => updateField('emailDelivered', event.target.checked)} /></label>
                 </div>
-                <div className="settings-form-actions"><button type="button" className="settings-secondary-btn" onClick={handleTestEmail}><AdminIcon name="fa-paper-plane" /><span>Chạy email test</span></button><button type="button" className="settings-primary-btn" onClick={() => handleSaveSection('email')}><AdminIcon name="fa-save" /><span>Lưu email</span></button></div>
+                <div className="settings-form-actions"><button type="button" className="settings-secondary-btn" onClick={handleTestEmail}><AdminIcon name="fa-paper-plane" /><span>Chạy email test</span></button><button type="button" className="settings-primary-btn" onClick={() => handleSaveSection('email', 'email')}><AdminIcon name="fa-save" /><span>Lưu email</span></button></div>
               </section>
               <aside className="settings-insight-panel">
                 <div className="settings-panel-head"><div><span className="settings-overline">Mail timeline</span><h3>Lịch sử gửi & kiểm tra email</h3></div></div>
@@ -711,7 +1105,7 @@ export default function AdminSettings() {
                   <label className="settings-switch-card"><div><strong>Đánh giá mới</strong><p>Phù hợp với đội nội dung hoặc CSKH theo dõi phản hồi.</p></div><input type="checkbox" checked={settings.notifyNewReview} onChange={(event) => updateField('notifyNewReview', event.target.checked)} /></label>
                   <label className="settings-switch-card"><div><strong>Khách hàng mới</strong><p>Phản ánh trực tiếp tốc độ tăng trưởng tệp khách.</p></div><input type="checkbox" checked={settings.notifyNewCustomer} onChange={(event) => updateField('notifyNewCustomer', event.target.checked)} /></label>
                 </div>
-                <div className="settings-form-actions"><button type="button" className="settings-primary-btn" onClick={() => handleSaveSection('thông báo')}><AdminIcon name="fa-save" /><span>Lưu thông báo</span></button></div>
+                <div className="settings-form-actions"><button type="button" className="settings-primary-btn" onClick={() => handleSaveSection('notifications', 'thông báo')}><AdminIcon name="fa-save" /><span>Lưu thông báo</span></button></div>
               </section>
               <aside className="settings-insight-panel">
                 <div className="settings-panel-head"><div><span className="settings-overline">Signal density</span><h3>Tổng quan độ dày cảnh báo</h3></div></div>
@@ -738,7 +1132,7 @@ export default function AdminSettings() {
                   <label className="settings-switch-card"><div><strong>Ghi nhận chính sách 2FA</strong><p>Đánh dấu hệ thống sẵn sàng cho lớp xác thực nâng cao.</p></div><input type="checkbox" checked={settings.enable2FA} onChange={(event) => updateField('enable2FA', event.target.checked)} /></label>
                   <label className="settings-switch-card"><div><strong>Lưu log đăng nhập admin</strong><p>Giữ lại audit timeline mỗi khi admin đăng nhập hoặc đổi mật khẩu.</p></div><input type="checkbox" checked={settings.loginNotification} onChange={(event) => updateField('loginNotification', event.target.checked)} /></label>
                 </div>
-                <div className="settings-form-actions"><button type="button" className="settings-secondary-btn" onClick={handleChangePassword}><AdminIcon name="fa-key" /><span>Đổi mật khẩu</span></button><button type="button" className="settings-primary-btn" onClick={() => handleSaveSection('bảo mật')}><AdminIcon name="fa-save" /><span>Lưu bảo mật</span></button></div>
+                <div className="settings-form-actions"><button type="button" className="settings-secondary-btn" onClick={handleChangePassword}><AdminIcon name="fa-key" /><span>Đổi mật khẩu</span></button><button type="button" className="settings-primary-btn" onClick={() => handleSaveSection('security', 'bảo mật')}><AdminIcon name="fa-save" /><span>Lưu bảo mật</span></button></div>
               </section>
               <aside className="settings-insight-panel">
                 <div className="settings-panel-head"><div><span className="settings-overline">Audit trail</span><h3>Lịch sử truy cập & thay đổi</h3></div></div>
@@ -802,7 +1196,7 @@ export default function AdminSettings() {
                 </div>
 
                 <div className="settings-form-actions">
-                  <button type="button" className="settings-primary-btn" onClick={() => handleSaveSection('Chatbot AI')}>
+                  <button type="button" className="settings-primary-btn" onClick={() => handleSaveSection('chatbot', 'Chatbot AI')}>
                     <AdminIcon name="fa-save" /><span>Lưu cấu hình chatbot</span>
                   </button>
                 </div>
