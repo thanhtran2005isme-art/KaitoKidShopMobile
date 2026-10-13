@@ -12,6 +12,7 @@ import {
   Query,
   UseGuards,
 } from "@nestjs/common";
+import { ReturnShipmentService } from "../admin/return-shipment.service.js";
 import { CurrentUser } from "../../auth/current-user.decorator.js";
 import type { AuthenticatedUser } from "../../auth/authenticated-user.js";
 import { JwtAuthGuard } from "../../auth/jwt-auth.guard.js";
@@ -24,6 +25,7 @@ export class ShippingController {
   constructor(
     private readonly shipping: ShippingService,
     private readonly lalamove: LalamoveShippingService,
+    private readonly returnShipments: ReturnShipmentService,
   ) {}
 
   @Get("providers")
@@ -77,15 +79,23 @@ export class ShippingController {
 
   @Post("lalamove/webhook")
   @HttpCode(HttpStatus.OK)
-  lalamoveWebhook(@Body() body: Record<string, unknown>) {
-    // Lalamove validates a newly configured webhook URL with an initial
-    // request that can contain no body and requires HTTP 200. Only that
-    // empty validation request bypasses HMAC verification; every real event
-    // still goes through LalamoveShippingService.handleWebhook().
+  async lalamoveWebhook(@Body() body: Record<string, unknown>) {
+    // Initial empty validation request is allowed, but every real event must
+    // pass the outbound service's existing HMAC authentication first.
     if (!body || Object.keys(body).length === 0) {
       return { received: true, validation: true };
     }
-    return this.lalamove.handleWebhook(body);
+    const result = await this.lalamove.handleWebhook(body);
+    if (!("ignored" in result) || result.ignored !== true) return result;
+    // Outbound webhooks are handled as before. Unknown outbound order IDs may
+    // instead refer to separate customer-to-shop reverse shipments.
+    const payload = body.data && typeof body.data === "object" && !Array.isArray(body.data)
+      ? body.data as Record<string, unknown> : {};
+    const carrierOrder = payload.order && typeof payload.order === "object" && !Array.isArray(payload.order)
+      ? payload.order as Record<string, unknown> : {};
+    const externalOrderId = carrierOrder.orderId ?? payload.orderId;
+    const matched = await this.returnShipments.reconcileVerifiedWebhook(externalOrderId);
+    return matched ? { received: true, returnShipment: true } : result;
   }
 
   @Get("track/:orderCode")

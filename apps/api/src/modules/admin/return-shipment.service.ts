@@ -9,7 +9,7 @@ type ShipmentRow = {
   senderPhone: string; pickupAddress: string; receiverName: string;
   receiverPhone: string; dropoffAddress: string; fee: unknown;
   trackingUrl: string | null; deliveredAt: Date | string | null;
-  errorMessage: string | null;
+  errorMessage: string | null; lastCheckedAt: Date | string | null;
 };
 type OrderRow = {
   id: unknown; orderCode: string; orderStatus: string;
@@ -75,7 +75,8 @@ export class ReturnShipmentService {
               DiaChiLay AS pickupAddress, TenNguoiNhan AS receiverName,
               SDTNguoiNhan AS receiverPhone, DiaChiGiao AS dropoffAddress,
               PhiVanChuyen AS fee, LinkTheoDoi AS trackingUrl,
-              GiaoThanhCongLuc AS deliveredAt, LoiCuoi AS errorMessage
+              GiaoThanhCongLuc AS deliveredAt, LoiCuoi AS errorMessage,
+              NgayCapNhat AS lastCheckedAt
        FROM VanDonHoanHang WHERE DonHangId = ? LIMIT 1`,
       orderId,
     );
@@ -230,6 +231,25 @@ export class ReturnShipmentService {
       );
       throw error;
     }
+  }
+
+  /**
+   * Called only AFTER the existing LalamoveShippingService has verified the
+   * webhook HMAC. Correlate against return shipments (never the outbound order).
+   * Always GET the provider again: a webhook event alone does not release money.
+   */
+  async reconcileVerifiedWebhook(externalOrderId: unknown): Promise<boolean> {
+    const id = asText(externalOrderId);
+    if (!id || id.length > 120) return false;
+    const found = await this.db.$queryRawUnsafe<Array<{ orderId: unknown }>>(
+      `SELECT DonHangId AS orderId FROM VanDonHoanHang
+       WHERE NhaVanChuyen = 'lalamove' AND MaVanDon = ? LIMIT 1`,
+      id,
+    );
+    const orderId = Number(found[0]?.orderId);
+    if (!Number.isSafeInteger(orderId) || orderId <= 0) return false;
+    await this.sync(orderId);
+    return true;
   }
 
   async sync(orderId: number) {

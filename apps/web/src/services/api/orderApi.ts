@@ -55,6 +55,7 @@ export type ReturnShipmentDTO = {
   trackingUrl: string | null;
   fee: number | null;
   deliveredAt: string | null;
+  lastCheckedAt: string | null;
   errorMessage: string | null;
 };
 

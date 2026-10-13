@@ -184,3 +184,11 @@ Sau đó smoke Web customer + Admin + Mobile bằng **Node-only**. Không khởi
 - `POST /api/orders/:id/return-request` hỗ trợ multipart `reasonCode`, `detail`, `images`, backward-compatible JSON `reason`. Backend kiểm tra nội dung ảnh và quyền sở hữu trước khi commit marker; lưu ảnh `public/uploads/returns` UUID, marker `return_evidence` trong `LichSuTrangThaiVanChuyen` cùng order; không thêm bảng/migration.
 - DTO customer trả `returnEvidence`, Admin snapshot trả `returnEvidence`, Admin `AdminAfterSalesPanel` xem ảnh; chỉ Admin mới quyết định duyệt/từ chối, request không hoàn tiền.
 - Cần chạy CI Web/Mobile, API checkout contracts và test thật chọn ảnh trên Expo Web/Android; không kết luận đã nghiệm thu runtime chỉ từ contract tests.
+
+
+## Đồng bộ trạng thái Lalamove cho vận đơn hoàn (2026-10-13)
+
+- Trước đây Admin load snapshot DB và nút đồng bộ là cách duy nhất GET Lalamove; vì vậy share link đã Completed vẫn có thể hiện in_transit. Web giờ tự gọi POST sync một lần khi mở và poll 20s khi tab visible, dừng sau delivered; có lastCheckedAt/lỗi kiểm tra.
+- Webhook signed từ Lalamove (sau HMAC verification của delivery service) định tuyến mã vận đơn hoàn bị ignored ở chiều outgoing, GET provider để xác minh và cập nhật bản ghi riêng.
+- Chỉ khi provider GET trả khớp `data.orderId` + `COMPLETED` thì đơn hoàn là delivered; Admin vẫn phải tự xác nhận kiểm hàng, nhập tồn/quarantine và refund wallet idempotent.
+- Chưa chạy live Lalamove GET/webhook trên máy dev trong phiên này; CI dùng mocked transport + contract tests, sandbox E2E cần nghiệm thu trước merge.

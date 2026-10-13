@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
 import AdminIcon from '../components/admin/AdminIcon';
 import { orderApi } from '../services/api/orderApi';
@@ -55,6 +55,13 @@ export default function AdminAfterSalesPanel({ orderId, onChanged }: Props) {
   const [carriers, setCarriers] = useState<AdminReturnCarrier[]>([]);
   const [provider, setProvider] = useState('lalamove');
   const [carrierError, setCarrierError] = useState('');
+  const [syncError, setSyncError] = useState('');
+  const [carrierChecking, setCarrierChecking] = useState(false);
+  const syncInFlight = useRef(false);
+  const busyRef = useRef(busy);
+  const onChangedRef = useRef(onChanged);
+  busyRef.current = busy;
+  onChangedRef.current = onChanged;
   const [inspectionNote, setInspectionNote] = useState('');
   const [disposition, setDisposition] = useState<'restock' | 'quarantine'>('quarantine');
   const [refundReference, setRefundReference] = useState('');
@@ -78,6 +85,57 @@ export default function AdminAfterSalesPanel({ orderId, onChanged }: Props) {
       .then((items) => { setCarriers(items); setCarrierError(''); })
       .catch(() => { setCarriers([]); setCarrierError('Không tải được hãng vận chuyển hoàn.'); });
   }, [orderId]);
+
+  const currentShippingStatus = data?.returnShipment?.status;
+  const currentShippingId = data?.returnShipment?.externalId;
+
+  useEffect(() => {
+    if (!currentShippingId || !['placed', 'in_transit'].includes(currentShippingStatus || '')) return;
+
+    let disposed = false;
+    let inFlight = false;
+    const reconcile = async () => {
+      if (disposed || inFlight || syncInFlight.current ||
+          busyRef.current !== null || document.visibilityState === 'hidden') return;
+      inFlight = true;
+      syncInFlight.current = true;
+      setCarrierChecking(true);
+      try {
+        // POST intentionally performs a provider GET + persists verified status.
+        // A plain Admin refresh reads only the database and cannot replace it.
+        const updated = await orderApi.syncReturnShipment(orderId);
+        if (disposed) return;
+        setData(updated);
+        setSyncError('');
+        if (updated.returnShipment?.status === 'delivered') {
+          // Refresh order list summary after carrier completion, not on every tick.
+          void Promise.resolve(onChangedRef.current?.()).catch(() => undefined);
+        }
+      } catch (error) {
+        if (!disposed) {
+          console.error('Return shipment carrier sync failed', error);
+          setSyncError('Chưa xác minh được trạng thái mới với Lalamove. Bạn có thể thử kiểm tra lại.');
+        }
+      } finally {
+        inFlight = false;
+        syncInFlight.current = false;
+        if (!disposed) setCarrierChecking(false);
+      }
+    };
+
+    void reconcile(); // on open / after initial database snapshot
+    const intervalId = window.setInterval(() => { void reconcile(); }, 20_000);
+    const onVisible = () => { if (document.visibilityState === 'visible') void reconcile(); };
+    const onFocus = () => { void reconcile(); };
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('focus', onFocus);
+    return () => {
+      disposed = true;
+      window.clearInterval(intervalId);
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('focus', onFocus);
+    };
+  }, [orderId, currentShippingId, currentShippingStatus]);
 
   const refreshAll = async (next: AdminAfterSalesCase) => {
     setData(next);
@@ -147,18 +205,24 @@ export default function AdminAfterSalesPanel({ orderId, onChanged }: Props) {
   };
 
   const syncShipment = async () => {
-    if (!data || busy) return;
+    if (!data || busy || syncInFlight.current) return;
+    syncInFlight.current = true;
     setBusy('sync');
+    setCarrierChecking(true);
     try {
       const next = await orderApi.syncReturnShipment(orderId);
       await refreshAll(next);
+      setSyncError('');
       toast.success(next.returnShipment?.status === 'delivered'
-        ? 'Hãng đã xác nhận giao hàng hoàn thành công'
-        : 'Đã đồng bộ trạng thái vận đơn hoàn');
+        ? 'Lalamove đã xác nhận giao hàng hoàn thành công'
+        : 'Đã kiểm tra Lalamove; hãng chưa xác nhận hoàn tất qua API.');
     } catch (error) {
       console.error(error);
-      toast.error('Không xác minh được với hãng vận chuyển. Chưa thể nhận hàng hoàn.');
+      setSyncError('Không xác minh được vận đơn hoàn qua API Lalamove. Vui lòng thử lại.');
+      toast.error('Chưa xác minh được trạng thái vận đơn hoàn.');
     } finally {
+      syncInFlight.current = false;
+      setCarrierChecking(false);
       setBusy(null);
     }
   };
@@ -293,10 +357,19 @@ export default function AdminAfterSalesPanel({ orderId, onChanged }: Props) {
               <a href={data.returnShipment.trackingUrl} target="_blank" rel="noopener noreferrer">Theo dõi vận đơn hoàn</a>
             )}
             {data.returnShipment.errorMessage && <p role="alert">{data.returnShipment.errorMessage}</p>}
+            {data.returnShipment.lastCheckedAt && (
+              <p className="after-sales-help">
+                Đồng bộ hãng gần nhất: {new Date(data.returnShipment.lastCheckedAt).toLocaleString('vi-VN')}
+              </p>
+            )}
+            {['placed', 'in_transit'].includes(data.returnShipment.status) && (
+              <p className="after-sales-help">Tự động kiểm tra Lalamove mỗi 20 giây khi mở trang. Tải lại trang cũng sẽ kiểm tra lại.</p>
+            )}
+            {syncError && <p role="alert">{syncError}</p>}
             {['placed', 'in_transit'].includes(data.returnShipment.status) && (
               <button type="button" className="after-sales-button primary"
-                disabled={busy !== null} onClick={() => void syncShipment()}>
-                <AdminIcon name="fa-rotate" /> Kiểm tra trạng thái từ Lalamove
+                disabled={busy !== null || carrierChecking} onClick={() => void syncShipment()}>
+                <AdminIcon name="fa-rotate" /> {carrierChecking ? 'Đang kiểm tra Lalamove...' : 'Kiểm tra trạng thái từ Lalamove'}
               </button>
             )}
             {data.returnShipment.status === 'delivered' && (

@@ -395,3 +395,13 @@ Triệu chứng: `GET /api/wallet`, Home, Cart hoặc Checkout đôi lúc báo h
 - API POST `/api/orders/:id/return-request` nhận multipart FormData `reasonCode`, `detail`, `images` (không tự set multipart boundary thủ công), timeout client 45s.
 - Backend lưu file `/uploads/returns/` theo UUID và event `return_evidence`. Admin thấy ảnh tại Đơn hàng → Chi tiết → Đối soát giao hàng & hoàn trả. Không dùng ảnh làm xác nhận giao hàng hoàn hoặc chi tiền.
 - Lỗi upload/transaction sẽ dọn ảnh đã tải lên; khi user gửi lặp, trạng thái không tạo case mới hoặc duplicate ảnh; retry thủ công sau khi xem lại trạng thái đơn.
+
+
+## Lalamove báo Completed nhưng Admin vẫn hiện Đang đưa hàng về shop
+
+- Kiểm tra đúng mã **vận đơn hoàn**, tách biệt với vận đơn giao đi. Mã phải bằng `VanDonHoanHang.MaVanDon` cho đơn đang xem.
+- Với code mới, khi mở màn hậu mãi trạng thái `placed/in_transit`, Web tự gọi POST `/api/admin/order-after-sales/:id/return-shipment/sync` rồi lặp mỗi 20 giây khi tab đang hoạt động; có thể bấm **Kiểm tra trạng thái từ Lalamove** để yêu cầu ngay. Reload chỉ có tác dụng gián tiếp qua poll lúc mount, không phải bằng chứng server đã đồng bộ.
+- Kiểm tra DevTools Network: POST trả 200 với `returnShipment.status=delivered` khi API hãng trả `data.status=COMPLETED` và đúng `orderId`. Xem `lastCheckedAt`; 401/403 kiểm tra phiên và `orders.update_status`, 5xx xem log NestJS + credentials Lalamove/Sandbox.
+- Nếu share link Completed nhưng sync vẫn `in_transit`, so đối chiếu response GET trực tiếp từ hãng bằng credential backend (không log API secret). Không chỉnh thẳng trạng thái DB, không chạy receive/refund thủ công.
+- Webhook `/api/shipping/lalamove/webhook` hỗ trợ vận đơn chiều hoàn sau khi xác minh HMAC và truy vấn trạng thái bằng provider GET. Localhost không nhận được webhook public nếu chưa thiết lập HTTPS tunnel/URL chính xác. Admin polling bù được khi mở màn.
+- Lalamove COMPLETED chỉ mở quyền **Admin xác nhận đã nhận và kiểm hàng hoàn**. Không tự nhập kho hoặc hoàn tiền ví.

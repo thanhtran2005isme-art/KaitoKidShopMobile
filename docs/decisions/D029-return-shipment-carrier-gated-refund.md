@@ -45,3 +45,14 @@ Các endpoint mutation yêu cầu JWT + `orders.update_status`; receive tiếp t
 5. Test đồng thời hai lần đặt, timeout/ambiguous response, hai lần receive, provider 5xx/unknown status và tài khoản thiếu quyền. Không dựa vào giả lập provider làm bằng chứng live.
 
 Không auto-generate shipping label hay hoàn tiền nếu provider chưa xác minh giao thành công.
+
+
+## Trạng thái Lalamove hoàn hàng đồng bộ tự động (2026-10-13)
+
+- `GET /api/admin/order-after-sales/:id` chỉ đọc DB, không tự truy vấn Lalamove.
+- Khi Admin mở chi tiết đơn, Web chủ động POST `/api/admin/order-after-sales/:id/return-shipment/sync` một lần và cứ **20 giây** khi panel đang mở, tab đang visible, vận đơn còn `placed/in_transit`. Quay về tab sẽ kiểm tra ngay. Có chống gửi song song và ngừng khi `delivered`/unmount.
+- Web hiển thị thời điểm `NgayCapNhat` đã kiểm tra gần nhất và lỗi gọi hãng. Nút kiểm tra thủ công vẫn giữ để hỗ trợ đối soát. Reload Web sẽ khởi động quá trình kiểm tra, không coi snapshot DB cũ là trạng thái của hãng.
+- Đối với event webhook **có HMAC hợp lệ**, sau khi backend outgoing bỏ qua mã vận đơn không thuộc giao hàng đi, controller tìm vận đơn hoàn có mã Lalamove trùng trong `VanDonHoanHang` rồi **GET API hãng** và đồng bộ trạng thái. Không dựa vào status tự nhập hay screenshot; việc gọi GET không tự credit ví/cộng tồn.
+- Public webhook cần URL HTTPS có thể truy cập từ Lalamove. Nếu môi trường local không có inbound webhook, Admin polling vẫn tự cập nhật khi đang mở; không có worker nền toàn cục khi Admin đã đóng.
+- Status chỉ thành `delivered` nếu hãng trả `data.orderId` đúng mã vận đơn và `data.status=COMPLETED`. Sau đó **vẫn chờ Admin nhận, kiểm và chọn restock/quarantine**. Không thay đổi guard receive/tiền ví.
+- Nếu share link hiện Completed nhưng GET API chưa trả COMPLETED, hiển thị lần đồng bộ gần nhất và tiếp tục xác minh; tuyệt đối không tự chỉnh DB dựa vào share page.
