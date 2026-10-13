@@ -55,6 +55,7 @@ export interface CustomerOrderDTO {
   canRequestReturn?: boolean;
   returnRequested?: boolean;
   returnStatus?: CustomerReturnStatus;
+  returnEvidence?: string[];
   refundStatus?: CustomerRefundStatus;
   receivedAt?: string | null;
   returnDeadline?: string | null;
@@ -102,10 +103,19 @@ export const customerOrderApi = {
     }
   },
 
-  /** Gửi yêu cầu hoàn hàng trong 7 ngày kể từ lúc khách xác nhận nhận hàng. */
-  async requestReturn(id: number, reason: string): Promise<ApiResponse<{ message: string; returnDeadline: string | null }>> {
+  /** Gửi yêu cầu hoàn hàng kèm tối đa 3 ảnh bằng chứng trong 15 ngày. */
+  async requestReturn(
+    id: number, reasonCode: string, detail: string, images: File[],
+  ): Promise<ApiResponse<{ message: string; returnDeadline: string | null }>> {
     try {
-      const response = await apiClient.post(`/api/orders/${id}/return-request`, { reason });
+      const body = new FormData();
+      body.append('reasonCode', reasonCode);
+      body.append('detail', detail);
+      images.forEach((image) => body.append('images', image, image.name));
+      const response = await apiClient.post(`/api/orders/${id}/return-request`, body, {
+        headers: { 'Content-Type': undefined },
+        timeout: 45000,
+      });
       return { success: true, data: response.data };
     } catch (error) {
       return { success: false, error: getErrorMessage(error) };

@@ -14,6 +14,7 @@ const SYMBOLS = {
   arrowRight: { ios: 'arrow.right', android: 'arrow_forward', web: 'arrow_forward' },
   arrowLeft: { ios: 'chevron.left', android: 'arrow_back', web: 'arrow_back' },
   chevronRight: { ios: 'chevron.right', android: 'chevron_right', web: 'chevron_right' },
+  chevronDown: { ios: 'chevron.down', android: 'expand_more', web: 'expand_more' },
   home: { ios: 'house', android: 'home', web: 'home' },
   grid: { ios: 'square.grid.2x2', android: 'grid_view', web: 'grid_view' },
   refresh: { ios: 'arrow.clockwise', android: 'refresh', web: 'refresh' },

@@ -18,6 +18,7 @@ import { openInvoicePrintWindow } from '../utils/invoicePrint';
 import OrderStatusFilter, { type OrderStatusFilterValue } from '../components/order/OrderStatusFilter';
 import ReviewModal from '../components/order/ReviewModal';
 import toast from 'react-hot-toast';
+import '../styles/return-request.css';
 
 const statusMap: Record<string, string> = {
   pending: 'Chờ xác nhận',
@@ -68,6 +69,16 @@ const LALAMOVE_TERMINAL_SHIPPING_STATUSES = new Set([
   'cancelled',
   'failed',
 ]);
+
+const RETURN_REASONS = [
+  { code: 'defective', label: 'Sản phẩm bị lỗi sản xuất, đường may' },
+  { code: 'damaged', label: 'Sản phẩm bị rách, hỏng khi nhận' },
+  { code: 'wrong_item', label: 'Shop giao sai sản phẩm' },
+  { code: 'wrong_variant', label: 'Sai kích cỡ hoặc màu sắc' },
+  { code: 'not_as_described', label: 'Sản phẩm khác mô tả hoặc hình ảnh' },
+  { code: 'missing_items', label: 'Thiếu sản phẩm hoặc phụ kiện' },
+  { code: 'other', label: 'Khác' },
+] as const;
 
 type AfterSalesTone = 'warning' | 'info' | 'success' | 'danger';
 
@@ -133,6 +144,13 @@ function afterSalesState(order: CustomerOrderDTO): {
   }
 }
 
+function evidenceImageUrl(path: string) {
+  const base = ((import.meta.env.VITE_NODE_API_URL as string | undefined)
+    || (import.meta.env.VITE_API_BASE_URL as string | undefined)
+    || 'http://localhost:5300').replace(/\/+$/, '');
+  return base + path;
+}
+
 function AfterSalesNotice({ order }: { order: CustomerOrderDTO }) {
   const state = afterSalesState(order);
   if (!state) return null;
@@ -149,6 +167,16 @@ function AfterSalesNotice({ order }: { order: CustomerOrderDTO }) {
     <div style={{ margin: '0 16px 12px', padding: '10px 12px', background: tone.background, border: `1px solid ${tone.border}`, borderRadius: 8, color: tone.color, fontSize: 13 }}>
       <div style={{ fontWeight: 700 }}>{state.title}</div>
       <div style={{ marginTop: 3, lineHeight: 1.45 }}>{state.detail}</div>
+      {order.returnEvidence?.length ? (
+        <div className="return-evidence-saved">
+          {order.returnEvidence.map((path, index) => (
+            <a key={path} href={evidenceImageUrl(path)} target="_blank" rel="noopener noreferrer"
+               aria-label={'Xem ảnh hoàn hàng ' + (index + 1)}>
+              <img src={evidenceImageUrl(path)} alt={'Bằng chứng hoàn hàng ' + (index + 1)} loading="lazy" />
+            </a>
+          ))}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -198,7 +226,16 @@ export default function OrderTracking() {
   const [reorderingId, setReorderingId] = useState<number | null>(null);
   const [afterSalesOrderId, setAfterSalesOrderId] = useState<number | null>(null);
   const [returningOrder, setReturningOrder] = useState<CustomerOrderDTO | null>(null);
-  const [returnReason, setReturnReason] = useState('');
+  const [returnReasonCode, setReturnReasonCode] = useState('');
+  const [returnDetail, setReturnDetail] = useState('');
+  const [returnImages, setReturnImages] = useState<File[]>([]);
+  const returnPreviews = useMemo(
+    () => returnImages.map((file) => URL.createObjectURL(file)),
+    [returnImages],
+  );
+  useEffect(() => () => {
+    returnPreviews.forEach((preview) => URL.revokeObjectURL(preview));
+  }, [returnPreviews]);
   const livePollInFlight = useRef(false);
 
   const applyOrders = (items: CustomerOrderDTO[]) => {
@@ -332,7 +369,7 @@ export default function OrderTracking() {
   };
 
   const handleConfirmReceived = async (order: CustomerOrderDTO) => {
-    if (!window.confirm('Xác nhận bạn đã thực sự nhận được hàng? Mốc hoàn hàng 7 ngày sẽ bắt đầu từ thời điểm này.')) return;
+    if (!window.confirm('Xác nhận bạn đã thực sự nhận được hàng? Mốc hoàn hàng 15 ngày sẽ bắt đầu từ thời điểm này.')) return;
     setAfterSalesOrderId(order.id);
     const result = await customerOrderApi.confirmReceived(order.id);
     setAfterSalesOrderId(null);
@@ -361,27 +398,57 @@ export default function OrderTracking() {
 
   const openReturnRequest = (order: CustomerOrderDTO) => {
     setSelected(null);
-    setReturnReason('');
+    setReturnReasonCode('');
+    setReturnDetail('');
+    setReturnImages([]);
     setReturningOrder(order);
   };
 
+  const changeReturnImages = (files: FileList | null) => {
+    const incoming = Array.from(files ?? []);
+    if (incoming.some((file) => !['image/jpeg', 'image/png', 'image/webp'].includes(file.type))) {
+      toast.error('Chỉ hỗ trợ ảnh JPEG, PNG hoặc WebP.');
+      return;
+    }
+    if (incoming.some((file) => file.size > 5 * 1024 * 1024 || file.size === 0)) {
+      toast.error('Mỗi ảnh phải có dung lượng tối đa 5MB.');
+      return;
+    }
+    setReturnImages((current) => {
+      const combined = [...current, ...incoming];
+      if (combined.length > 3) toast.error('Chỉ được chọn tối đa 3 ảnh.');
+      return combined.slice(0, 3);
+    });
+  };
+
   const submitReturnRequest = async () => {
-    if (!returningOrder) return;
-    if (returnReason.trim().length < 5) {
-      toast.error('Vui lòng mô tả lỗi hoặc lý do hoàn hàng ít nhất 5 ký tự');
+    if (!returningOrder || afterSalesOrderId !== null) return;
+    if (!returnReasonCode) {
+      toast.error('Vui lòng chọn lý do hoàn hàng.');
+      return;
+    }
+    if (returnReasonCode === 'other' && returnDetail.trim().length < 5) {
+      toast.error('Vui lòng mô tả lý do khác ít nhất 5 ký tự.');
       return;
     }
     setAfterSalesOrderId(returningOrder.id);
-    const result = await customerOrderApi.requestReturn(returningOrder.id, returnReason.trim());
-    setAfterSalesOrderId(null);
-    if (!result.success) {
-      toast.error(result.error || 'Không thể gửi yêu cầu hoàn hàng');
-      return;
+    try {
+      const result = await customerOrderApi.requestReturn(
+        returningOrder.id, returnReasonCode, returnDetail.trim(), returnImages,
+      );
+      if (!result.success) {
+        toast.error(result.error || 'Không thể gửi yêu cầu hoàn hàng');
+        return;
+      }
+      toast.success(result.data?.message || 'Đã gửi yêu cầu hoàn hàng');
+      setReturningOrder(null);
+      setReturnReasonCode('');
+      setReturnDetail('');
+      setReturnImages([]);
+      await loadOrders();
+    } finally {
+      setAfterSalesOrderId(null);
     }
-    toast.success(result.data?.message || 'Đã gửi yêu cầu hoàn hàng');
-    setReturningOrder(null);
-    setReturnReason('');
-    await loadOrders();
   };
 
   const handleReorder = async (orderId: number) => {
@@ -604,10 +671,40 @@ export default function OrderTracking() {
           <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 520 }}>
             <div className="modal-header"><h3>Yêu cầu hoàn hàng</h3><button className="modal-close" onClick={() => setReturningOrder(null)}>×</button></div>
             <div className="modal-body">
-              <p style={{ margin: '0 0 12px', color: '#475569', fontSize: 14 }}>Bạn có thể gửi yêu cầu trong 7 ngày kể từ lúc xác nhận đã nhận hàng. Hãy mô tả lỗi sản phẩm hoặc lý do cần hoàn.</p>
-              {returningOrder.returnDeadline && <p style={{ margin: '0 0 12px', color: '#92400e', fontSize: 13 }}>Hạn yêu cầu: <strong>{formatDate(returningOrder.returnDeadline)}</strong></p>}
-              <textarea value={returnReason} onChange={(e) => setReturnReason(e.target.value)} maxLength={500} rows={5} placeholder="Ví dụ: sản phẩm lỗi đường may, rách, sai sản phẩm..." style={{ width: '100%', boxSizing: 'border-box', border: '1px solid #d1d5db', borderRadius: 8, padding: 12, resize: 'vertical', font: 'inherit' }} />
-              <div style={{ marginTop: 8, color: '#64748b', fontSize: 12 }}>Gửi yêu cầu không tự động hoàn tiền hoặc nhập lại kho. KaitoKid sẽ kiểm tra trước khi xử lý.</div>
+              <p className="return-form-note">Bạn có thể yêu cầu hoàn hàng trong {returningOrder.returnWindowDays ?? 15} ngày từ khi xác nhận nhận hàng. Gửi yêu cầu không tự động hoàn tiền.</p>
+              {returningOrder.returnDeadline && <p className="return-form-note">Hạn yêu cầu: <strong>{formatDate(returningOrder.returnDeadline)}</strong></p>}
+              <label className="return-form-label" htmlFor="return-reason-select">Lý do hoàn hàng *</label>
+              <select id="return-reason-select" className="return-form-field"
+                value={returnReasonCode} onChange={(e) => setReturnReasonCode(e.target.value)}>
+                <option value="">Chọn lý do hoàn hàng</option>
+                {RETURN_REASONS.map((item) => <option value={item.code} key={item.code}>{item.label}</option>)}
+              </select>
+              {returnReasonCode && (
+                <>
+                  <label className="return-form-label" htmlFor="return-reason-detail">
+                    {returnReasonCode === 'other' ? 'Mô tả lý do khác *' : 'Mô tả thêm (không bắt buộc)'}
+                  </label>
+                  <textarea id="return-reason-detail" className="return-form-field"
+                    value={returnDetail} onChange={(e) => setReturnDetail(e.target.value)}
+                    maxLength={380} rows={4} placeholder="Mô tả tình trạng sản phẩm, vị trí lỗi..." />
+                  <div className="return-form-note">{returnDetail.length}/380</div>
+                </>
+              )}
+              <label className="return-form-label" htmlFor="return-evidence-upload">Ảnh sản phẩm / bằng chứng (tối đa 3 ảnh)</label>
+              <input type="file" id="return-evidence-upload" accept="image/jpeg,image/png,image/webp"
+                multiple disabled={returnImages.length >= 3 || afterSalesOrderId !== null}
+                onChange={(e) => { changeReturnImages(e.target.files); e.target.value = ''; }}
+                className="return-form-field" />
+              <div className="return-evidence-previews">
+                {returnPreviews.map((preview, index) => (
+                  <div key={preview} className="return-evidence-preview">
+                    <img alt={'Bằng chứng sản phẩm ' + (index + 1)} src={preview} />
+                    <button type="button" aria-label={'Xóa ảnh số ' + (index + 1)}
+                      onClick={() => setReturnImages((items) => items.filter((_, position) => position !== index))}>×</button>
+                  </div>
+                ))}
+              </div>
+              <div className="return-form-note">JPEG, PNG, WebP · tối đa 5MB mỗi ảnh. Admin sẽ xem ảnh khi duyệt.</div>
               <div style={{ marginTop: 18, display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
                 <button className="btn-view-order" onClick={() => setReturningOrder(null)}>Đóng</button>
                 <button className="btn-view-order" style={{ background: '#f59e0b', color: '#fff' }} disabled={afterSalesOrderId === returningOrder.id} onClick={() => void submitReturnRequest()}>

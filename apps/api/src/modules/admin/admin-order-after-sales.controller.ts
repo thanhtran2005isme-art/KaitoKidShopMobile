@@ -24,6 +24,31 @@ export class AdminOrderAfterSalesController {
     return this.afterSales.listCases();
   }
 
+  @Get("return-providers")
+  providers(@CurrentUser() user: AuthenticatedUser) {
+    assertStaffPermission(user, "orders.view");
+    return this.afterSales.providersForReturn();
+  }
+
+  @Post(":id/return-shipment")
+  dispatchReturn(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param("id") rawId: string,
+    @Body() body: JsonRecord,
+  ): Promise<unknown> {
+    assertStaffPermission(user, "orders.update_status");
+    return this.afterSales.dispatchReturn(user, intPath(rawId), body.provider);
+  }
+
+  @Post(":id/return-shipment/sync")
+  syncReturn(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param("id") rawId: string,
+  ): Promise<unknown> {
+    assertStaffPermission(user, "orders.update_status");
+    return this.afterSales.syncReturn(intPath(rawId));
+  }
+
   @Get(":id")
   one(
     @CurrentUser() user: AuthenticatedUser,

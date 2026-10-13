@@ -4,6 +4,7 @@ import { toNumber } from "../../common/db-value.js";
 import type { SqlClient } from "../../common/sql-client.js";
 import { PrismaService } from "../../database/prisma.service.js";
 import { WalletService } from "../wallet/wallet.service.js";
+import { ReturnShipmentService } from "./return-shipment.service.js";
 import { insertRow } from "./admin-utils.js";
 
 const RETURN_MARKERS = [
@@ -19,6 +20,9 @@ const REFUND_MARKERS = [
   "refund_wallet_credited",
 ] as const;
 const CASE_MARKERS = [
+  "return_evidence",
+  "return_shipping_placed",
+  "return_shipping_delivered",
   "delivery_disputed",
   "received_by_customer",
   ...RETURN_MARKERS,
@@ -112,7 +116,20 @@ export class AdminOrderAfterSalesService {
   constructor(
     private readonly db: PrismaService,
     private readonly wallet: WalletService,
+    private readonly returnShipments: ReturnShipmentService,
   ) {}
+
+  providersForReturn() { return this.returnShipments.providers(); }
+
+  async dispatchReturn(user: AuthenticatedUser, orderId: number, provider: unknown) {
+    await this.returnShipments.dispatch(orderId, provider, staffName(user));
+    return this.snapshot(orderId);
+  }
+
+  async syncReturn(orderId: number) {
+    await this.returnShipments.sync(orderId);
+    return this.snapshot(orderId);
+  }
 
   async listCases() {
     const rows = await this.db.$queryRawUnsafe<Array<{ orderId: unknown }>>(
@@ -145,7 +162,10 @@ export class AdminOrderAfterSalesService {
     const order = orders[0];
     if (!order) throw new NotFoundException("Đơn hàng không tồn tại.");
 
-    const history = await this.caseHistory(this.db, orderId);
+    const [history, returnShipment] = await Promise.all([
+      this.caseHistory(this.db, orderId),
+      this.returnShipments.get(orderId),
+    ]);
     const latestReturn = latestOf(history, RETURN_MARKERS);
     const latestRefund = latestOf(history, REFUND_MARKERS);
     const latestDelivery = latestOf(history, ["delivery_disputed", "received_by_customer"]);
@@ -167,8 +187,10 @@ export class AdminOrderAfterSalesService {
       paidAt: order.paidAt,
       total: toNumber(order.total),
       deliveryIssueOpen,
+      returnShipment,
       returnStatus,
       returnReason,
+      returnEvidence: history.filter((row) => row.status === "return_evidence" && row.description?.startsWith("/uploads/returns/")).map((row) => row.description as string).slice(0, 3),
       decisionNote:
         latestReturn && ["return_approved", "return_rejected"].includes(latestReturn.status)
           ? latestReturn.description
@@ -193,7 +215,9 @@ export class AdminOrderAfterSalesService {
       canApproveReturn: returnStatus === "requested",
       canRejectReturn: returnStatus === "requested",
       canReceiveReturn:
-        returnStatus === "approved" && normalized(order.orderStatus) !== "returned",
+        returnStatus === "approved" &&
+        normalized(order.orderStatus) === "completed" &&
+        returnShipment?.status === "delivered" && Boolean(returnShipment.externalId),
       // Chỉ dữ liệu legacy refund_pending mới còn nút hoàn thủ công.
       canMarkRefundCompleted:
         normalized(order.orderStatus) === "returned" && refundStatus === "pending",
@@ -267,6 +291,16 @@ export class AdminOrderAfterSalesService {
       }
       if (normalized(order.orderStatus) !== "completed") {
         throw new BadRequestException("Chỉ đơn completed đã duyệt hoàn mới được nhận hàng trả về.");
+      }
+      // Backend gate: admin cannot bypass carrier delivery by calling /receive directly.
+      const deliveredShipment = await tx.$queryRawUnsafe<Array<{ externalId: string }>>(
+        `SELECT MaVanDon AS externalId FROM VanDonHoanHang
+         WHERE DonHangId = ? AND TrangThai = 'delivered' AND MaVanDon IS NOT NULL
+         LIMIT 1 FOR UPDATE`,
+        orderId,
+      );
+      if (!deliveredShipment[0]?.externalId) {
+        throw new BadRequestException("Lalamove chưa xác nhận giao hàng hoàn về shop; không thể nhập kho hoặc hoàn tiền.");
       }
 
       const items = await tx.$queryRawUnsafe<OrderItemRow[]>(

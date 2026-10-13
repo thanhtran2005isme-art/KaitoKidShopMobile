@@ -1,0 +1,16 @@
+
+/* Return request: compact, accessible fields shared with existing order modal. */
+.return-form-label { display: block; margin: 14px 0 6px; color: #111827; font-size: 13px; font-weight: 700; }
+.return-form-field { display: block; width: 100%; min-height: 44px; box-sizing: border-box; border: 1px solid #cbd5e1; border-radius: 10px; background: #fff; color: #111827; padding: 10px 12px; font: inherit; }
+.return-form-field:focus-visible { outline: 2px solid #111827; outline-offset: 2px; }
+textarea.return-form-field { resize: vertical; min-height: 96px; }
+input.return-form-field[type="file"] { padding: 9px; }
+.return-form-note { margin: 7px 0; color: #475569; font-size: 12px; line-height: 1.5; }
+.return-evidence-previews { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; }
+.return-evidence-preview { width: 92px; height: 92px; position: relative; }
+.return-evidence-preview img { width: 92px; height: 92px; border-radius: 10px; object-fit: cover; border: 1px solid #e2e8f0; }
+.return-evidence-preview button { position: absolute; right: 2px; top: 2px; width: 30px; height: 30px; border: 0; border-radius: 50%; background: #111827; color: white; cursor: pointer; font-size: 18px; }
+.return-evidence-preview button:focus-visible { outline: 2px solid #111827; outline-offset: 2px; }
+.return-evidence-saved { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+.return-evidence-saved a { display: block; width: 72px; height: 72px; }
+.return-evidence-saved img { width: 72px; height: 72px; object-fit: cover; border-radius: 8px; border: 1px solid #cbd5e1; }

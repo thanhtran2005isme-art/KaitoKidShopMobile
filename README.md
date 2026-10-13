@@ -54,10 +54,11 @@ Fresh schema nền:
 database/KaitoKid_MariaDB.sql
 ```
 
-Sau khi import fresh schema nền, chạy migration Ví KaitoKid để đạt contract DB hiện hành:
+Sau khi import fresh schema nền, áp dụng migration Ví KaitoKid và vận đơn hoàn để đạt contract DB hiện hành:
 
 ```text
 database/migrations/20261006_wallet_refund_withdrawal.sql
+database/migrations/20261013_return_shipment_lifecycle.sql
 ```
 
 Database đã tồn tại cũng chạy migration trên theo cách in-place; không rebuild dữ liệu. Các migration khác nằm trong:
@@ -66,7 +67,7 @@ Database đã tồn tại cũng chạy migration trên theo cách in-place; khô
 database/migrations/
 ```
 
-Database development hiện dùng tên `kaitokid`; health/audit hiện kỳ vọng **55 bảng**. Ba bảng bổ sung của Ví KaitoKid là `ViDienTu`, `GiaoDichVi`, `YeuCauRutTien`.
+Database development hiện dùng tên `kaitokid`; health/audit hiện kỳ vọng **56 bảng** sau cả hai migration (Ví + vận đơn hoàn). Bảng vận đơn hoàn mới: `VanDonHoanHang` (migration `20261013_return_shipment_lifecycle.sql`). Ba bảng bổ sung của Ví KaitoKid là `ViDienTu`, `GiaoDichVi`, `YeuCauRutTien`.
 
 Không dùng `prisma migrate reset`, `prisma migrate dev` hoặc `prisma db push` trên database đang có dữ liệu. Khi cần đồng bộ Prisma với schema hiện hữu, dùng:
 

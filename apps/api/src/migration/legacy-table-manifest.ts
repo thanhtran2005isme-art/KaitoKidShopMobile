@@ -1,7 +1,7 @@
 /**
  * Contract bảng MariaDB hiện hành của KaitoKid.
  *
- * 52 bảng nền từ database/KaitoKid_MariaDB.sql + 3 bảng Ví KaitoKid được
+ * 52 bảng nền + 3 bảng Ví KaitoKid + 1 bảng vận đơn hoàn được
  * bổ sung bởi migration 20261006_wallet_refund_withdrawal.sql.
  * Đây là contract bảo toàn dữ liệu khi Node API khởi động/audit database.
  */
@@ -18,6 +18,7 @@ export const LEGACY_TABLES = [
   "CauHoiSanPham", "PhienXemSanPham", "GioiThieu", "LichSuTrangThaiVanChuyen",
   "VaiTro", "QuyenHan", "VaiTro_QuyenHan", "NhanVien", "LichSuDangNhapNV",
   "ViDienTu", "GiaoDichVi", "YeuCauRutTien",
+  "VanDonHoanHang",
 ] as const;
 
 export const LEGACY_TABLE_COUNT = LEGACY_TABLES.length;

@@ -27,7 +27,7 @@ Kiểm tra table count:
 "C:\xampp\mysql\bin\mysql.exe" -u root -e "SELECT COUNT(*) AS table_count FROM information_schema.tables WHERE table_schema='kaitokid' AND table_type='BASE TABLE';"
 ```
 
-Contract hiện tại kỳ vọng 52 bảng sau registration-email-verification migration.
+Contract hiện tại kỳ vọng 56 bảng sau wallet và return-shipment migrations.
 
 ## Fresh database / migration path
 
@@ -51,7 +51,7 @@ Ví dụ registration verification:
 
 Không chạy `prisma migrate reset`, `prisma migrate dev` hoặc `prisma db push` trên database đang có dữ liệu.
 
-## `/health` không báo 52/52
+## `/health` không báo 56/56
 
 Chạy:
 
@@ -258,7 +258,7 @@ Các key `bankEnabled`, `enableBankTransfer`, `bankAccounts` hoặc VietQR legac
 
 ## Ví KaitoKid không xuất hiện / API báo thiếu bảng
 
-Kiểm tra `/health` trước. Nếu chưa 55/55, chạy wallet migration:
+Kiểm tra `/health` trước. Nếu còn 52/55 bảng, kiểm tra và chạy wallet migration:
 
 ```bat
 "C:\xampp\mysql\bin\mysql.exe" -u root kaitokid < database\migrations\20261006_wallet_refund_withdrawal.sql
@@ -374,3 +374,34 @@ Triệu chứng: `GET /api/wallet`, Home, Cart hoặc Checkout đôi lúc báo h
 - Mobile tự thử lại **tối đa 1 lần** khi lỗi transport trên các GET đọc dữ liệu đã cho phép (catalog, cart, ví, ...). Không retry POST/PUT/DELETE hoặc `GET /api/payment/instructions` vì có thể gây tác dụng phụ ở nhà cung cấp thanh toán.
 - Không kết luận thanh toán thất bại chỉ vì Mobile timeout: kiểm tra danh sách đơn/checkout status từ backend trước khi bấm Tạo đơn lần nữa.
 - HTTP 401, 400, 500 là phản hồi có thật từ server và không bị client tự retry. Không sửa bằng cách đặt balance hay order giả vào localStorage.
+
+
+## Admin không thấy vận đơn hoàn hoặc nút nhận hàng hoàn
+
+- Chạy migration `database/migrations/20261013_return_shipment_lifecycle.sql` (create-only), xác nhận `GET /health` báo 56/56.
+- Mở Admin → Đơn hàng → Chi tiết → Đối soát giao hàng & hoàn trả. Sau khi duyệt case, chọn hãng Lalamove đang enabled và bấm Đặt vận đơn hoàn.
+- Đảm bảo Admin Shipping có địa chỉ + số điện thoại kho, Lalamove enabled và backend có `LALAMOVE_API_KEY`/`LALAMOVE_API_SECRET`.
+- `GHN/GHTK` chưa hỗ trợ Place Order và tracking hoàn nên chưa được chọn.
+- Nếu `placing/unknown/failed`, không bấm đặt lại liên tục: đối soát trước để tránh hai vận đơn thật.
+- Khi mã hoàn đã có, bấm Kiểm tra trạng thái từ Lalamove. Chỉ `COMPLETED` được backend xác minh mới mở nút nhận/kiểm hàng.
+- API `/receive` từ chối ngay cả khi gọi trực tiếp nếu chưa có bản ghi `VanDonHoanHang` đã `delivered`; không sửa DB để bypass.
+- Case đã được hoàn ví **trước** migration là lịch sử; không tạo vận đơn hoặc hoàn tiền lại.
+
+
+## Gửi yêu cầu hoàn hàng kèm ảnh bị lỗi
+
+- Kiểm tra backend port 5300, JWT customer, đơn đã được khách xác nhận nhận trong 15 ngày và chưa có case hoàn được xử lý.
+- Chọn lý do từ dropdown, `Khác` cần mô tả ≥5 ký tự; ảnh hỗ trợ JPEG/PNG/WebP tối đa 3 ảnh, mỗi ảnh ≤5MB. File giả ảnh không được backend chấp nhận.
+- API POST `/api/orders/:id/return-request` nhận multipart FormData `reasonCode`, `detail`, `images` (không tự set multipart boundary thủ công), timeout client 45s.
+- Backend lưu file `/uploads/returns/` theo UUID và event `return_evidence`. Admin thấy ảnh tại Đơn hàng → Chi tiết → Đối soát giao hàng & hoàn trả. Không dùng ảnh làm xác nhận giao hàng hoàn hoặc chi tiền.
+- Lỗi upload/transaction sẽ dọn ảnh đã tải lên; khi user gửi lặp, trạng thái không tạo case mới hoặc duplicate ảnh; retry thủ công sau khi xem lại trạng thái đơn.
+
+
+## Lalamove báo Completed nhưng Admin vẫn hiện Đang đưa hàng về shop
+
+- Kiểm tra đúng mã **vận đơn hoàn**, tách biệt với vận đơn giao đi. Mã phải bằng `VanDonHoanHang.MaVanDon` cho đơn đang xem.
+- Với code mới, khi mở màn hậu mãi trạng thái `placed/in_transit`, Web tự gọi POST `/api/admin/order-after-sales/:id/return-shipment/sync` rồi lặp mỗi 20 giây khi tab đang hoạt động; có thể bấm **Kiểm tra trạng thái từ Lalamove** để yêu cầu ngay. Reload chỉ có tác dụng gián tiếp qua poll lúc mount, không phải bằng chứng server đã đồng bộ.
+- Kiểm tra DevTools Network: POST trả 200 với `returnShipment.status=delivered` khi API hãng trả `data.status=COMPLETED` và đúng `orderId`. Xem `lastCheckedAt`; 401/403 kiểm tra phiên và `orders.update_status`, 5xx xem log NestJS + credentials Lalamove/Sandbox.
+- Nếu share link Completed nhưng sync vẫn `in_transit`, so đối chiếu response GET trực tiếp từ hãng bằng credential backend (không log API secret). Không chỉnh thẳng trạng thái DB, không chạy receive/refund thủ công.
+- Webhook `/api/shipping/lalamove/webhook` hỗ trợ vận đơn chiều hoàn sau khi xác minh HMAC và truy vấn trạng thái bằng provider GET. Localhost không nhận được webhook public nếu chưa thiết lập HTTPS tunnel/URL chính xác. Admin polling bù được khi mở màn.
+- Lalamove COMPLETED chỉ mở quyền **Admin xác nhận đã nhận và kiểm hàng hoàn**. Không tự nhập kho hoặc hoàn tiền ví.

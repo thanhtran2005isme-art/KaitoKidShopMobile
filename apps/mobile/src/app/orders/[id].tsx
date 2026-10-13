@@ -1,4 +1,5 @@
 import { Image } from 'expo-image';
+import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
@@ -25,6 +26,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useShopping } from '@/context/ShoppingContext';
 import { resolveMediaUrl } from '@/services/api-client';
 import { ordersApi } from '@/services/orders.api';
+import { isSupportedUploadImage } from '@/utils/media-upload';
 import type { CustomerOrder } from '@/types/orders';
 import {
   afterSalesStatusMeta,
@@ -43,6 +45,16 @@ type OrderAction =
   | 'return-request';
 
 type DeliveryDecision = 'confirm-received' | 'report-not-received';
+
+const RETURN_REASONS = [
+  { code: 'defective', label: 'Sản phẩm bị lỗi sản xuất, đường may' },
+  { code: 'damaged', label: 'Sản phẩm bị rách, hỏng khi nhận' },
+  { code: 'wrong_item', label: 'Shop giao sai sản phẩm' },
+  { code: 'wrong_variant', label: 'Sai kích cỡ hoặc màu sắc' },
+  { code: 'not_as_described', label: 'Sản phẩm khác mô tả hoặc hình ảnh' },
+  { code: 'missing_items', label: 'Thiếu sản phẩm hoặc phụ kiện' },
+  { code: 'other', label: 'Khác' },
+] as const;
 
 const LALAMOVE_POLL_MS = 10_000;
 const LALAMOVE_TERMINAL_SHIPPING_STATUSES = new Set([
@@ -84,7 +96,10 @@ export default function OrderDetailScreen() {
   const [actionNotice, setActionNotice] = useState<string | null>(null);
   const deliverySubmissionLock = useRef(false);
   const [showReturnForm, setShowReturnForm] = useState(false);
-  const [returnReason, setReturnReason] = useState('');
+  const [returnReasonCode, setReturnReasonCode] = useState('');
+  const [returnReasonOptionsOpen, setReturnReasonOptionsOpen] = useState(false);
+  const [returnDetail, setReturnDetail] = useState('');
+  const [returnImages, setReturnImages] = useState<ImagePicker.ImagePickerAsset[]>([]);
   const [error, setError] = useState<string | null>(null);
   const livePollInFlight = useRef(false);
 
@@ -244,23 +259,56 @@ export default function OrderDetailScreen() {
     }
   };
 
+  const pickReturnImages = async () => {
+    if (actionBusy || returnImages.length >= 3) return;
+    try {
+      const picked = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsMultipleSelection: true,
+        selectionLimit: 3 - returnImages.length,
+        quality: 0.8,
+      });
+      if (picked.canceled) return;
+      if (picked.assets.some((asset) => asset.fileSize && asset.fileSize > 5 * 1024 * 1024)) {
+        setError('Mỗi ảnh bằng chứng phải không quá 5MB.');
+        return;
+      }
+      if (picked.assets.some((asset) => !isSupportedUploadImage(asset))) {
+        setError('Chỉ hỗ trợ ảnh JPEG, PNG hoặc WebP.');
+        return;
+      }
+      setReturnImages((current) => {
+        const byUri = new Map(current.map((image) => [image.uri, image]));
+        picked.assets.forEach((image) => byUri.set(image.uri, image));
+        return Array.from(byUri.values()).slice(0, 3);
+      });
+      setError(null);
+    } catch (pickerError) {
+      setError(messageFrom(pickerError, 'Không thể mở thư viện ảnh.'));
+    }
+  };
+
   const submitReturnRequest = async () => {
     if (!token || !order || !order.canRequestReturn || actionBusy) return;
-
-    const reason = returnReason.trim();
-    if (reason.length < 5) {
-      setError('Vui lòng mô tả lỗi hoặc lý do hoàn hàng ít nhất 5 ký tự.');
+    if (!returnReasonCode) {
+      setError('Vui lòng chọn lý do hoàn hàng.');
       return;
     }
-
+    const detail = returnDetail.trim();
+    if (returnReasonCode === 'other' && detail.length < 5) {
+      setError('Vui lòng mô tả lý do khác ít nhất 5 ký tự.');
+      return;
+    }
     setActionBusy('return-request');
     setError(null);
     try {
-      const result = await ordersApi.requestReturn(token, order.id, reason);
-      setReturnReason('');
+      const result = await ordersApi.requestReturn(token, order.id, returnReasonCode, detail, returnImages);
+      setReturnReasonCode('');
+      setReturnDetail('');
+      setReturnImages([]);
       setShowReturnForm(false);
+      setActionNotice(result.message);
       await loadOrder('refresh');
-      Alert.alert('Đã gửi yêu cầu hoàn hàng', result.message);
     } catch (actionError) {
       setError(messageFrom(actionError, 'Không thể gửi yêu cầu hoàn hàng.'));
     } finally {
@@ -543,6 +591,14 @@ export default function OrderDetailScreen() {
                 </View>
               ) : null}
 
+              {order.returnEvidence?.length ? (
+                <View style={styles.returnImageRow}>
+                  {order.returnEvidence.map((url) => (
+                    <Image key={url} accessibilityLabel="Ảnh sản phẩm khách gửi khi hoàn hàng" source={resolveMediaUrl(url)} style={styles.returnImage} />
+                  ))}
+                </View>
+              ) : null}
+
               {afterSalesMeta ? (
                 <View
                   style={[
@@ -611,28 +667,89 @@ export default function OrderDetailScreen() {
                       actionBusy !== null && styles.disabled,
                     ]}>
                     <Text style={styles.secondaryButtonText}>
-                      {showReturnForm ? 'Đóng yêu cầu hoàn hàng' : 'Yêu cầu hoàn hàng trong 7 ngày'}
+                      {showReturnForm ? 'Đóng yêu cầu hoàn hàng' : 'Yêu cầu hoàn hàng'}
                     </Text>
                   </Pressable>
 
                   {showReturnForm ? (
                     <View style={styles.returnForm}>
                       <Text style={styles.returnLabel}>Lý do hoàn hàng *</Text>
-                      <TextInput
-                        accessibilityLabel="Lý do hoàn hàng"
-                        maxLength={500}
-                        multiline
-                        onChangeText={(value) => {
-                          setReturnReason(value);
-                          if (error) setError(null);
-                        }}
-                        placeholder="Ví dụ: sản phẩm lỗi đường may, sai hàng, hư hỏng khi nhận..."
-                        placeholderTextColor="#9CA3AF"
-                        style={styles.returnInput}
-                        textAlignVertical="top"
-                        value={returnReason}
-                      />
-                      <Text style={styles.returnCounter}>{returnReason.length}/500</Text>
+                      <Pressable
+                        accessibilityLabel="Chọn lý do hoàn hàng"
+                        accessibilityRole="button"
+                        accessibilityState={{ expanded: returnReasonOptionsOpen }}
+                        disabled={actionBusy !== null}
+                        onPress={() => setReturnReasonOptionsOpen((current) => !current)}
+                        style={styles.returnSelect}>
+                        <Text style={returnReasonCode ? styles.returnSelected : styles.returnPlaceholder}>
+                          {RETURN_REASONS.find((item) => item.code === returnReasonCode)?.label ?? 'Chọn lý do'}
+                        </Text>
+                        <AppIcon name="chevronDown" size={18} color={BRAND_COLORS.muted} />
+                      </Pressable>
+                      {returnReasonOptionsOpen ? (
+                        <View style={styles.returnOptions}>
+                          {RETURN_REASONS.map((item) => (
+                            <Pressable
+                              key={item.code}
+                              accessibilityRole="button"
+                              accessibilityState={{ selected: returnReasonCode === item.code }}
+                              onPress={() => {
+                                setReturnReasonCode(item.code);
+                                setReturnReasonOptionsOpen(false);
+                                setError(null);
+                              }}
+                              style={styles.returnOption}>
+                              <Text style={styles.returnSelected}>{item.label}</Text>
+                            </Pressable>
+                          ))}
+                        </View>
+                      ) : null}
+                      {returnReasonCode ? (
+                        <>
+                          <Text style={styles.returnLabel}>
+                            {returnReasonCode === 'other' ? 'Mô tả lý do khác *' : 'Mô tả thêm (không bắt buộc)'}
+                          </Text>
+                          <TextInput
+                            accessibilityLabel="Mô tả thêm lý do hoàn hàng"
+                            maxLength={380}
+                            multiline
+                            onChangeText={(value) => { setReturnDetail(value); if (error) setError(null); }}
+                            placeholder="Mô tả tình trạng sản phẩm, vị trí lỗi..."
+                            placeholderTextColor="#9CA3AF"
+                            style={styles.returnInput}
+                            textAlignVertical="top"
+                            value={returnDetail}
+                          />
+                          <Text style={styles.returnCounter}>{returnDetail.length}/380</Text>
+                        </>
+                      ) : null}
+                      <Text style={styles.returnLabel}>Ảnh sản phẩm / bằng chứng (tối đa 3 ảnh)</Text>
+                      <View style={styles.returnImageRow}>
+                        {returnImages.map((asset) => (
+                          <View key={asset.uri} style={styles.returnImageWrap}>
+                            <Image source={{ uri: asset.uri }} style={styles.returnImage} />
+                            <Pressable
+                              accessibilityLabel="Xóa ảnh đã chọn"
+                              accessibilityRole="button"
+                              onPress={() => setReturnImages((current) => current.filter((item) => item.uri !== asset.uri))}
+                              style={styles.returnImageRemove}>
+                              <AppIcon name="close" size={14} color="#FFFFFF" />
+                            </Pressable>
+                          </View>
+                        ))}
+                        {returnImages.length < 3 ? (
+                          <Pressable
+                            accessibilityRole="button"
+                            accessibilityLabel="Thêm ảnh sản phẩm"
+                            disabled={actionBusy !== null}
+                            onPress={() => void pickReturnImages()}
+                            style={styles.returnAddPhoto}>
+                            <AppIcon name="image" size={22} color={BRAND_COLORS.ink} />
+                            <Text style={styles.returnImageHint}>Thêm ảnh</Text>
+                          </Pressable>
+                        ) : null}
+                      </View>
+                      <Text style={styles.returnCounter}>JPEG, PNG, WebP · tối đa 5MB/ảnh</Text>
                       <Pressable
                         accessibilityLabel="Gửi yêu cầu hoàn hàng"
                         accessibilityRole="button"
@@ -1127,6 +1244,21 @@ const styles = StyleSheet.create({
     lineHeight: 17,
     fontWeight: '900',
   },
+  returnSelect: {
+    minHeight: 48, borderWidth: 1, borderColor: BRAND_COLORS.line,
+    backgroundColor: '#FFFFFF', borderRadius: 12, paddingHorizontal: 12,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8,
+  },
+  returnSelected: { color: BRAND_COLORS.ink, fontSize: 13, fontWeight: '600', flexShrink: 1 },
+  returnPlaceholder: { color: BRAND_COLORS.muted, fontSize: 13 },
+  returnOptions: { borderWidth: 1, borderColor: BRAND_COLORS.line, borderRadius: 12, overflow: 'hidden' },
+  returnOption: { minHeight: 46, paddingHorizontal: 12, justifyContent: 'center', backgroundColor: '#FFFFFF', borderBottomWidth: StyleSheet.hairlineWidth, borderColor: BRAND_COLORS.line },
+  returnImageRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  returnImageWrap: { width: 88, height: 88, position: 'relative' },
+  returnImage: { width: 88, height: 88, borderRadius: 10 },
+  returnImageRemove: { position: 'absolute', top: 2, right: 2, backgroundColor: '#111827', borderRadius: 12, width: 28, height: 28, alignItems: 'center', justifyContent: 'center' },
+  returnAddPhoto: { width: 88, minHeight: 88, borderRadius: 10, borderWidth: 1, borderStyle: 'dashed', borderColor: BRAND_COLORS.muted, backgroundColor: '#F9FAFB', alignItems: 'center', justifyContent: 'center', gap: 4 },
+  returnImageHint: { color: BRAND_COLORS.ink, fontSize: 11 },
   returnInput: {
     minHeight: 110,
     borderRadius: 14,

@@ -1,14 +1,33 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
 import AdminIcon from '../components/admin/AdminIcon';
 import { orderApi } from '../services/api/orderApi';
-import type { AdminAfterSalesCase } from '../services/api/orderApi';
+import type { AdminAfterSalesCase, AdminReturnCarrier } from '../services/api/orderApi';
 import { formatCurrency, formatDate } from '../utils/format';
 import '../styles/admin/admin-orders-after-sales.css';
 
 interface Props {
   orderId: number;
   onChanged?: () => Promise<void> | void;
+}
+
+function returnShipmentLabel(status: string) {
+  switch (status) {
+    case 'placing': return 'Đang đặt vận đơn';
+    case 'unknown': return 'Chưa rõ kết quả đặt vận đơn — cần đối soát';
+    case 'failed': return 'Vận đơn thất bại — cần xử lý';
+    case 'placed': return 'Đã đặt vận đơn — chờ tài xế';
+    case 'in_transit': return 'Đang đưa hàng về shop';
+    case 'delivered': return 'Lalamove đã xác nhận giao hoàn thành công';
+    default: return status;
+  }
+}
+
+function evidenceUrl(path: string) {
+  const base = ((import.meta.env.VITE_NODE_API_URL as string | undefined)
+    || (import.meta.env.VITE_API_BASE_URL as string | undefined)
+    || 'http://localhost:5300').replace(/\/+$/, '');
+  return base + path;
 }
 
 function returnLabel(status: AdminAfterSalesCase['returnStatus']) {
@@ -33,6 +52,16 @@ export default function AdminAfterSalesPanel({ orderId, onChanged }: Props) {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
   const [decisionNote, setDecisionNote] = useState('');
+  const [carriers, setCarriers] = useState<AdminReturnCarrier[]>([]);
+  const [provider, setProvider] = useState('lalamove');
+  const [carrierError, setCarrierError] = useState('');
+  const [syncError, setSyncError] = useState('');
+  const [carrierChecking, setCarrierChecking] = useState(false);
+  const syncInFlight = useRef(false);
+  const busyRef = useRef(busy);
+  const onChangedRef = useRef(onChanged);
+  busyRef.current = busy;
+  onChangedRef.current = onChanged;
   const [inspectionNote, setInspectionNote] = useState('');
   const [disposition, setDisposition] = useState<'restock' | 'quarantine'>('quarantine');
   const [refundReference, setRefundReference] = useState('');
@@ -52,7 +81,61 @@ export default function AdminAfterSalesPanel({ orderId, onChanged }: Props) {
 
   useEffect(() => {
     void load();
+    void orderApi.getReturnCarriers()
+      .then((items) => { setCarriers(items); setCarrierError(''); })
+      .catch(() => { setCarriers([]); setCarrierError('Không tải được hãng vận chuyển hoàn.'); });
   }, [orderId]);
+
+  const currentShippingStatus = data?.returnShipment?.status;
+  const currentShippingId = data?.returnShipment?.externalId;
+
+  useEffect(() => {
+    if (!currentShippingId || !['placed', 'in_transit'].includes(currentShippingStatus || '')) return;
+
+    let disposed = false;
+    let inFlight = false;
+    const reconcile = async () => {
+      if (disposed || inFlight || syncInFlight.current ||
+          busyRef.current !== null || document.visibilityState === 'hidden') return;
+      inFlight = true;
+      syncInFlight.current = true;
+      setCarrierChecking(true);
+      try {
+        // POST intentionally performs a provider GET + persists verified status.
+        // A plain Admin refresh reads only the database and cannot replace it.
+        const updated = await orderApi.syncReturnShipment(orderId);
+        if (disposed) return;
+        setData(updated);
+        setSyncError('');
+        if (updated.returnShipment?.status === 'delivered') {
+          // Refresh order list summary after carrier completion, not on every tick.
+          void Promise.resolve(onChangedRef.current?.()).catch(() => undefined);
+        }
+      } catch (error) {
+        if (!disposed) {
+          console.error('Return shipment carrier sync failed', error);
+          setSyncError('Chưa xác minh được trạng thái mới với Lalamove. Bạn có thể thử kiểm tra lại.');
+        }
+      } finally {
+        inFlight = false;
+        syncInFlight.current = false;
+        if (!disposed) setCarrierChecking(false);
+      }
+    };
+
+    void reconcile(); // on open / after initial database snapshot
+    const intervalId = window.setInterval(() => { void reconcile(); }, 20_000);
+    const onVisible = () => { if (document.visibilityState === 'visible') void reconcile(); };
+    const onFocus = () => { void reconcile(); };
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('focus', onFocus);
+    return () => {
+      disposed = true;
+      window.clearInterval(intervalId);
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('focus', onFocus);
+    };
+  }, [orderId, currentShippingId, currentShippingStatus]);
 
   const refreshAll = async (next: AdminAfterSalesCase) => {
     setData(next);
@@ -100,6 +183,46 @@ export default function AdminAfterSalesPanel({ orderId, onChanged }: Props) {
       console.error(error);
       toast.error('Không thể ghi nhận hàng hoàn');
     } finally {
+      setBusy(null);
+    }
+  };
+
+  const dispatchShipment = async () => {
+    if (!data || busy || !carriers.find((item) => item.code === provider)?.enabled) return;
+    if (!window.confirm('Đặt vận đơn Lalamove lấy hàng tại địa chỉ của khách và giao về shop?')) return;
+    setBusy('dispatch');
+    try {
+      const next = await orderApi.dispatchReturnShipment(orderId, provider);
+      await refreshAll(next);
+      toast.success('Đã đặt vận đơn hoàn; chờ Lalamove giao hàng về shop');
+    } catch (error) {
+      console.error(error);
+      toast.error('Đặt vận đơn hoàn chưa thành công hoặc cần đối soát. Không tự đặt lại.');
+      await load();
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const syncShipment = async () => {
+    if (!data || busy || syncInFlight.current) return;
+    syncInFlight.current = true;
+    setBusy('sync');
+    setCarrierChecking(true);
+    try {
+      const next = await orderApi.syncReturnShipment(orderId);
+      await refreshAll(next);
+      setSyncError('');
+      toast.success(next.returnShipment?.status === 'delivered'
+        ? 'Lalamove đã xác nhận giao hàng hoàn thành công'
+        : 'Đã kiểm tra Lalamove; hãng chưa xác nhận hoàn tất qua API.');
+    } catch (error) {
+      console.error(error);
+      setSyncError('Không xác minh được vận đơn hoàn qua API Lalamove. Vui lòng thử lại.');
+      toast.error('Chưa xác minh được trạng thái vận đơn hoàn.');
+    } finally {
+      syncInFlight.current = false;
+      setCarrierChecking(false);
       setBusy(null);
     }
   };
@@ -165,6 +288,20 @@ export default function AdminAfterSalesPanel({ orderId, onChanged }: Props) {
         </div>
       )}
 
+      {Boolean(data.returnEvidence?.length) && (
+        <div className="after-sales-note-card">
+          <span>Ảnh sản phẩm khách gửi ({data.returnEvidence?.length})</span>
+          <div className="after-sales-evidence-grid">
+            {data.returnEvidence?.map((url, index) => (
+              <a key={url} href={evidenceUrl(url)} target="_blank" rel="noopener noreferrer"
+                 aria-label={'Xem ảnh bằng chứng số ' + (index + 1)}>
+                <img loading="lazy" src={evidenceUrl(url)} alt={'Bằng chứng hoàn hàng ' + (index + 1)} />
+              </a>
+            ))}
+          </div>
+        </div>
+      )}
+
       {(data.canApproveReturn || data.canRejectReturn) && (
         <div className="after-sales-action-card">
           <label htmlFor={`decision-note-${orderId}`}>Ghi chú duyệt / lý do từ chối</label>
@@ -186,7 +323,62 @@ export default function AdminAfterSalesPanel({ orderId, onChanged }: Props) {
         </div>
       )}
 
-      {data.canReceiveReturn && (
+      {data.returnStatus === 'approved' && !data.returnShipment && (
+          <div className="after-sales-action-card">
+            <div className="after-sales-field-label">Chọn đơn vị vận chuyển hoàn hàng</div>
+            <p className="after-sales-help">Chiều hoàn hàng: lấy tại địa chỉ khách, giao đến kho/shop. Chỉ hãng có tích hợp xác minh giao thành công mới được chọn.</p>
+            {carrierError && <p role="alert">{carrierError}</p>}
+            <select value={provider} onChange={(event) => setProvider(event.target.value)} aria-label="Đơn vị vận chuyển hoàn">
+              {carriers.map((item) => (
+                <option key={item.code} value={item.code} disabled={!item.enabled}>
+                  {item.name} {item.enabled ? '' : '— chưa hỗ trợ'}
+                </option>
+              ))}
+            </select>
+            {carriers.find((item) => item.code === provider)?.note && (
+              <p className="after-sales-help">{carriers.find((item) => item.code === provider)?.note}</p>
+            )}
+            <button type="button" className="after-sales-button primary"
+              disabled={busy !== null || !carriers.find((item) => item.code === provider)?.enabled}
+              onClick={() => void dispatchShipment()}>
+              <AdminIcon name="fa-truck" /> Đặt vận đơn hoàn
+            </button>
+          </div>
+        )}
+
+        {data.returnShipment && (
+          <div className="after-sales-action-card">
+            <div className="after-sales-field-label">Vận chuyển hàng hoàn · {data.returnShipment.provider.toUpperCase()}</div>
+            <p><strong>{returnShipmentLabel(data.returnShipment.status)}</strong></p>
+            <p className="after-sales-help">Lấy từ: {data.returnShipment.senderName} · {data.returnShipment.pickupAddress}</p>
+            <p className="after-sales-help">Giao về: {data.returnShipment.receiverName} · {data.returnShipment.dropoffAddress}</p>
+            {data.returnShipment.externalId && <p>Mã vận đơn hoàn: <strong>{data.returnShipment.externalId}</strong></p>}
+            {data.returnShipment.trackingUrl && (
+              <a href={data.returnShipment.trackingUrl} target="_blank" rel="noopener noreferrer">Theo dõi vận đơn hoàn</a>
+            )}
+            {data.returnShipment.errorMessage && <p role="alert">{data.returnShipment.errorMessage}</p>}
+            {data.returnShipment.lastCheckedAt && (
+              <p className="after-sales-help">
+                Đồng bộ hãng gần nhất: {new Date(data.returnShipment.lastCheckedAt).toLocaleString('vi-VN')}
+              </p>
+            )}
+            {['placed', 'in_transit'].includes(data.returnShipment.status) && (
+              <p className="after-sales-help">Tự động kiểm tra Lalamove mỗi 20 giây khi mở trang. Tải lại trang cũng sẽ kiểm tra lại.</p>
+            )}
+            {syncError && <p role="alert">{syncError}</p>}
+            {['placed', 'in_transit'].includes(data.returnShipment.status) && (
+              <button type="button" className="after-sales-button primary"
+                disabled={busy !== null || carrierChecking} onClick={() => void syncShipment()}>
+                <AdminIcon name="fa-rotate" /> {carrierChecking ? 'Đang kiểm tra Lalamove...' : 'Kiểm tra trạng thái từ Lalamove'}
+              </button>
+            )}
+            {data.returnShipment.status === 'delivered' && (
+              <p className="after-sales-help">Đã có xác nhận hãng. Admin phải kiểm tra hàng thực tế trước khi hoàn tiền và nhập kho.</p>
+            )}
+          </div>
+        )}
+
+        {data.canReceiveReturn && (
         <div className="after-sales-action-card">
           <div className="after-sales-field-label">Kết quả kiểm hàng thực tế</div>
           <div className="after-sales-choice-grid">
@@ -223,7 +415,7 @@ export default function AdminAfterSalesPanel({ orderId, onChanged }: Props) {
         <div className="after-sales-action-card refund">
           <div className="after-sales-field-label">Hoàn tiền thủ công</div>
           <p className="after-sales-help">
-            Hệ thống chưa có API refund gateway cho flow này. Chỉ xác nhận sau khi tiền đã được hoàn thực tế.
+            Chỉ áp dụng cho yêu cầu hoàn tiền thủ công từ dữ liệu cũ. Đơn mới hoàn vào Ví KaitoKid sau khi hãng xác nhận giao hoàn và Admin kiểm hàng.
           </p>
           <input
             maxLength={300}
@@ -240,7 +432,7 @@ export default function AdminAfterSalesPanel({ orderId, onChanged }: Props) {
       {data.history.length > 0 && (
         <div className="after-sales-timeline">
           <h5>Lịch sử hậu mãi</h5>
-          {data.history.slice().reverse().map((event) => (
+          {data.history.filter((event) => event.status !== 'return_evidence').slice().reverse().map((event) => (
             <div className="after-sales-event" key={event.id}>
               <div className="after-sales-event-dot" />
               <div>
