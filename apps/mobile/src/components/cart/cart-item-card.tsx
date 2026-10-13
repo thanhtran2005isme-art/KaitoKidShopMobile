@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { CartReservationTimer } from '@/components/cart/cart-reservation-timer';
 import { AppIcon } from '@/components/ui/app-icon';
+import { QuantityNumberInput } from '@/components/ui/quantity-number-input';
 import { BRAND_COLORS } from '@/constants/brand';
 import { resolveMediaUrl } from '@/services/api-client';
 import type { CartItem } from '@/types/shopping';
@@ -31,6 +32,8 @@ export function CartItemCard({
   const image = resolveMediaUrl(item.image);
   const canDecrease = item.quantity > 1 && !busy;
   const canIncrease = item.availableStock > 0 && !busy;
+  // availableStock là lượng CHƯA giữ, cộng phần đang giữ trong giỏ cho mức tối đa.
+  const maxQuantity = item.quantity + Math.max(0, item.availableStock);
 
   return (
     <View style={[styles.card, selected && styles.cardSelected]}>
@@ -120,7 +123,12 @@ export function CartItemCard({
                 ]}>
                 <Text style={styles.quantityButtonText}>−</Text>
               </Pressable>
-              <Text style={styles.quantity}>{item.quantity}</Text>
+              <QuantityNumberInput
+                disabled={busy}
+                max={maxQuantity}
+                onChange={onChangeQuantity}
+                value={item.quantity}
+              />
               <Pressable
                 accessibilityLabel="Tăng số lượng"
                 accessibilityRole="button"
@@ -288,14 +296,6 @@ const styles = StyleSheet.create({
     color: BRAND_COLORS.ink,
     fontSize: 18,
     lineHeight: 22,
-    fontWeight: '900',
-  },
-  quantity: {
-    minWidth: 34,
-    textAlign: 'center',
-    color: BRAND_COLORS.ink,
-    fontSize: 13,
-    lineHeight: 18,
     fontWeight: '900',
   },
   totalWrap: {

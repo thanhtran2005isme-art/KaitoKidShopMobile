@@ -4,7 +4,7 @@
 
 import apiClient, { getErrorMessage } from '../apiClient';
 import type { ApiResponse } from '../../types/api';
-import type { Product } from '../../types';
+import type { Product, ProductVariantInventory } from '../../types';
 
 // Backend DTOs
 export interface ProductDTO {
@@ -16,6 +16,7 @@ export interface ProductDTO {
   price: number;
   oldPrice: number | null;
   stock: number;
+  availableStock?: number;
   status: string;
   image: string;
   shortDescription?: string;
@@ -39,6 +40,7 @@ export interface ProductDetailDTO extends ProductDTO {
   collection?: string;
   specs?: string;
   variants: Array<{ size: string; color: string; sku: string }>;
+  variantInventory?: ProductVariantInventory[];
   reviews: Array<{
     id: number;
     customerName: string;
@@ -88,6 +90,7 @@ function mapProductDTOToProduct(dto: ProductDTO): Product {
     price: dto.price,
     oldPrice: dto.oldPrice,
     stock: dto.stock,
+    availableStock: dto.availableStock,
     status: dto.status as 'active' | 'out-of-stock' | 'draft',
     image: dto.image,
     images: [dto.image],
@@ -118,6 +121,7 @@ function mapProductDetailDTOToProduct(dto: ProductDetailDTO): Product {
     price: dto.price,
     oldPrice: dto.oldPrice,
     stock: dto.stock,
+    availableStock: dto.availableStock,
     status: dto.status as 'active' | 'out-of-stock' | 'draft',
     image: dto.image,
     images: dto.images && dto.images.length > 0 ? dto.images : [dto.image],
@@ -141,6 +145,7 @@ function mapProductDetailDTOToProduct(dto: ProductDetailDTO): Product {
       price: dto.price,
       stock: 0,
     })),
+    variantInventory: dto.variantInventory || [],
     specs: dto.specs,
     createdAt: dto.createdAt,
   };

@@ -152,8 +152,4 @@ export const shopApi = {
     return apiRequest<PagedResult<Product>>(`/api/products?${query}`);
   },
 
-  searchProducts(search: string, page = 1, pageSize = 20) {
-    const query = `Search=${encodeURIComponent(search)}&Page=${page}&PageSize=${pageSize}`;
-    return apiRequest<PagedResult<Product>>(`/api/products?${query}`);
-  },
 };

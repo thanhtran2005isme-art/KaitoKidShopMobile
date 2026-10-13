@@ -1,6 +1,6 @@
 # AI Handoff — Current State
 
-Last updated: 2026-10-06
+Last updated: 2026-10-13 (wallet integration branch)
 
 ## Repository
 
@@ -10,8 +10,6 @@ Last updated: 2026-10-06
 - Brand: KaitoKid Shop Fashion — Nam/Nữ/Trẻ em/nhiều lứa tuổi theo D020
 - Commit Node migration đã merge vào `main`: `2cad95ed5c9f959dffa206260b3325950a6e2dee`
 - Runtime/source migration C# -> NestJS đã được project owner xác nhận PASS cho source/build, protected Auth/RBAC, commerce/admin race, payment terminal race, Socket.IO realtime, Web/Mobile/Admin smoke, soak và rollback trước khi merge PR #40.
-- Work-in-progress lớn: PR #75 `feat/admin-lalamove-carrier`, vẫn Draft/Open. Nhánh này chứa Lalamove lifecycle, customer receipt/after-sales, Mobile address parity và payment cutover sang payOS theo D025–D027.
-- Wallet/refund/withdrawal đang được phát triển trên nhánh stacked `feat/wallet-refund-withdrawal`, dựa trên PR #75. Không coi behavior này là `main` cho tới khi nhánh/PR liên quan được merge.
 
 ## Current structure
 
@@ -29,7 +27,7 @@ KaitoKidShop/
 └─ README.md
 ```
 
-Legacy ASP.NET Core `backend/` đã retire. SQL/schema assets hiện nằm trong `database/`.
+Legacy ASP.NET Core `backend/` đã retire trong retirement change. SQL/schema assets được giữ nguyên và chuyển sang `database/`.
 
 ## Runtime
 
@@ -39,105 +37,53 @@ Legacy ASP.NET Core `backend/` đã retire. SQL/schema assets hiện nằm trong
 - REST/Auth/Admin/Customer/media: same origin
 - Socket.IO path: `/chatHub`
 - MariaDB: `kaitokid`
-- Expected current table contract sau wallet migration: **55 tables**
+- Expected current base-table contract: 55 tables on wallet integration branch after applying wallet migration; main remains 52 until PR #78 merges
 - Secrets: `apps/api/.env` (gitignored)
 - Template: `apps/api/.env.example`
-- Local CORS cho phép loopback `localhost`/`127.0.0.1` dùng port dev động khi cùng scheme đã được allow; không mở rộng tùy ý sang LAN/origin khác.
-- JSON body limit: 16 MB.
-- Node là background-worker owner duy nhất; critical workers vẫn điều khiển bằng feature flags.
+- Local CORS cho phép loopback `localhost`/`127.0.0.1` dùng port dev động khi cùng scheme đã được allow; không mở rộng sang origin/LAN tùy ý.
+- JSON body limit hiện là 16 MB để admin có thể lưu cấu hình ngân hàng chứa QR base64 mà không bị HTTP 413.
 
-### payOS trên PR #75
-
-- Dùng official payOS SDK trong Node.
-- Secrets `PAYOS_CLIENT_ID`, `PAYOS_API_KEY`, `PAYOS_CHECKSUM_KEY` chỉ ở backend/deployment.
-- Webhook public: `POST /api/payment/payos/webhook`; không dùng KaitoKid JWT nhưng bắt buộc verify signature, currency, amount và order mapping.
-- Provider order code được suy ra reversible từ `MaDonHang`; không dùng `DonHang.Id` làm provider authority.
-- Payment DB compatibility code vẫn là `ATM`; client có `paymentProvider='payos'` khi payOS active.
-- `bankEnabled`, VietQR/manual bank config legacy không được trở lại làm authority cho online payment mới.
-
-### Ví KaitoKid — D028
-
-Ba bảng mới:
-
-- `ViDienTu`: snapshot số dư khả dụng/tạm giữ;
-- `GiaoDichVi`: append-only money ledger;
-- `YeuCauRutTien`: withdrawal state machine.
-
-Money invariants:
-
-- client Web/Mobile chỉ gửi `useWallet=true|false`;
-- backend tính `walletUsed = min(available, TongTien)`;
-- `DonHang.TongTien` luôn là full order total;
-- `amountDue = TongTien - walletUsed` là phần external payment/COD còn lại;
-- payOS create/reconcile/webhook chỉ dùng `amountDue`;
-- ví trả đủ thì order được paid/confirmed mà không tạo payOS payment;
-- cancel/expiry ghi `order_payment_reversal` và trả đúng phần ví đã dùng;
-- projection `walletUsed` phải tính **net ledger** (`order_payment - order_payment_reversal`), không chỉ đọc debit ban đầu;
-- refund sau return credit `DonHang.TongTien` vào ví bằng `refund_credit` đúng một lần;
-- không có UI sửa số dư thủ công.
-
-Withdrawal:
-
-- customer request: `available -= amount`, `held += amount`;
-- Admin approve: chỉ chuyển state;
-- Admin reject: release hold về available;
-- Admin complete sau khi chuyển khoản thực tế: `held -= amount` và lưu bank reference;
-- quyền riêng: `wallet.view`, `wallet.manage`.
+Node là background worker owner duy nhất; critical workers vẫn điều khiển bằng feature flags.
 
 ### Mobile
 
 - Expo/Metro: `8081`
-- API/Auth: Node `:5300`
+- API/Auth cùng dùng Node `:5300`
 - Android emulator fallback: `10.0.2.2:5300`
 - Physical device: LAN auto-detect hoặc ADB reverse `5300`
 - Google native login cần development/native build; Expo Go không chứa native Google module.
-- `ShoppingContext` phải chờ `AuthContext` restore session.
-- Partial checkout chỉ persist selected `CartItemIds`: Expo Web `localStorage`, native `expo-secure-store`; sau restore phải tải cart thật và giữ ID còn hợp lệ.
-- Không persist snapshot giá/tồn/coupon/shipping làm authority.
-- payOS screen chỉ render data backend, mở hosted checkout bằng `expo-web-browser` và poll KaitoKid backend; webhook/reconcile mới là payment authority.
-- Mobile không đọc SMS/notification ngân hàng/số dư để xác nhận paid.
-- Ví có route `account/wallet`; checkout hỗ trợ `useWallet` và bỏ qua QR khi backend trả `amountDue=0`.
-- Lựa chọn card cũ vẫn chỉ là UI/local validation; chưa có card gateway thật.
+- `ShoppingContext` phải chờ `AuthContext` restore session xong trước khi xử lý trạng thái no-token/logout.
+- Mobile Quantity: Product Detail và Cart cho chạm số lượng để nhập bàn phím số, commit khi blur/Done. Product lấy max từ tồn biến thể, Cart lấy max từ số đang giữ + số chưa giữ; backend xác thực cập nhật tồn kho.
+- Mobile Search: Home bar là lối vào `/search`; `apps/mobile/src/services/product-search.api.ts` dùng `/api/search` + `/api/search/suggestions` (Node :5300) cho gợi ý, lọc category/giá, sort và phân trang thật. Không lọc catalog cục bộ hoặc dùng dữ liệu giả.
+- Partial checkout giữ continuity qua reload bằng cách chỉ persist `CartItemIds` đã chọn: Expo Web dùng `localStorage`, native dùng `expo-secure-store`. Sau restore, Mobile tải cart thật từ backend rồi giữ các ID còn hợp lệ; logout xóa selection đã persist.
+- Không persist snapshot sản phẩm/giá/tồn kho/coupon/shipping làm source of truth ở checkout; backend vẫn authoritative theo D015 và D024.
+- Lựa chọn thẻ tín dụng/thẻ ghi nợ hiện chỉ nối tới form UI/local validation. Backend payment contract thực tế vẫn chỉ nhận các method được `PaymentConfig` bật (hiện COD/ATM); chưa được coi là card gateway thật.
 
 ### Web/Admin
 
 - React + Vite, thường `5173`
-- Customer + Staff/Admin gọi Node `:5300`
-- Staff auth dùng `adminApiClient`; không fallback legacy `:5053`.
-- Chat realtime gọi Socket.IO `/chatHub`.
-- Customer Web payment dùng owner-scoped payment instructions; polling chỉ refresh UI.
-- Customer Web có `/wallet`; Admin có `/admin/wallet` để xử lý withdrawal theo RBAC.
-- Admin bank/VietQR verification code cũ chỉ là migration surface; không được làm payment authority.
+- Customer + Staff/Admin cùng gọi Node `:5300`
+- Staff auth dùng chung `adminApiClient`; không fallback về legacy `localhost:5053`.
+- Chat realtime gọi Socket.IO Node `/chatHub`
+- Admin Khách hàng có `GET /api/admin/customers/summary` trả số liệu toàn tệp trực tiếp từ MariaDB theo `NguoiDungId`, độc lập với phân trang Web. Doanh thu chỉ tính đơn hoàn thành; lỗi API không còn bị ngụy trang thành tệp khách rỗng.
 
 ## Database
 
-Fresh schema nền:
+Fresh schema:
 
 ```text
 database/KaitoKid_MariaDB.sql
 ```
 
-Sau fresh import hoặc trên DB hiện hữu, chạy migration Ví KaitoKid:
+Migrations:
 
 ```text
-database/migrations/20261006_wallet_refund_withdrawal.sql
+database/migrations/
 ```
 
-Sau migration, `/health` phải audit **55/55** tables.
+Các migration quan trọng hiện có gồm cart reservation, discovery seed, multi-audience/media và registration email verification.
 
-Migration wallet đồng thời đồng bộ customer-facing return policy từ 7 ngày cũ sang **15 ngày từ lúc customer xác nhận nhận hàng**.
-
-Không chạy `prisma migrate reset`, `prisma migrate dev` hoặc `prisma db push` trên DB có dữ liệu.
-
-## Return / refund — D026 + D028
-
-- Carrier `delivered` không tự hoàn tất business order.
-- Customer `confirm-received` tạo authority `received_by_customer` và mốc `NgayHoanThanh`.
-- Cửa sổ gửi return request: **15 ngày** từ mốc đó.
-- Admin duyệt/từ chối request không chạm tồn kho hay tiền.
-- Chỉ khi hàng vật lý quay về và Admin chọn `restock`/`quarantine` mới chuyển order `returned`.
-- Trong cùng transaction nhận hàng hoàn, hệ thống xử lý inventory và credit toàn bộ `TongTien` vào Ví KaitoKid đúng một lần.
-- `refund_pending/refund_completed_manual` chỉ còn compatibility cho case legacy.
+Không chạy Prisma reset/dev/db push trên DB có dữ liệu.
 
 ## Main launchers
 
@@ -159,7 +105,9 @@ Backend only:
 scripts\run-backend.bat
 ```
 
-## Required validation
+## Required validation after retirement checkout
+
+Retirement PR phải được nghiệm thu lại trên máy dev trước khi merge:
 
 ```bat
 scripts\node-final-cutover-check.bat
@@ -170,45 +118,50 @@ scripts\node-concurrency-race-gate.bat
 scripts\node-realtime-runtime-gate.bat
 ```
 
-Runtime race gates hiện phải nhận `/health` **55/55** sau wallet migration.
-
-Payment payOS acceptance riêng:
-
-```text
-docs/runbooks/PAYOS_PAYMENT_E2E.md
-```
-
-Wallet/return acceptance cần kiểm tra thêm:
-
-1. refund return → wallet credit đúng một lần;
-2. wallet full/partial checkout với COD và payOS;
-3. cancel/expiry → reversal đúng một lần;
-4. withdrawal hold/approve/reject/complete dưới double-click/race;
-5. account deletion bị chặn khi còn available/held hoặc active withdrawal.
+Sau đó smoke Web customer + Admin + Mobile bằng **Node-only**. Không khởi động/khôi phục C# vì source runtime đã retire.
 
 ## Important business invariants
 
-- Cart reserve product + exact variant; available = stock - reserved.
+- Cart reserve product + variant; available = stock - reserved.
 - Partial checkout theo selected `CartItemIds`.
+- Checkout selection có thể persist qua reload, nhưng chỉ lưu ID; dữ liệu commerce authoritative vẫn lấy lại từ backend.
 - Pricing/coupon/combo/shipping/payment authoritative ở backend.
-- payOS signed webhook/reconcile là authority để set `NgayThanhToan`; browser return URL/polling UI không tự đánh dấu paid.
-- Online payment cancel/expiry provider-first trước local restore.
-- Online paid mới tạo shipment; duplicate callback không double-create shipment.
-- Payment/order cancellation/restock/wallet ledger idempotent dưới race.
+- Payment/order cancellation/restock idempotent dưới race.
 - Tracking/cancel/reorder owner-only.
-- Review exact completed order + purchased variant + customer receipt authority.
-- Delete account releases reservations và không được anonymize khi ví còn tiền/withdrawal active.
-- Pending registration + email verification trước local account.
-- Staff RBAC permissions enforced, bao gồm `wallet.view/manage`.
-- Socket.IO guest identity handshake-bound; staff chat permissions enforced.
+- Review exact completed order + purchased variant.
+- Delete account releases reservations first.
+- Pending registration + email verification before creating local account.
+- Staff RBAC permissions remain enforced.
+- Socket.IO guest identity is handshake-bound; staff chat permissions enforced.
 
 ## Resume rules for future AI/chat
 
 1. Read `AGENTS.md`.
 2. Read this file.
 3. Read `docs/ARCHITECTURE.md`, `docs/BRAND.md`, relevant decisions/troubleshooting.
-4. Nếu tiếp tục PR #75 + wallet, đọc D025, D026, D027, **D028** và runbook Lalamove/payOS trước khi sửa.
-5. Inspect current `main`, current head của PR #75 và Git history; stacked branch không phải `main` source of truth.
-6. Do not infer C# fallback from historical docs; `apps/api` là backend source of truth.
-7. One task/fix/phase = one aggregate commit by default; AI commit descriptions in Vietnamese.
-8. Thay đổi architecture/operations/business behavior phải cập nhật durable docs trong cùng task/PR.
+4. Inspect current `main` + recent Git history.
+5. Do not infer a C# fallback from old migration docs; `apps/api` is the current backend source of truth.
+6. One task/fix/phase = one aggregate commit by default; AI commit descriptions in Vietnamese.
+7. Khi một fix làm thay đổi architecture, operations hoặc durable behavior, cập nhật docs liên quan trong cùng task/PR; cosmetic-only fix không cần tạo quyết định mới.
+
+## PR #75 — Lalamove/payOS đang nghiệm thu trước merge
+
+- Branch `feat/admin-lalamove-carrier` chứa carrier lifecycle Lalamove quote/re-quote → Place Order → tracking/webhook/cancel, xác nhận khách thực nhận và hậu mãi theo D025/D026.
+- Online payment của branch dùng SDK `@payos/node`; signed public webhook `POST /api/payment/payos/webhook`, provider reconciliation và race-safe paid/expiry/cancel theo D027.
+- payOS numeric orderCode phải được ánh xạ có thể đảo ngược từ `DonHang.MaDonHang` dạng `KK-YYYYMMDD-XXXXXX`; không tái sử dụng `DonHang.Id` làm orderCode khi DB được reset/reseed.
+- Secrets PAYOS_CLIENT_ID/PAYOS_API_KEY/PAYOS_CHECKSUM_KEY chỉ trong cấu hình backend/deployment, không commit.
+- Browser return, client polling hoặc QR không có quyền đánh dấu paid. Chỉ webhook đã xác minh/reconcile từ provider được xác nhận thanh toán. Chỉ tạo vận đơn online sau paid.
+- Mobile có Expo USB/ADB launcher hardening, địa chỉ cascade tỉnh/huyện/xã, và màn payment payOS; order detail dùng Modal để xác nhận nhận/chưa nhận hàng trên Expo Web.
+- Merge gate còn yêu cầu E2E HTTPS webhook + Lalamove sandbox + paid/cancel/expiry race với DB thật: `docs/runbooks/PAYOS_PAYMENT_E2E.md`, `docs/runbooks/LALAMOVE_SANDBOX_E2E.md`.
+- Những hành vi trên chỉ thuộc nhánh PR #75 khi chưa merge. `main` vẫn là runtime source of truth.
+
+## PR #78 — Ví KaitoKid / hoàn tiền / rút tiền (đang nghiệm thu)
+
+- Stacked trên PR #75; không coi wallet, return 15 ngày hay payOS amountDue mới là chức năng của main trước khi merge.
+- MariaDB: migration `database/migrations/20261006_wallet_refund_withdrawal.sql`; contract nhánh wallet 55 base tables so với 52 trên main.
+- `ViDienTu` có available/held balance; `GiaoDichVi` là append-only idempotent ledger; `YeuCauRutTien` có workflow approve/reject/complete và RBAC.
+- Checkout: client chỉ gửi `useWallet`, backend quyết định `walletUsed=min(available,TongTien)`, `amountDue=TongTien-walletUsed`, payOS chỉ thu `amountDue`.
+- Cancel/expiry đảo phần ví đã debit đúng một lần sau khi provider xác nhận chưa paid; không hoàn tiền/stock nếu provider có thể đã paid.
+- Customer confirm-received mới bắt đầu cửa sổ return 15 ngày; chỉ credit toàn bộ order total vào ví đúng một lần khi Admin thực nhận hàng hoàn và chọn restock/quarantine. Quarantine không cộng tồn bán được.
+- Không xóa account khi còn số dư hoặc withdrawal pending/approved.
+- Chỉ nhập PR #78 sau khi PR #75 đủ live E2E và DB wallet migration + refund/withdrawal/partial payment race gates được nghiệm thu.
